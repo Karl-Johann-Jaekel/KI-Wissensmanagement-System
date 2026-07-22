@@ -1,0 +1,51 @@
+# KI-Forschungskorpus — Metadaten (committet). PLAN §2.5 / §7 Phase 3.
+#
+# Nur Themen-Queries + Seed-Paper-IDs kommen ins Repo. Die PDFs selbst werden NIE
+# committet (arXiv-Standardlizenz erlaubt keine Weiterverbreitung); sie werden von
+# scripts/fetch_corpus.py zur Laufzeit nach data/corpus/ geladen (git-ignoriert).
+#
+# Die queries dienen dem Delta-Fetch in Phase 8 (neue Papers zu diesen Themen).
+
+queries:
+  - retrieval augmented generation
+  - dense passage retrieval
+  - hybrid search reranking cross-encoder
+  - knowledge graph large language models
+  - llm agents tool use
+  - multilingual text embeddings
+
+# ~16 Seed-Papers: Klassiker + aktuelle Arbeiten zu RAG, Retrieval, Agenten,
+# Wissensgraphen, Embeddings/Reranking und Modellen.
+seed_papers:
+  - id: "1706.03762"
+    note: Attention Is All You Need
+  - id: "2005.11401"
+    note: Retrieval-Augmented Generation for Knowledge-Intensive NLP (Lewis et al.)
+  - id: "2004.04906"
+    note: Dense Passage Retrieval (DPR)
+  - id: "2004.12832"
+    note: ColBERT — efficient late-interaction retrieval
+  - id: "2007.01282"
+    note: Fusion-in-Decoder
+  - id: "2002.08909"
+    note: REALM — retrieval-augmented language model pre-training
+  - id: "2212.10496"
+    note: HyDE — precise zero-shot dense retrieval
+  - id: "2310.11511"
+    note: Self-RAG
+  - id: "2309.15217"
+    note: RAGAS — evaluation of RAG
+  - id: "2402.03216"
+    note: BGE-M3 — multilingual multi-granularity embeddings
+  - id: "2306.08302"
+    note: Unifying Large Language Models and Knowledge Graphs (survey)
+  - id: "2404.16130"
+    note: From Local to Global — GraphRAG
+  - id: "2210.03629"
+    note: ReAct — reasoning and acting with LLMs
+  - id: "2302.04761"
+    note: Toolformer
+  - id: "2307.03172"
+    note: Lost in the Middle — how LMs use long contexts
+  - id: "2310.06825"
+    note: Mistral 7B

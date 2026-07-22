@@ -12,6 +12,8 @@ dependencies = [
     "alembic>=1.13",
     "psycopg[binary]>=3.2",
     "pgvector>=0.3",
+    "pyyaml>=6.0",
+    "docling>=2.0",
 ]
 
 [project.optional-dependencies]

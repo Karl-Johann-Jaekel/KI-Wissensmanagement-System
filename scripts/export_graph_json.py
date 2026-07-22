@@ -28,10 +28,10 @@ def main(out: str = "frontend/public/graph.json") -> int:
     path = Path(out)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    p, k = data["portfolio"], data["knowledge"]
     print(
-        f"wrote {out}: "
-        f"portfolio {len(data['portfolio']['nodes'])} nodes / {len(data['portfolio']['links'])} links, "
-        f"knowledge {len(data['knowledge']['nodes'])} nodes"
+        f"wrote {out}: portfolio {len(p['nodes'])} nodes / {len(p['links'])} links, "
+        f"knowledge {len(k['nodes'])} nodes"
     )
     return 0
 

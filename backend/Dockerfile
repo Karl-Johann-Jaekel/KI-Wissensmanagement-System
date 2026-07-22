@@ -6,15 +6,27 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# System deps kept minimal; psycopg[binary] ships its own libpq.
+# System deps: curl (healthcheck) + runtime libs Docling/opencv need
+# (libGL, libxcb, ... — otherwise "libxcb.so.1: cannot open shared object file").
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
+        libgl1 \
+        libglib2.0-0 \
+        libxcb1 \
+        libsm6 \
+        libxext6 \
+        libxrender1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy source then editable-install (app/ must exist for setuptools discovery).
-# Source is also bind-mounted in compose for --reload; copy enables standalone builds.
+# Install Python deps first, keyed only on pyproject.toml so heavy wheels (torch,
+# docling) stay cached across source edits. A placeholder app/ lets the editable
+# install resolve; real source is copied (and bind-mounted in compose) afterwards.
+COPY pyproject.toml ./
+RUN mkdir -p app && touch app/__init__.py \
+    && pip install --upgrade pip \
+    && pip install -e ".[dev]"
+
 COPY . .
-RUN pip install --upgrade pip && pip install -e ".[dev]"
 
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

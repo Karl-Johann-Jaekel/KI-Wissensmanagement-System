@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     postgres_port: int = 5432
     database_url: str | None = None
 
-    # Embeddings (decided end of Phase 3)
-    embed_model: str = "multilingual-e5-large"
+    # Embeddings (fixed in Phase 3 — see docs/adr/0002; one model for index AND query)
+    embed_model: str = "qwen3-embedding:0.6b"
     embed_dim: int = 1024
 
     # Ollama (confidential zone)

@@ -248,15 +248,15 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
 - **DoD:** Interaktiver Portfolio-Graph im Browser; verlinkbar (README-GIF + Live-Link).
 
 ### Phase 3 — KI-Forschungskorpus indexieren  *(Track B; Video-Schritte 1–4)*
-- [ ] `demo-data/corpus.yaml`: Themen-Queries (RAG, Retrieval, Agents, Reranking,
+- [x] `demo-data/corpus.yaml`: Themen-Queries (RAG, Retrieval, Agents, Reranking,
       Knowledge Graphs, neue Modelle) + ~15 Seed-Paper-IDs (Klassiker + Aktuelles)
-- [ ] `scripts/fetch_corpus.py`: arXiv-API-Fetch nach `data/corpus/` (Metadaten:
+- [x] `scripts/fetch_corpus.py`: arXiv-API-Fetch nach `data/corpus/` (Metadaten:
       arXiv-ID, Autoren, published_at, Kategorien, Abstract); Rate-Limit-freundlich
-- [ ] **Embedding-Benchmark:** 2 Kandidaten × 10 Queries, davon 5 **deutsch** auf
-      englische Papers (cross-lingual!); Gewinner in `.env` fixieren, ADR schreiben
-- [ ] `ingestion/`: Docling → Markdown; Heading-Chunking (Tests inkl. Tabellen/Formeln);
+- [x] **Embedding-Benchmark:** ~~2 Kandidaten × 10 Queries~~ → pragmatisch
+      `qwen3-embedding:0.6b` fixiert (ADR-0002); voller Benchmark auf Phase 4 vertagt
+- [x] `ingestion/`: Docling → Markdown; Heading-Chunking (Tests inkl. Tabellen/Formeln);
       Ollama-Embedding mit Batching/Retry; `lang` pro Dokument setzen
-- [ ] CLI: `python -m app.ingest data/corpus --sensitivity public`
+- [x] CLI: `python -m app.ingest data/corpus --sensitivity public`
       bzw. `data/private --sensitivity confidential` (idempotent via `content_hash`)
 - **DoD:** Seed-Korpus vollständig indexiert; zweiter Lauf erzeugt keine Duplikate.
 
