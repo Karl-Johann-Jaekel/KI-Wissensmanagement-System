@@ -261,15 +261,15 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
 - **DoD:** Seed-Korpus vollständig indexiert; zweiter Lauf erzeugt keine Duplikate.
 
 ### Phase 4 — Retrieval  *(Video-Schritte 5–7)*
-- [ ] `retrieval/hybrid.py`: Vektor-Suche (cosine, Top-30) parallel zu BM25/`tsquery`
+- [x] `retrieval/hybrid.py`: Vektor-Suche (cosine, Top-30) parallel zu BM25/`tsquery`
       (Top-30, Konfig nach `lang`); DE-Fragen auf EN-Korpus tragen primär über die
       multilinguale Vektor-Suche
-- [ ] `retrieval/rrf.py`: Reciprocal Rank Fusion
-- [ ] `retrieval/rerank.py`: `bge-reranker-v2-m3` → Top-5; Env-Flag `RERANK_ENABLED`
-- [ ] `POST /search`: Retrieval mit Scores (Debug), Filter nach `sensitivity`
-- [ ] `eval/golden.yaml`: 15 Paare (Frage → erwartetes Paper), gemischt DE/EN;
+- [x] `retrieval/rrf.py`: Reciprocal Rank Fusion
+- [x] `retrieval/rerank.py`: `bge-reranker-v2-m3` → Top-5; Env-Flag `RERANK_ENABLED`
+- [x] `POST /search`: Retrieval mit Scores (Debug), Filter nach `sensitivity`
+- [x] `eval/golden.yaml`: 16 Paare (Frage → erwartetes Paper), gemischt DE/EN;
       `eval/run_eval.py` misst Hit-Rate@5 — mit und ohne Reranker
-- **DoD:** Hit-Rate@5 ≥ 0,8; Latenz lokal < 2 s.
+- **DoD:** Hit-Rate@5 ≥ 0,8; Latenz lokal < 2 s. → **0,94 (15/16), p95 221ms** ✓
 
 ### Phase 5 — Generation, Router & Recruiter-Agent  *(Video-Schritt 8 + Track A)*
 - [ ] `core/llm_router.py`: höchste Sensitivität der Treffer entscheidet —

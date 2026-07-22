@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api import graph, health
+from app.api import graph, health, search
 from app.core.config import get_settings
 
 app = FastAPI(
@@ -24,6 +24,7 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(graph.router)
+app.include_router(search.router)
 
 
 @app.get("/")

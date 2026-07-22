@@ -1,0 +1,51 @@
+# Golden retrieval set (PLAN §7 Phase 4). Question -> the arXiv paper that should
+# appear in the top results. Mixed DE/EN to exercise cross-lingual retrieval
+# (German questions over the English corpus).
+- question: "What is Retrieval-Augmented Generation and how does it combine a retriever with a generator?"
+  arxiv_id: "2005.11401"
+  lang: en
+- question: "Was ist Retrieval-Augmented Generation und wie kombiniert es Retriever und Generator?"
+  arxiv_id: "2005.11401"
+  lang: de
+- question: "How does ColBERT use late interaction for efficient passage search?"
+  arxiv_id: "2004.12832"
+  lang: en
+- question: "Dense passage retrieval with dual encoders and in-batch negatives"
+  arxiv_id: "2004.04906"
+  lang: en
+- question: "Self-RAG: learning to retrieve, generate and critique with reflection tokens"
+  arxiv_id: "2310.11511"
+  lang: en
+- question: "GraphRAG: from local to global query-focused summarization over a knowledge graph"
+  arxiv_id: "2404.16130"
+  lang: en
+- question: "ReAct: interleaving reasoning traces and actions in language models"
+  arxiv_id: "2210.03629"
+  lang: en
+- question: "Toolformer: how language models teach themselves to call external APIs"
+  arxiv_id: "2302.04761"
+  lang: en
+- question: "Wie nutzen Sprachmodelle lange Kontexte und warum geht Information in der Mitte verloren?"
+  arxiv_id: "2307.03172"
+  lang: de
+- question: "BGE M3 multilingual multi-granularity text embeddings"
+  arxiv_id: "2402.03216"
+  lang: en
+- question: "RAGAS automated evaluation of retrieval augmented generation faithfulness"
+  arxiv_id: "2309.15217"
+  lang: en
+- question: "HyDE: precise zero-shot dense retrieval using hypothetical documents"
+  arxiv_id: "2212.10496"
+  lang: en
+- question: "Was macht die Sliding-Window-Attention im Mistral 7B Modell?"
+  arxiv_id: "2310.06825"
+  lang: de
+- question: "REALM: retrieval-augmented language model pre-training"
+  arxiv_id: "2002.08909"
+  lang: en
+- question: "Wie funktioniert die Self-Attention im Transformer?"
+  arxiv_id: "1706.03762"
+  lang: de
+- question: "Fusion-in-Decoder: leveraging passage retrieval with generative models for open-domain QA"
+  arxiv_id: "2007.01282"
+  lang: en
