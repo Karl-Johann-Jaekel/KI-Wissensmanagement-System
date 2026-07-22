@@ -272,16 +272,16 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
 - **DoD:** Hit-Rate@5 ≥ 0,8; Latenz lokal < 2 s. → **0,94 (15/16), p95 221ms** ✓
 
 ### Phase 5 — Generation, Router & Recruiter-Agent  *(Video-Schritt 8 + Track A)*
-- [ ] `core/llm_router.py`: höchste Sensitivität der Treffer entscheidet —
+- [x] `core/llm_router.py`: höchste Sensitivität der Treffer entscheidet —
       `confidential` ⇒ nur Ollama, nachweislich kein externer Call (Test mit Netz-Mock)
-- [ ] `generation/prompts.py`: Nur-Kontext-Regel, Zitatformat `[Paper, Abschnitt]`,
+- [x] `generation/prompts.py`: Nur-Kontext-Regel, Zitatformat `[Paper, Abschnitt]`,
       explizite „weiß nicht"-Regel
-- [ ] `POST /chat`: SSE-Streaming; Response enthält `answer` + `sources[]`
-- [ ] `generation/portfolio_agent.py` + `POST /portfolio/chat`:
+- [x] `POST /chat`: SSE-Streaming; Response enthält `answer` + `sources[]`
+- [x] `generation/portfolio_agent.py` + `POST /portfolio/chat`:
       feste Tool-Funktionen `repos_by_technology(tech)`, `technologies_of(repo)`,
       `related_repos(repo)` + RAG über READMEs; **hart auf Zone `public` beschränkt**
-- [ ] Hardening: Rate-Limit (slowapi), tägliches Token-/Kosten-Cap, festes
-      Systemprompt, Input-Längenlimit
+- [x] Hardening: Rate-Limit (~~slowapi~~ in-process, ADR-0003), tägliches
+      Token-/Kosten-Cap, festes Systemprompt, Input-Längenlimit
 - **DoD:** Portfolio-Fragen korrekt mit Repo-Links; Fachfragen („Was ist RRF?") mit
   Paper-Beleg; Zonentest belegt keinen Zugriff auf `confidential`.
 

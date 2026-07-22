@@ -29,6 +29,7 @@ class SearchHit:
     uri: str | None
     sensitivity: str
     content: str
+    heading: str | None = None
     scores: dict = field(default_factory=dict)
 
 
@@ -87,6 +88,7 @@ def hybrid_search(
                 uri=doc.uri,
                 sensitivity=doc.sensitivity,
                 content=chunk.content,
+                heading=(chunk.meta or {}).get("heading"),
                 scores={
                     "vector": vec_scores.get(cid),
                     "keyword": kw_scores.get(cid),
