@@ -219,10 +219,10 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
 ## 7. Phasenplan
 
 ### Phase 0 — Repo & Infrastruktur
-- [ ] Repo-Struktur aus Abschnitt 5; `.gitignore` (inkl. `data/`), `.env.example`, `CLAUDE.md`
-- [ ] `docker-compose.yml`: postgres (pgvector-Image), backend; Profile `local` (+ Ollama), `full` (+ frontend, n8n)
-- [ ] pre-commit: ruff, gitleaks; GitHub Actions: lint + tests
-- [ ] FastAPI-Skelett mit `GET /health`; Alembic initialisiert
+- [x] Repo-Struktur aus Abschnitt 5; `.gitignore` (inkl. `data/`), `.env.example`, `CLAUDE.md`
+- [x] `docker-compose.yml`: postgres (pgvector-Image), backend; Profile `local` (+ Ollama), `full` (+ frontend, n8n)
+- [x] pre-commit: ruff, gitleaks; GitHub Actions: lint + tests
+- [x] FastAPI-Skelett mit `GET /health`; Alembic initialisiert
 - **DoD:** `docker compose up` startet DB + Backend; `/health` antwortet; CI grün.
 
 ### Phase 1 — GitHub-Sync & Portfolio-Graph-Daten  *(Track A)*
