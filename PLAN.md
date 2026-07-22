@@ -226,16 +226,16 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
 - **DoD:** `docker compose up` startet DB + Backend; `/health` antwortet; CI grün.
 
 ### Phase 1 — GitHub-Sync & Portfolio-Graph-Daten  *(Track A)*
-- [ ] Migration: Schema aus Abschnitt 6
-- [ ] `github/sync.py`: GitHub-REST-API (PAT, nur public scope) — Repos, Topics,
+- [x] Migration: Schema aus Abschnitt 6
+- [x] `github/sync.py`: GitHub-REST-API (PAT, nur public scope) — Repos, Topics,
       Languages (Byte-Anteile → `weight`), READMEs, Manifeste
       (`package.json`, `pyproject.toml`, `requirements.txt`)
-- [ ] `github/extract.py`: **regelbasiert** Manifeste/Topics → nodes/edges
+- [x] `github/extract.py`: **regelbasiert** Manifeste/Topics → nodes/edges
       (Mapping Dependency→Technologie); Status direkt `verified` (deterministisch)
-- [ ] READMEs als `public`-Dokumente in `documents` (für RAG in Phase 5)
-- [ ] `GET /graph?scope=portfolio|knowledge` liefert `{nodes, links}`;
+- [x] READMEs als `public`-Dokumente in `documents` (für RAG in Phase 5)
+- [x] `GET /graph?scope=portfolio|knowledge` liefert `{nodes, links}`;
       ETag/Conditional Requests beim Sync (GitHub-Rate-Limits)
-- [ ] CLI: `python -m app.sync_github <username>` (idempotent)
+- [x] CLI: `python -m app.sync_github <username>` (idempotent)
 - **DoD:** Sync füllt Graph reproduzierbar; Unit-Tests fürs Dependency-Mapping.
 
 ### Phase 2 — Graph-Visualisierung  *(Track A — erstes öffentliches Deliverable)*
