@@ -239,11 +239,11 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
 - **DoD:** Sync füllt Graph reproduzierbar; Unit-Tests fürs Dependency-Mapping.
 
 ### Phase 2 — Graph-Visualisierung  *(Track A — erstes öffentliches Deliverable)*
-- [ ] React-Seite mit **react-force-graph**: Farbe nach `kind`, Knotengröße nach
+- [x] React-Seite mit **react-force-graph**: Farbe nach `kind`, Knotengröße nach
       Kantengewicht; Komponente generisch (nimmt später auch den Wissens-Graph)
-- [ ] Interaktion: Hover-Highlight der Nachbarn, Filter nach Technologie/Sprache,
+- [x] Interaktion: Hover-Highlight der Nachbarn, Filter nach Technologie/Sprache,
       Klick auf Repo → Seitenpanel (Beschreibung, Link, Tech-Liste)
-- [ ] `scripts/export_graph_json.py` → statisches `graph.json`
+- [x] `scripts/export_graph_json.py` → statisches `graph.json`
       (Fallback: läuft notfalls ohne Backend auf GitHub Pages)
 - **DoD:** Interaktiver Portfolio-Graph im Browser; verlinkbar (README-GIF + Live-Link).
 

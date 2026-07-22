@@ -9,12 +9,23 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.github.extract import graph_counts, store_portfolio
 from app.github.sync import RepoData
 from app.main import app
+
+
+def _reset_graph(session: Session) -> None:
+    """Clean slate inside the test transaction (rolled back, so real data survives).
+
+    Deleting nodes cascades to edges; also drop synced README docs so counts are
+    deterministic regardless of any prior live sync.
+    """
+    session.execute(text("DELETE FROM graph_nodes"))
+    session.execute(text("DELETE FROM documents WHERE source_type = 'github_readme'"))
 
 
 def _repos() -> list[RepoData]:
@@ -37,6 +48,7 @@ def _repos() -> list[RepoData]:
 
 
 def test_store_portfolio_is_idempotent(db_session: Session) -> None:
+    _reset_graph(db_session)
     store_portfolio(db_session, _repos())
     first = graph_counts(db_session)
     store_portfolio(db_session, _repos())  # second run must add nothing
@@ -47,6 +59,7 @@ def test_store_portfolio_is_idempotent(db_session: Session) -> None:
 
 
 def test_graph_endpoint_returns_nodes_and_links(db_session: Session, client: TestClient) -> None:
+    _reset_graph(db_session)
     store_portfolio(db_session, _repos())
 
     def _override() -> Iterator[Session]:

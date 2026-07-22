@@ -12,7 +12,8 @@ Zwei Datenzonen, architektonisch getrennt (Privacy by Architecture):
   verlässt nie den eigenen Rechner.
 
 Der vollständige Plan steht in **[PLAN.md](PLAN.md)**; Kurzregeln in
-**[CLAUDE.md](CLAUDE.md)**. Aktueller Stand: **Phase 0** (Infrastruktur).
+**[CLAUDE.md](CLAUDE.md)**. Aktueller Stand: **Phase 2** (Portfolio-Graph
+im Browser).
 
 ## Stack
 FastAPI · PostgreSQL 16 + pgvector · Ollama · Mistral-API · fastmcp · React + TS · n8n.
@@ -32,6 +33,27 @@ Health-Check:
 ```bash
 curl localhost:8000/health        # {"status":"ok","version":"0.1.0"}
 curl localhost:8000/health/db     # {"status":"ok","db":"reachable"}
+```
+
+## Portfolio-Graph (Frontend)
+
+```bash
+# 1) Backend + DB starten und eigene Repos syncen (PAT in .env):
+docker compose up -d
+docker compose exec backend python -m app.sync_github <github-username>
+
+# 2) Frontend:
+cd frontend
+npm install
+npm run dev            # http://localhost:5173  (spricht CORS-frei mit :8000)
+```
+
+Statischer Fallback (ohne Backend, z. B. GitHub Pages):
+
+```bash
+docker compose exec backend python - data/graph.json < scripts/export_graph_json.py
+cp data/graph.json frontend/public/graph.json    # api.ts nutzt dies als Fallback
+npm run build                                     # -> frontend/dist/
 ```
 
 ## Entwicklung

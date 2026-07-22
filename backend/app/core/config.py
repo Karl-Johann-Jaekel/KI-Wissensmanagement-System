@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     # Runtime
     app_env: str = "development"
     log_level: str = "INFO"
+    # Comma-separated allowed CORS origins (frontend dev servers).
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # Database
     postgres_user: str = "kwms"
@@ -52,6 +54,10 @@ class Settings(BaseSettings):
     admin_api_key: str = "change-me"
     daily_token_cap: int = 200_000
     rate_limit: str = Field(default="30/minute")
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     @computed_field  # type: ignore[prop-decorator]
     @property
