@@ -1,0 +1,12 @@
+# Normalize line endings to LF in the repo (CI/lint runs on Linux; keeps ruff-format
+# deterministic across Windows/macOS/Linux checkouts).
+* text=auto eol=lf
+
+# Binary assets must never be touched by EOL conversion.
+*.png binary
+*.jpg binary
+*.gif binary
+*.pdf binary
+*.ico binary
+*.woff binary
+*.woff2 binary

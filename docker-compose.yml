@@ -1,0 +1,78 @@
+# KI-Wissensmanagement-System — Compose
+#   docker compose up                  -> postgres + backend (public core)
+#   docker compose --profile local up  -> + Ollama (confidential zone, local LLM/embeddings)
+#   docker compose --profile full  up  -> + frontend + n8n
+# See PLAN §4, §7 Phase 0.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kwms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kwms}
+      POSTGRES_DB: ${POSTGRES_DB:-kwms}
+    ports:
+      # Host-side port is separate from the in-container port (always 5432) so a local
+      # Postgres on 5432 doesn't block the stack. Override POSTGRES_HOST_PORT in .env.
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kwms} -d ${POSTGRES_DB:-kwms}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # --- profile: local (confidential zone — nothing leaves the machine) ---
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["local"]
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+  # --- profile: full (frontend available from Phase 2, n8n from Phase 7) ---
+  frontend:
+    build: ./frontend
+    profiles: ["full"]
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+  n8n:
+    image: n8nio/n8n:latest
+    profiles: ["full"]
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_SECURE_COOKIE: "false"
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  pgdata:
+  ollama_data:
+  n8n_data:
