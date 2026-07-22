@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from app import __version__
-from app.api import health
+from app.api import graph, health
 
 app = FastAPI(
     title="KI-Wissensmanagement-System",
@@ -14,6 +14,7 @@ app = FastAPI(
 )
 
 app.include_router(health.router)
+app.include_router(graph.router)
 
 
 @app.get("/")
