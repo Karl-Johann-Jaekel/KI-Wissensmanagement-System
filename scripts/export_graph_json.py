@@ -5,8 +5,8 @@ Phase 2). Run inside the backend environment (needs DB access):
 
     python scripts/export_graph_json.py [output_path]
 
-Writes {"portfolio": {...}, "knowledge": {...}} — the shape api.ts expects as its
-offline fallback.
+Writes the knowledge graph as {"nodes": [...], "links": [...]} — the shape api.ts
+expects as its offline fallback.
 """
 
 from __future__ import annotations
@@ -21,18 +21,11 @@ from app.db.session import SessionLocal
 
 def main(out: str = "frontend/public/graph.json") -> int:
     with SessionLocal() as session:
-        data = {
-            scope: get_graph(scope=scope, include_pending=False, db=session)
-            for scope in ("portfolio", "knowledge")
-        }
+        data = get_graph(include_pending=False, db=session)
     path = Path(out)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    p, k = data["portfolio"], data["knowledge"]
-    print(
-        f"wrote {out}: portfolio {len(p['nodes'])} nodes / {len(p['links'])} links, "
-        f"knowledge {len(k['nodes'])} nodes"
-    )
+    print(f"wrote {out}: {len(data['nodes'])} nodes / {len(data['links'])} links")
     return 0
 
 

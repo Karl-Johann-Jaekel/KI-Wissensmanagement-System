@@ -1,59 +1,60 @@
 # KI-Wissensmanagement-System
 
-DSGVO-konformes RAG-Wissensmanagement über **KI-Forschungsartikel (arXiv)** plus ein
-interaktiver **GitHub-Portfolio-Graph** und ein **rekursiver Update-Loop**, der neue
-Publikationen automatisch holt, extrahiert und — nach Verifikation — in einen
-Wissens-Graphen übernimmt.
+DSGVO-konformes RAG-Wissensmanagement über **KI-Forschungsartikel (arXiv)** mit
+**Wissens-Graph** (Papers ↔ Konzepte ↔ Modelle ↔ Datasets) und einem **rekursiven
+Update-Loop**, der neue Publikationen automatisch holt, extrahiert und — nach
+Verifikation — in den Bestand übernimmt.
 
 Zwei Datenzonen, architektonisch getrennt (Privacy by Architecture):
 
-- **public** — Forschungskorpus + GitHub-Daten; Inferenz via EU-API (Mistral, AVV).
-- **confidential** — private Dokumente aus `data/private/`; ausschließlich lokal (Ollama),
-  verlässt nie den eigenen Rechner.
+- **public** — Forschungskorpus; Inferenz via EU-API (Mistral, AVV) oder lokal.
+- **confidential** — private Dokumente aus `data/private/`; ausschließlich lokal
+  (Ollama), verlässt nie den eigenen Rechner.
 
 Der vollständige Plan steht in **[PLAN.md](PLAN.md)**; Kurzregeln in
-**[CLAUDE.md](CLAUDE.md)**. Aktueller Stand: **Phase 2** (Portfolio-Graph
-im Browser).
+**[CLAUDE.md](CLAUDE.md)**. Aktueller Stand: **Phase 6** abgeschlossen
+(Chat-UI, Dokumente, Admin-Modus); der GitHub-Portfolio-Track wurde entfernt
+(ADR-0004).
 
 ## Stack
-FastAPI · PostgreSQL 16 + pgvector · Ollama · Mistral-API · fastmcp · React + TS · n8n.
+FastAPI · PostgreSQL 16 + pgvector · Docling · Ollama · Mistral-API · fastmcp ·
+React + TS · n8n.
 
 ## Quickstart
 
 ```bash
-cp .env.example .env          # Werte anpassen (mind. POSTGRES_PASSWORD)
+cp .env.example .env          # Werte anpassen (mind. POSTGRES_PASSWORD, ADMIN_API_KEY)
 
-docker compose up             # postgres + backend  ->  http://localhost:8000/health
-docker compose --profile local up   # + Ollama (confidential zone)
-docker compose --profile full  up   # + frontend + n8n
+docker compose up -d          # postgres + backend  ->  http://localhost:8000/health
+docker compose exec backend alembic upgrade head
+
+# Korpus holen + indexieren (Ollama mit EMBED_MODEL muss laufen):
+docker compose exec backend python scripts/fetch_corpus.py
+docker compose exec backend python -m app.ingest data/corpus --sensitivity public
+
+# Frontend:
+cd frontend && npm install && npm run dev    # http://localhost:5173
 ```
 
-Health-Check:
+Endpoints: `POST /chat` (zitierte Antworten, SSE) · `POST /search` (Hybrid-Retrieval
+mit Scores) · `GET /graph` (Wissens-Graph) · `GET /documents` · `POST /ingest`
+(Admin-Upload) · Swagger unter `/docs`.
+
+## Privater Betrieb (confidential)
 
 ```bash
-curl localhost:8000/health        # {"status":"ok","version":"0.1.0"}
-curl localhost:8000/health/db     # {"status":"ok","db":"reachable"}
+# Eigene PDFs nach data/private/ legen, dann:
+docker compose exec backend python -m app.ingest data/private --sensitivity confidential
 ```
 
-## Portfolio-Graph (Frontend)
+Fragen mit `max_sensitivity=confidential` (Admin-Key nötig) werden **garantiert nur
+vom lokalen Ollama-Modell** beantwortet — kein externer API-Call (Zonen-Router,
+per Test belegt).
+
+## Eval
 
 ```bash
-# 1) Backend + DB starten und eigene Repos syncen (PAT in .env):
-docker compose up -d
-docker compose exec backend python -m app.sync_github <github-username>
-
-# 2) Frontend:
-cd frontend
-npm install
-npm run dev            # http://localhost:5173  (spricht CORS-frei mit :8000)
-```
-
-Statischer Fallback (ohne Backend, z. B. GitHub Pages):
-
-```bash
-docker compose exec backend python - data/graph.json < scripts/export_graph_json.py
-cp data/graph.json frontend/public/graph.json    # api.ts nutzt dies als Fallback
-npm run build                                     # -> frontend/dist/
+docker compose exec backend python eval/run_eval.py        # Hit-Rate@5 + Latenz
 ```
 
 ## Entwicklung
@@ -66,19 +67,7 @@ mypy app
 pytest
 ```
 
-Datenbank-Migrationen (Alembic, ab Phase 1):
-
-```bash
-cd backend
-alembic upgrade head
-alembic revision -m "beschreibung"    # neue Migration
-```
-
-Pre-commit (ruff + gitleaks) einmalig aktivieren:
-
-```bash
-pip install pre-commit && pre-commit install
-```
+Pre-commit (ruff + gitleaks) einmalig aktivieren: `pip install pre-commit && pre-commit install`
 
 ## Lizenz
 MIT — siehe [LICENSE](LICENSE). Paper-PDFs und private Daten unter `data/` sind

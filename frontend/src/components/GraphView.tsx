@@ -66,8 +66,8 @@ export default function GraphView({
         ctx.strokeStyle = '#ffffff'
         ctx.stroke()
       }
-      // labels: repos always; others when zoomed in or bright
-      const showLabel = node.kind === 'repo' || (bright && scale > 1.3)
+      // labels: papers always; others when zoomed in or bright
+      const showLabel = node.kind === 'paper' || (bright && scale > 1.3)
       if (showLabel && bright) {
         const fontSize = Math.max(3, 11 / scale)
         ctx.font = `${fontSize}px ui-sans-serif, system-ui, sans-serif`

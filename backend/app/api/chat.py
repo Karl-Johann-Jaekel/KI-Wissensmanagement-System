@@ -7,12 +7,18 @@ import json
 from collections.abc import Iterator
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.core.security import MAX_INPUT_CHARS, estimate_tokens, get_budget, rate_limit
+from app.core.security import (
+    MAX_INPUT_CHARS,
+    estimate_tokens,
+    get_budget,
+    rate_limit,
+    require_admin_for_nonpublic,
+)
 from app.db.session import get_db
 from app.generation.generate import prepare_answer
 
@@ -32,7 +38,8 @@ def sse(obj: dict) -> str:
 
 
 @router.post("/chat", dependencies=[Depends(rate_limit)])
-def chat(req: ChatRequest, db: Session = Depends(get_db)) -> StreamingResponse:
+def chat(req: ChatRequest, request: Request, db: Session = Depends(get_db)) -> StreamingResponse:
+    require_admin_for_nonpublic(request, req.max_sensitivity)
     plan = prepare_answer(
         db,
         req.query,

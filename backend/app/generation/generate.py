@@ -27,6 +27,7 @@ class AnswerPlan:
                 "section": h.heading,
                 "chunk_id": h.chunk_id,
                 "sensitivity": h.sensitivity,
+                "preview": h.content[:240] + ("…" if len(h.content) > 240 else ""),
             }
             for h in self.hits
         ]

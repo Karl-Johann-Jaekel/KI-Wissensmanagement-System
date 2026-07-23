@@ -1,7 +1,7 @@
-"""DB-backed tests: idempotent portfolio store + GET /graph.
+"""DB-backed tests: idempotent knowledge-graph upserts + GET /graph.
 
 Skipped automatically when no database is reachable (see db_session fixture).
-Covers PLAN §7 Phase 1 DoD: "Sync füllt Graph reproduzierbar".
+Also covers the Phase-8 contract: pending facts are hidden unless requested.
 """
 
 from __future__ import annotations
@@ -12,74 +12,64 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.db.graph import graph_counts, upsert_edge, upsert_node
 from app.db.session import get_db
-from app.github.extract import graph_counts, store_portfolio
-from app.github.sync import RepoData
 from app.main import app
 
 
 def _reset_graph(session: Session) -> None:
-    """Clean slate inside the test transaction (rolled back, so real data survives).
-
-    Deleting nodes cascades to edges; also drop synced README docs so counts are
-    deterministic regardless of any prior live sync.
-    """
+    """Clean slate inside the test transaction (rolled back afterwards)."""
     session.execute(text("DELETE FROM graph_nodes"))
-    session.execute(text("DELETE FROM documents WHERE source_type = 'github_readme'"))
 
 
-def _repos() -> list[RepoData]:
-    return [
-        RepoData(
-            name="demo",
-            full_name="octo/demo",
-            description="d",
-            html_url="https://github.com/octo/demo",
-            topics=["rag"],
-            languages={"Python": 800, "TypeScript": 200},
-            manifests={
-                "pyproject.toml": (
-                    '[project]\ndependencies = ["fastapi>=0.115", "sqlalchemy>=2.0"]\n'
-                )
-            },
-            readme="# demo readme",
-        )
-    ]
+def _seed_knowledge(session: Session) -> None:
+    paper = upsert_node(session, "paper", "Attention Is All You Need", {"arxiv": "1706.03762"})
+    concept = upsert_node(session, "concept", "Self-Attention")
+    pending = upsert_node(session, "concept", "Fresh Pending Concept", status="pending")
+    upsert_edge(session, paper, concept, "INTRODUCES", meta={"source_document_ids": ["d1"]})
+    upsert_edge(session, paper, pending, "INTRODUCES", status="pending")
+    session.commit()
 
 
-def test_store_portfolio_is_idempotent(db_session: Session) -> None:
+def test_upserts_are_idempotent(db_session: Session) -> None:
     _reset_graph(db_session)
-    store_portfolio(db_session, _repos())
+    _seed_knowledge(db_session)
     first = graph_counts(db_session)
-    store_portfolio(db_session, _repos())  # second run must add nothing
-    second = graph_counts(db_session)
-    assert first == second
-    # 1 repo + 2 langs + 2 deps + 1 domain = 6 nodes
-    assert first["nodes"] == 6
+    _seed_knowledge(db_session)  # second run must add nothing
+    assert graph_counts(db_session) == first
+    assert first == {"nodes": 3, "edges": 2}
 
 
-def test_graph_endpoint_returns_nodes_and_links(db_session: Session, client: TestClient) -> None:
+def test_upsert_preserves_existing_status(db_session: Session) -> None:
     _reset_graph(db_session)
-    store_portfolio(db_session, _repos())
+    node_id = upsert_node(db_session, "concept", "RAG", status="pending")
+    # re-upsert with default (verified) must NOT silently promote the pending node
+    same_id = upsert_node(db_session, "concept", "RAG")
+    assert node_id == same_id
+    status = db_session.execute(
+        text("SELECT status FROM graph_nodes WHERE kind='concept' AND name='RAG'")
+    ).scalar_one()
+    assert status == "pending"
+
+
+def test_graph_endpoint_hides_pending_by_default(db_session: Session, client: TestClient) -> None:
+    _reset_graph(db_session)
+    _seed_knowledge(db_session)
 
     def _override() -> Iterator[Session]:
         yield db_session
 
     app.dependency_overrides[get_db] = _override
     try:
-        portfolio = client.get("/graph", params={"scope": "portfolio"}).json()
-        knowledge = client.get("/graph", params={"scope": "knowledge"}).json()
+        default_view = client.get("/graph").json()
+        review_view = client.get("/graph", params={"include_pending": "true"}).json()
     finally:
         app.dependency_overrides.clear()
 
-    kinds = {n["kind"] for n in portfolio["nodes"]}
-    assert {"repo", "technology", "domain"} <= kinds
-    relations = {link["relation"] for link in portfolio["links"]}
-    assert {"BUILT_WITH", "USES", "RELATED_TO"} <= relations
+    default_names = {n["name"] for n in default_view["nodes"]}
+    assert "Attention Is All You Need" in default_names
+    assert "Fresh Pending Concept" not in default_names
+    assert all(link["status"] == "verified" for link in default_view["links"])
 
-    # BUILT_WITH weight is the language byte share.
-    built_with = [link for link in portfolio["links"] if link["relation"] == "BUILT_WITH"]
-    assert any(abs(link["weight"] - 0.8) < 1e-6 for link in built_with)
-
-    # knowledge scope is empty in Phase 1
-    assert knowledge["nodes"] == []
+    review_names = {n["name"] for n in review_view["nodes"]}
+    assert "Fresh Pending Concept" in review_names
