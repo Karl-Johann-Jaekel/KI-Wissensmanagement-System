@@ -286,9 +286,9 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
   Paper-Beleg; Zonentest belegt keinen Zugriff auf `confidential`.
 
 ### Phase 6 — Frontend-Ausbau
-- [ ] Eine App: Graph-Seiten + Chat; Recruiter-Modus (public, ohne Login) und
+- [x] Eine App: Graph-Seiten + Chat; Recruiter-Modus (public, ohne Login) und
       Admin-Modus (API-Key; lokal auch `confidential`)
-- [ ] Quellen-Panel (Chunk-Vorschau, Paper-/Dokument-Link), Dokumentliste mit
+- [x] Quellen-Panel (Chunk-Vorschau, Paper-/Dokument-Link), Dokumentliste mit
       Sensitivity-Badge, Upload nur im Admin-Modus
 - **DoD:** Ende-zu-Ende im Browser: Frage → belegte Antwort; Graph ↔ Chat verlinkt.
 

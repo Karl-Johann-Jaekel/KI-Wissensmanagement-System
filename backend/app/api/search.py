@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.core.security import rate_limit, require_admin_for_nonpublic
 from app.db.session import get_db
 from app.retrieval.search import hybrid_search
 
@@ -38,8 +39,9 @@ class SearchResponse(BaseModel):
     hits: list[SearchHitOut]
 
 
-@router.post("/search", response_model=SearchResponse)
-def search(req: SearchRequest, db: Session = Depends(get_db)) -> SearchResponse:
+@router.post("/search", response_model=SearchResponse, dependencies=[Depends(rate_limit)])
+def search(req: SearchRequest, request: Request, db: Session = Depends(get_db)) -> SearchResponse:
+    require_admin_for_nonpublic(request, req.max_sensitivity)
     hits = hybrid_search(
         db,
         req.query,

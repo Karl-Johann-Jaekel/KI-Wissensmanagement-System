@@ -5,6 +5,7 @@ interface Props {
   data: GraphData
   onClose: () => void
   onSelectTech: (tech: string) => void
+  onAskAbout?: (repoName: string) => void
 }
 
 interface TechRef {
@@ -13,7 +14,7 @@ interface TechRef {
   weight: number
 }
 
-export default function SidePanel({ node, data, onClose, onSelectTech }: Props) {
+export default function SidePanel({ node, data, onClose, onSelectTech, onAskAbout }: Props) {
   const byId = new Map(data.nodes.map((n) => [n.id, n]))
   const techs: TechRef[] = []
   for (const l of data.links) {
@@ -61,16 +62,26 @@ export default function SidePanel({ node, data, onClose, onSelectTech }: Props) 
         )}
       </div>
 
-      {meta.url && (
-        <a
-          href={meta.url}
-          target="_blank"
-          rel="noreferrer"
-          className="mb-4 inline-block rounded bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-500"
-        >
-          Auf GitHub öffnen ↗
-        </a>
-      )}
+      <div className="mb-4 flex flex-wrap gap-2">
+        {meta.url && (
+          <a
+            href={meta.url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-block rounded bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-500"
+          >
+            Auf GitHub öffnen ↗
+          </a>
+        )}
+        {onAskAbout && (
+          <button
+            onClick={() => onAskAbout(node.name)}
+            className="inline-block rounded border border-sky-500/50 px-3 py-1.5 text-sm font-medium text-sky-300 hover:bg-sky-500/10"
+          >
+            Im Chat fragen 💬
+          </button>
+        )}
+      </div>
 
       {techs.length > 0 && (
         <div>
