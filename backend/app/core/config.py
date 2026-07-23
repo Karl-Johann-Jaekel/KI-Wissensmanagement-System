@@ -46,10 +46,6 @@ class Settings(BaseSettings):
     mistral_api_key: str = ""
     mistral_model: str = "mistral-medium-latest"
 
-    # GitHub (Phase 1)
-    github_token: str = ""
-    github_username: str = ""
-
     # Hardening (Phase 5)
     admin_api_key: str = "change-me"
     daily_token_cap: int = 200_000

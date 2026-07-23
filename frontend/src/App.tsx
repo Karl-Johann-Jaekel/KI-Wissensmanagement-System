@@ -1,47 +1,42 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { fetchGraph } from './api'
 import ChatPanel from './components/ChatPanel'
 import DocumentsView from './components/DocumentsView'
-import Filters from './components/Filters'
 import GraphView from './components/GraphView'
 import SidePanel from './components/SidePanel'
-import { endpointId, type GraphData, type GraphNode, type Scope } from './types'
+import { KIND_COLORS, type GraphData, type GraphNode, type NodeKind } from './types'
 import { useElementSize } from './useElementSize'
 
 const EMPTY: GraphData = { nodes: [], links: [] }
-type Tab = 'graph' | 'chat' | 'portfolio' | 'docs'
+type Tab = 'graph' | 'chat' | 'docs'
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'graph', label: 'Graph' },
-  { id: 'chat', label: 'Wissens-Chat' },
-  { id: 'portfolio', label: 'Portfolio-Chat' },
+  { id: 'graph', label: 'Wissens-Graph' },
+  { id: 'chat', label: 'Chat' },
   { id: 'docs', label: 'Dokumente' },
 ]
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>('graph')
+  const [tab, setTab] = useState<Tab>('chat')
   const [adminKey, setAdminKey] = useState<string | null>(
     () => localStorage.getItem('kwms-admin-key') || null,
   )
   const [showKeyInput, setShowKeyInput] = useState(false)
   const [keyDraft, setKeyDraft] = useState('')
-  const [portfolioPrefill, setPortfolioPrefill] = useState<string>()
 
-  // ---- graph state (Phase 2 view) ----
-  const [scope, setScope] = useState<Scope>('portfolio')
+  // ---- knowledge-graph state ----
   const [data, setData] = useState<GraphData>(EMPTY)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<GraphNode | null>(null)
-  const [filterTech, setFilterTech] = useState<string | null>(null)
+  const [includePending, setIncludePending] = useState(false)
   const { ref, width, height } = useElementSize<HTMLDivElement>()
 
   useEffect(() => {
     let cancelled = false
     setStatus('loading')
     setSelected(null)
-    setFilterTech(null)
-    fetchGraph(scope)
+    fetchGraph(includePending)
       .then((d) => {
         if (cancelled) return
         setData(d)
@@ -55,21 +50,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [scope])
-
-  const activeIds = useMemo<Set<string> | null>(() => {
-    if (!filterTech) return null
-    const tech = data.nodes.find((n) => n.kind === 'technology' && n.name === filterTech)
-    if (!tech) return null
-    const ids = new Set<string>([tech.id])
-    for (const l of data.links) {
-      const s = endpointId(l.source)
-      const t = endpointId(l.target)
-      if (s === tech.id) ids.add(t)
-      if (t === tech.id) ids.add(s)
-    }
-    return ids
-  }, [filterTech, data])
+  }, [includePending])
 
   const saveKey = () => {
     const key = keyDraft.trim()
@@ -84,10 +65,7 @@ export default function App() {
     setKeyDraft('')
   }
 
-  const askAboutRepo = (repoName: string) => {
-    setPortfolioPrefill(`Erzähl mir mehr über das Repo "${repoName}".`)
-    setTab('portfolio')
-  }
+  const kindsPresent = Array.from(new Set(data.nodes.map((n) => n.kind))) as NodeKind[]
 
   return (
     <div className="flex h-full flex-col">
@@ -110,6 +88,34 @@ export default function App() {
               </button>
             ))}
           </nav>
+          {tab === 'graph' && (
+            <div className="flex items-center gap-3 text-xs text-slate-400">
+              <span>
+                {data.nodes.length} Knoten · {data.links.length} Kanten
+              </span>
+              {adminKey && (
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={includePending}
+                    onChange={(e) => setIncludePending(e.target.checked)}
+                  />
+                  pending anzeigen
+                </label>
+              )}
+              <span className="flex flex-wrap gap-2">
+                {kindsPresent.map((k) => (
+                  <span key={k} className="inline-flex items-center gap-1">
+                    <span
+                      className="inline-block h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: KIND_COLORS[k] }}
+                    />
+                    {k}
+                  </span>
+                ))}
+              </span>
+            </div>
+          )}
           <div className="ml-auto flex items-center gap-2 text-xs">
             {showKeyInput ? (
               <>
@@ -135,24 +141,13 @@ export default function App() {
                     ? 'border-emerald-500/50 text-emerald-300'
                     : 'border-slate-700 text-slate-400 hover:text-slate-200')
                 }
-                title={adminKey ? 'Admin-Modus aktiv' : 'Recruiter-Modus (öffentlich)'}
+                title={adminKey ? 'Admin-Modus aktiv' : 'Öffentlicher Modus'}
               >
-                {adminKey ? '🔓 Admin' : '🔒 Recruiter'}
+                {adminKey ? '🔓 Admin' : '🔒 Öffentlich'}
               </button>
             )}
           </div>
         </div>
-        {tab === 'graph' && (
-          <div className="mt-2">
-            <Filters
-              scope={scope}
-              onScope={setScope}
-              data={data}
-              filterTech={filterTech}
-              onFilterTech={setFilterTech}
-            />
-          </div>
-        )}
       </header>
 
       <main className="flex min-h-0 flex-1">
@@ -161,7 +156,7 @@ export default function App() {
             <div ref={ref} className="relative min-w-0 flex-1">
               {status === 'loading' && (
                 <div className="absolute inset-0 grid place-items-center text-slate-400">
-                  Lade {scope} …
+                  Lade Wissens-Graph …
                 </div>
               )}
               {status === 'error' && (
@@ -170,8 +165,9 @@ export default function App() {
                 </div>
               )}
               {status === 'ready' && data.nodes.length === 0 && (
-                <div className="absolute inset-0 grid place-items-center text-slate-400">
-                  Noch keine Knoten in dieser Ansicht.
+                <div className="absolute inset-0 grid place-items-center p-6 text-center text-slate-400">
+                  Noch keine Graph-Fakten. Der Wissens-Graph füllt sich in Phase 8
+                  (Extraktion aus den Papers).
                 </div>
               )}
               {status === 'ready' && data.nodes.length > 0 && width > 0 && (
@@ -179,21 +175,13 @@ export default function App() {
                   data={data}
                   width={width}
                   height={height}
-                  activeIds={activeIds}
+                  activeIds={null}
                   selectedId={selected?.id ?? null}
-                  onNodeClick={(n) => setSelected(n.kind === 'repo' ? n : null)}
+                  onNodeClick={(n) => setSelected(n)}
                 />
               )}
             </div>
-            {selected && (
-              <SidePanel
-                node={selected}
-                data={data}
-                onClose={() => setSelected(null)}
-                onSelectTech={(tech) => setFilterTech(tech)}
-                onAskAbout={askAboutRepo}
-              />
-            )}
+            {selected && <SidePanel node={selected} onClose={() => setSelected(null)} />}
           </>
         )}
 
@@ -205,18 +193,6 @@ export default function App() {
               adminKey={adminKey}
               allowConfidential
               emptyHint='Frag den Korpus — z. B. „Was ist Retrieval-Augmented Generation?" Antworten kommen mit Quellenbelegen.'
-            />
-          </div>
-        )}
-
-        {tab === 'portfolio' && (
-          <div className="min-w-0 flex-1">
-            <ChatPanel
-              endpoint="/portfolio/chat"
-              placeholder="Frage zum GitHub-Portfolio …"
-              adminKey={adminKey}
-              prefill={portfolioPrefill}
-              emptyHint='Frag zum Portfolio — z. B. „Welche Repos nutzen FastAPI?" Antworten verlinken die Repos.'
             />
           </div>
         )}

@@ -1,14 +1,13 @@
-"""GET /graph — serve nodes/links for react-force-graph (PLAN §7 Phase 1/2).
+"""GET /graph — knowledge graph (papers/concepts/models/datasets) for react-force-graph.
 
-One endpoint, two datasets via ``scope``: ``portfolio`` (repo/technology/domain) and
-``knowledge`` (paper/concept/model/dataset). ``val`` is the summed incident edge weight
-so the frontend can size nodes by importance.
+Public view shows only ``verified`` facts; ``include_pending=true`` (Review-Queue,
+Phase 8) also returns pending ones. ``val`` is the summed incident edge weight so the
+frontend can size nodes.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
@@ -19,20 +18,15 @@ from app.db.session import get_db
 
 router = APIRouter(tags=["graph"])
 
-PORTFOLIO_KINDS = ("repo", "technology", "domain")
 KNOWLEDGE_KINDS = ("paper", "concept", "model", "dataset")
-Scope = Literal["portfolio", "knowledge"]
 
 
 @router.get("/graph")
 def get_graph(
-    scope: Scope = "portfolio",
-    include_pending: bool = Query(default=False, description="knowledge: show pending nodes"),
+    include_pending: bool = Query(default=False, description="also return pending facts"),
     db: Session = Depends(get_db),
 ) -> dict[str, list[dict]]:
-    kinds = PORTFOLIO_KINDS if scope == "portfolio" else KNOWLEDGE_KINDS
-
-    node_q = select(GraphNode).where(GraphNode.kind.in_(kinds))
+    node_q = select(GraphNode).where(GraphNode.kind.in_(KNOWLEDGE_KINDS))
     if not include_pending:
         node_q = node_q.where(GraphNode.status == "verified")
     nodes = db.execute(node_q).scalars().all()
@@ -40,6 +34,8 @@ def get_graph(
 
     edges = db.execute(select(GraphEdge)).scalars().all()
     edges = [e for e in edges if e.source in node_ids and e.target in node_ids]
+    if not include_pending:
+        edges = [e for e in edges if e.status == "verified"]
 
     val: dict[str, float] = defaultdict(float)
     for e in edges:

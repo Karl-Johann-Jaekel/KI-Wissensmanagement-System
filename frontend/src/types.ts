@@ -1,13 +1,4 @@
-export type NodeKind =
-  | 'repo'
-  | 'technology'
-  | 'domain'
-  | 'paper'
-  | 'concept'
-  | 'model'
-  | 'dataset'
-
-export type Scope = 'portfolio' | 'knowledge'
+export type NodeKind = 'paper' | 'concept' | 'model' | 'dataset'
 
 export interface GraphNode {
   id: string
@@ -36,9 +27,6 @@ export interface GraphData {
 }
 
 export const KIND_COLORS: Record<NodeKind, string> = {
-  repo: '#38bdf8', // sky-400
-  technology: '#a78bfa', // violet-400
-  domain: '#f472b6', // pink-400
   paper: '#34d399', // emerald-400
   concept: '#fbbf24', // amber-400
   model: '#f87171', // red-400

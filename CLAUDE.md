@@ -1,11 +1,11 @@
 # Projektkontext: KI-Wissensmanagement-System
 
-DSGVO-konformes RAG-Wissensmanagement über KI-Forschungsartikel + GitHub-Portfolio-
-Graph + rekursiver Update-Loop. Vollständiger Plan in [PLAN.md](PLAN.md) — vor jeder
-Aufgabe lesen, aktuelle Phase dort abhaken.
+DSGVO-konformes RAG-Wissensmanagement über KI-Forschungsartikel + Wissens-Graph +
+rekursiver Update-Loop. Vollständiger Plan in [PLAN.md](PLAN.md) — vor jeder
+Aufgabe lesen, aktuelle Phase dort abhaken. GitHub-Portfolio-Track entfernt (ADR-0004).
 
 ## Regeln
-- Zonen: `public` (Korpus/GitHub, EU-API erlaubt) vs. `confidential` (nur lokal, Ollama).
+- Zonen: `public` (Korpus, EU-API erlaubt) vs. `confidential` (nur lokal, Ollama).
 - Öffentliches Deployment enthält NIE `confidential`-Daten (Deploy-Gate-Skript).
 - Paper-PDFs nie committen (arXiv-Lizenz); nur `demo-data/corpus.yaml` ist im Repo.
 - Extrahierte Graph-Fakten starten als `pending`; Promotion nur regelbasiert/Review;

@@ -6,13 +6,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api import chat, documents, graph, health, portfolio, search
+from app.api import chat, documents, graph, health, search
 from app.core.config import get_settings
 
 app = FastAPI(
     title="KI-Wissensmanagement-System",
     version=__version__,
-    summary="RAG über KI-Forschungskorpus + GitHub-Portfolio-Graph (PLAN.md)",
+    summary="RAG über KI-Forschungskorpus + Wissens-Graph (PLAN.md)",
 )
 
 app.add_middleware(
@@ -26,7 +26,6 @@ app.include_router(health.router)
 app.include_router(graph.router)
 app.include_router(search.router)
 app.include_router(chat.router)
-app.include_router(portfolio.router)
 app.include_router(documents.router)
 
 

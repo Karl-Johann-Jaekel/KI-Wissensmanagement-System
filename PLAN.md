@@ -11,10 +11,11 @@
 Projektname: **KI-Wissensmanagement-System** (Repo-Slug: `ki-wissensmanagement-system`).
 Zwei Tracks in einem Repo:
 
-**Track A — Portfolio-Graph (zuerst, Recruiter-Fokus):**
-Alle eigenen GitHub-Repos werden synchronisiert und als interaktiver Knowledge Graph
-visualisiert (Repos ↔ Technologien ↔ Domänen). Recruiter sehen den Tech-Stack auf
-einen Blick und können per Agent damit chatten. Nur öffentliche Daten.
+**~~Track A — Portfolio-Graph~~ (v4: ENTFERNT, siehe ADR-0004):**
+~~Alle eigenen GitHub-Repos werden synchronisiert und als interaktiver Knowledge Graph
+visualisiert.~~ Der GitHub-Portfolio-Track wurde nach Phase 6 komplett entfernt;
+das Projekt fokussiert auf Track B. Phasen 1–2 unten sind erledigte Historie,
+ihre Deliverables sind stillgelegt (Code in Git-History erhalten).
 
 **Track B — KI-Forschungskorpus (öffentlich) + privater Lokalbetrieb:**
 RAG-Pipeline (PDF → Markdown → Chunks → Embeddings → pgvector → Hybrid Search + RRF
@@ -360,6 +361,12 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
 | Wissens-Graph | nur Portfolio | zusätzlich Papers↔Konzepte↔Modelle↔Datasets | vom Nutzer gewünschtes Kernfeature; Schema um kinds/relations + `status`/`first_seen` erweitert |
 | Rekursion | — | Phase 8: Delta-Fetch ▸ Extraktion ▸ pending ▸ Promotion/Review ▸ „Neu"-Highlight | „selbst aktualisierend" konkret und sicher: kein Silent-Overwrite, Provenienzpflicht; „selbst optimierend" = messbares Eval-Tuning, keine autonomen Codeänderungen |
 | Sprache | de-only tsvector | `lang`-Spalte (en/de), cross-lingualer Eval | Korpus ist englisch, Fragen oft deutsch |
+
+**v4 (Kurzbegründung):**
+
+| Bereich | v3 | v4 | Warum |
+|---|---|---|---|
+| Track A (GitHub-Portfolio) | Portfolio-Graph + Recruiter-Agent (Phasen 1–2, Teile 5–6) | **komplett entfernt** (ADR-0004) | Fokus auf Track B; GitHub-Sync, `/portfolio/chat`, Portfolio-UI und -Daten gelöscht; generische Graph-Infrastruktur (Schema, Force-Graph-UI, Upserts in `app/db/graph.py`) bleibt für den Wissens-Graph (Phase 8) |
 
 ---
 
