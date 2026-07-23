@@ -9,7 +9,7 @@
 ## 1. Ziel & Scope
 
 Projektname: **KI-Wissensmanagement-System** (Repo-Slug: `ki-wissensmanagement-system`).
-Zwei Tracks in einem Repo:
+Seit v4 ein Track (Track B); Track A wurde entfernt:
 
 **~~Track A — Portfolio-Graph~~ (v4: ENTFERNT, siehe ADR-0004):**
 ~~Alle eigenen GitHub-Repos werden synchronisiert und als interaktiver Knowledge Graph
@@ -37,7 +37,7 @@ vollständiger Zitationsgraph (CITES via Referenz-Parsing).
 
 1. **Zwei aktive Datenzonen.** `sensitivity ∈ {public, confidential}`
    (Schema kennt zusätzlich `internal` für später, wird im MVP nicht genutzt).
-   - `public` → Forschungskorpus + GitHub-Daten; Inferenz via EU-API (Mistral, AVV).
+   - `public` → Forschungskorpus; Inferenz via EU-API (Mistral, AVV).
    - `confidential` → private Dokumente; ausschließlich lokale Modelle (Ollama).
 2. **Split-Deployment (Privacy by Architecture).** Der öffentliche Server enthält
    **ausschließlich** public-Daten. Private Dokumente existieren nur im lokalen
@@ -69,12 +69,11 @@ vollständiger Zitationsgraph (CITES via Referenz-Parsing).
 ```
               ÖFFENTLICHER BETRIEB (EU-VPS, nur public-Zone)
 ┌────────────────────────────────────────────────────────────────────┐
-│ GitHub-Sync ──▶ Portfolio-Graph ──┐                                │
 │ arXiv-Fetch ──▶ RAG-Pipeline ──▶ pgvector/tsvector                 │
 │                └▶ Extraktion ──▶ Wissens-Graph (pending→verified)  │
 │ n8n-Loop: Delta-Fetch ▸ Extraktion ▸ Review ▸ „Neu"-Highlight      │
 │ Retrieval: Hybrid ▸ RRF ▸ Reranker ── LLM: Mistral EU-API (AVV)    │
-│ FastAPI: /graph /search /chat /portfolio/chat  + MCP-Server        │
+│ FastAPI: /graph /search /chat /documents  + MCP-Server             │
 └────────────────────────────────────────────────────────────────────┘
 
               LOKALER BETRIEB (eigener Rechner, private Daten)
@@ -93,7 +92,7 @@ vollständiger Zitationsgraph (CITES via Referenz-Parsing).
 | Backend | Python 3.12, FastAPI, SQLAlchemy, Alembic, pydantic-settings | |
 | Datenbank | PostgreSQL 16 + **pgvector** | Volltext via `tsvector`/GIN, sprachabhängig (en/de) |
 | Graph-Speicher | **relationale Tabellen** `graph_nodes`/`graph_edges` | bewusst kein Apache AGE/Neo4j: Graphen bleiben klein; SQL-Traversals reichen; eine Abhängigkeit weniger |
-| Graph-Frontend | **react-force-graph** (2D, d3-force) | eine Komponente, zwei Datensätze: Portfolio- und Wissens-Graph |
+| Graph-Frontend | **react-force-graph** (2D, d3-force) | eine generische Komponente für den Wissens-Graph |
 | Korpus-Quelle | **arXiv API** (cs.AI, cs.CL, cs.IR, cs.LG + Keyword-Queries) | höflich: Rate-Limits beachten, User-Agent setzen |
 | OCR / Parsing | **Docling** (lokal, Default) | arXiv-PDFs sind born-digital; Formeln/Tabellen bestmöglich nach Markdown |
 | Chunking | Heading-aware Markdown-Split (~1.000 Zeichen, Overlap ~150) | semantisches Chunking nur für überlange Abschnitte |
@@ -122,17 +121,17 @@ ki-wissensmanagement-system/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py
-│   │   ├── api/                # health, graph, ingest, search, chat, portfolio, review
+│   │   ├── ingest.py           # CLI: python -m app.ingest <pfad> --sensitivity …
+│   │   ├── api/                # health, graph, search, chat, documents (+ review, Ph. 8)
 │   │   ├── core/               # config, llm_router, security
-│   │   ├── github/             # sync.py, extract.py (Manifeste/Topics → Graph)
-│   │   ├── corpus/             # arxiv.py (Fetch/Delta), extract.py (Paper → Fakten)
+│   │   ├── corpus/             # arxiv.py (Fetch/Delta), extract.py (Paper → Fakten) — Ph. 8
 │   │   ├── ingestion/          # ocr.py, chunking.py, embedding.py, pipeline.py
-│   │   ├── retrieval/          # hybrid.py, rrf.py, rerank.py
-│   │   ├── generation/         # prompts.py, generate.py, portfolio_agent.py
-│   │   └── db/                 # models.py, session.py, migrations/
+│   │   ├── retrieval/          # hybrid.py, rrf.py, rerank.py, search.py
+│   │   ├── generation/         # llm.py, prompts.py, generate.py
+│   │   └── db/                 # models.py, session.py, graph.py (Upserts), migrations/
 │   └── tests/
 ├── mcp_server/
-├── frontend/                   # Graph-Seiten + Chat + Review-Queue (eine App)
+├── frontend/                   # Wissens-Graph + Chat + Dokumente (+ Review-Queue, Ph. 8)
 ├── automation/                 # n8n-Exporte (JSON, ohne Credentials)
 ├── eval/                       # golden.yaml, run_eval.py, tune.py
 ├── demo-data/
@@ -184,7 +183,8 @@ CREATE TABLE chunks (
 CREATE INDEX idx_chunks_embedding ON chunks USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX idx_chunks_tsv       ON chunks USING gin (content_tsv);
 
--- Graphen (Portfolio + Wissen), relational statt Graph-DB
+-- Wissens-Graph, relational statt Graph-DB
+-- (kinds repo/technology/domain seit v4 ungenutzt, Schema unverändert — ADR-0004)
 CREATE TABLE graph_nodes (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     kind       TEXT NOT NULL CHECK (kind IN
@@ -226,7 +226,7 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
 - [x] FastAPI-Skelett mit `GET /health`; Alembic initialisiert
 - **DoD:** `docker compose up` startet DB + Backend; `/health` antwortet; CI grün.
 
-### Phase 1 — GitHub-Sync & Portfolio-Graph-Daten  *(Track A)*
+### Phase 1 — GitHub-Sync & Portfolio-Graph-Daten  *(Track A — v4: ENTFERNT, ADR-0004)*
 - [x] Migration: Schema aus Abschnitt 6
 - [x] `github/sync.py`: GitHub-REST-API (PAT, nur public scope) — Repos, Topics,
       Languages (Byte-Anteile → `weight`), READMEs, Manifeste
@@ -239,14 +239,15 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
 - [x] CLI: `python -m app.sync_github <username>` (idempotent)
 - **DoD:** Sync füllt Graph reproduzierbar; Unit-Tests fürs Dependency-Mapping.
 
-### Phase 2 — Graph-Visualisierung  *(Track A — erstes öffentliches Deliverable)*
+### Phase 2 — Graph-Visualisierung  *(v4: Portfolio-Ansicht entfernt; die generische Force-Graph-Komponente lebt als Wissens-Graph-View weiter)*
 - [x] React-Seite mit **react-force-graph**: Farbe nach `kind`, Knotengröße nach
       Kantengewicht; Komponente generisch (nimmt später auch den Wissens-Graph)
 - [x] Interaktion: Hover-Highlight der Nachbarn, Filter nach Technologie/Sprache,
       Klick auf Repo → Seitenpanel (Beschreibung, Link, Tech-Liste)
 - [x] `scripts/export_graph_json.py` → statisches `graph.json`
       (Fallback: läuft notfalls ohne Backend auf GitHub Pages)
-- **DoD:** Interaktiver Portfolio-Graph im Browser; verlinkbar (README-GIF + Live-Link).
+- **DoD:** ~~Interaktiver Portfolio-Graph im Browser~~ (v4: Ansicht dient jetzt dem
+  Wissens-Graph; füllt sich mit Phase 8).
 
 ### Phase 3 — KI-Forschungskorpus indexieren  *(Track B; Video-Schritte 1–4)*
 - [x] `demo-data/corpus.yaml`: Themen-Queries (RAG, Retrieval, Agents, Reranking,
@@ -272,26 +273,24 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
       `eval/run_eval.py` misst Hit-Rate@5 — mit und ohne Reranker
 - **DoD:** Hit-Rate@5 ≥ 0,8; Latenz lokal < 2 s. → **0,94 (15/16), p95 221ms** ✓
 
-### Phase 5 — Generation, Router & Recruiter-Agent  *(Video-Schritt 8 + Track A)*
+### Phase 5 — Generation & Router  *(v4: Recruiter-Agent/`/portfolio/chat` entfernt)*
 - [x] `core/llm_router.py`: höchste Sensitivität der Treffer entscheidet —
       `confidential` ⇒ nur Ollama, nachweislich kein externer Call (Test mit Netz-Mock)
 - [x] `generation/prompts.py`: Nur-Kontext-Regel, Zitatformat `[Paper, Abschnitt]`,
       explizite „weiß nicht"-Regel
 - [x] `POST /chat`: SSE-Streaming; Response enthält `answer` + `sources[]`
-- [x] `generation/portfolio_agent.py` + `POST /portfolio/chat`:
-      feste Tool-Funktionen `repos_by_technology(tech)`, `technologies_of(repo)`,
-      `related_repos(repo)` + RAG über READMEs; **hart auf Zone `public` beschränkt**
+- [x] ~~`generation/portfolio_agent.py` + `POST /portfolio/chat`~~ (v4: entfernt)
 - [x] Hardening: Rate-Limit (~~slowapi~~ in-process, ADR-0003), tägliches
       Token-/Kosten-Cap, festes Systemprompt, Input-Längenlimit
-- **DoD:** Portfolio-Fragen korrekt mit Repo-Links; Fachfragen („Was ist RRF?") mit
-  Paper-Beleg; Zonentest belegt keinen Zugriff auf `confidential`.
+- **DoD:** Fachfragen („Was ist RRF?") mit Paper-Beleg; Zonentest belegt keinen
+  Zugriff auf `confidential`. ~~Portfolio-Fragen mit Repo-Links~~ (v4)
 
 ### Phase 6 — Frontend-Ausbau
-- [x] Eine App: Graph-Seiten + Chat; Recruiter-Modus (public, ohne Login) und
+- [x] Eine App: Wissens-Graph + Chat + Dokumente; Öffentlich-Modus (ohne Login) und
       Admin-Modus (API-Key; lokal auch `confidential`)
 - [x] Quellen-Panel (Chunk-Vorschau, Paper-/Dokument-Link), Dokumentliste mit
       Sensitivity-Badge, Upload nur im Admin-Modus
-- **DoD:** Ende-zu-Ende im Browser: Frage → belegte Antwort; Graph ↔ Chat verlinkt.
+- **DoD:** Ende-zu-Ende im Browser: Frage → belegte Antwort mit Quellen-Panel.
 
 ### Phase 7 — MCP-Server & n8n-Basis
 - [ ] `mcp_server/`: fastmcp-Tools `search_knowledge(query, top_k)`,
@@ -328,15 +327,15 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
 
 ### Phase 9 — Deployment (öffentlich) & privater Lokalbetrieb
 - [ ] **Öffentlich:** EU-VPS (CPU reicht — Inferenz via Mistral-API), Compose-Profil
-      `public`, Caddy TLS; öffentlich nur `/graph` + `/portfolio/chat` (+ Chat im
-      public-Scope), Rest hinter API-Key; DB frisch aus GitHub-Sync + Korpus-Fetch
+      `public`, Caddy TLS; öffentlich nur `/graph` + `/chat`/`/search` im
+      public-Scope, Rest hinter API-Key; DB frisch aus Korpus-Fetch + Ingest
 - [ ] `scripts/check_no_confidential_in_prod.py` als Deploy-Gate
 - [ ] n8n-Cron für den Living-Knowledge-Loop produktiv schalten (inkl. Caps)
 - [ ] Backups: nightly `pg_dump` + Volume-Snapshot; **Restore einmal real testen**
 - [ ] Logging ohne Chunk-Inhalte; Uptime-Monitoring; Golden-Eval als Prod-Smoke-Test
 - [ ] **Lokal:** Profil `local` mit Ollama; `data/private/` ingesten; README-Abschnitt
       „Privater Betrieb"
-- **DoD:** Graph, Wissens-Graph und Recruiter-Chat live unter eigener Domain;
+- **DoD:** Wissens-Graph und Chat live unter eigener Domain;
   Deploy-Gate grün; Backup-Restore verifiziert.
 
 ---
@@ -379,25 +378,8 @@ Regeln: kleine Commits (Conventional Commits) · kein Phasenwechsel vor erfüllt
 Abweichungen als ADR in `docs/adr/` · niemals Inhalte aus `data/` in Commits,
 Logs oder Tests.
 
-**CLAUDE.md** (ins Repo-Root legen):
-
-```markdown
-# Projektkontext: KI-Wissensmanagement-System
-DSGVO-konformes RAG-Wissensmanagement über KI-Forschungsartikel + GitHub-Portfolio-
-Graph + rekursiver Update-Loop. Vollständiger Plan in PLAN.md — vor jeder Aufgabe
-lesen, aktuelle Phase dort abhaken.
-
-## Regeln
-- Zonen: public (Korpus/GitHub, EU-API erlaubt) vs. confidential (nur lokal, Ollama).
-- Öffentliches Deployment enthält NIE confidential-Daten (Deploy-Gate-Skript).
-- Paper-PDFs nie committen (arXiv-Lizenz); nur demo-data/corpus.yaml ist im Repo.
-- Extrahierte Graph-Fakten starten als pending; Promotion nur regelbasiert/Review;
-  Provenienz (source_document_ids) ist Pflicht; kein Silent-Overwrite.
-- Ein multilinguales Embedding-Modell für Index UND Query (siehe .env).
-- data/ und .env sind tabu für Commits, Logs und Tests. Gitleaks muss grün sein.
-- Agent-Tools nur als feste, parametrisierte Funktionen — kein LLM-generiertes SQL.
-- Stack: FastAPI, Postgres+pgvector, Ollama, Mistral-API, fastmcp, React+TS, n8n.
-```
+**CLAUDE.md** liegt im Repo-Root und ist die maßgebliche Kurzanweisung
+(dieser Abschnitt hält keine Kopie mehr vor — Single Source of Truth).
 
 ---
 
@@ -406,7 +388,7 @@ lesen, aktuelle Phase dort abhaken.
 | # | Entscheidung | Bis wann |
 |---|---|---|
 | 1 | ~~Projektname~~ → **KI-Wissensmanagement-System** | erledigt |
-| 2 | GitHub-PAT (read-only, public) anlegen | vor Phase 1 |
+| 2 | ~~GitHub-PAT anlegen~~ | obsolet (v4: Track A entfernt) |
 | 3 | Themen-Queries + Seed-Paper-Liste (`corpus.yaml`) | vor Phase 3 |
 | 4 | Embedding-Modell final (cross-lingualer Benchmark) | Ende Phase 3 |
 | 5 | Mistral-La-Plateforme-Account + AVV | vor Phase 5 |
@@ -426,7 +408,7 @@ für den öffentlichen Server ist keine GPU nötig.
 - **Laufende Kosten des Loops:** Extraktion pro Paper kostet Tokens — Caps pro Lauf
   sind Teil der DoD von Phase 8, nicht optional.
 - **Urheberrecht Korpus:** Paper-PDFs nie committen; nur Metadaten + Fetch-Skript.
-- **arXiv-/GitHub-Rate-Limits:** Delta-Fetch per Cron, ETag/Conditional Requests.
+- **arXiv-Rate-Limits:** Delta-Fetch per Cron, höflich (Delay + User-Agent).
 - **CPU-Latenz Reranker:** `RERANK_ENABLED`-Flag; Eval mit/ohne vergleichen.
 - **Missbrauch öffentlicher Endpoints:** Rate-Limit + Kosten-Cap (DoD Phase 5).
 - **Leak ins öffentliche Repo:** gitleaks + Review; im Ernstfall `git filter-repo`
