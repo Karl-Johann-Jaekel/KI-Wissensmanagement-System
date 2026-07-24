@@ -293,13 +293,16 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
 - **DoD:** Ende-zu-Ende im Browser: Frage → belegte Antwort mit Quellen-Panel.
 
 ### Phase 7 — MCP-Server & n8n-Basis
-- [ ] `mcp_server/`: fastmcp-Tools `search_knowledge(query, top_k)`,
-      `ask_knowledge(question)`, `list_documents(filter)`, `query_graph(scope, …)` —
-      alle mit `max_sensitivity`-Parameter (Default `public`)
-- [ ] In Claude Code/Desktop einbinden und manuell verifizieren
-- [ ] n8n aufsetzen; Workflow: Watch-Folder/Webhook → `/ingest`; Exporte nach `automation/`
+- [x] `mcp_server/`: fastmcp-Tools `search_knowledge(query, top_k)`,
+      `ask_knowledge(question)`, `list_documents(filter)`, `query_graph(include_pending)` —
+      alle mit `max_sensitivity`/Admin-Gate (Default `public`); HTTP-Wrapper über die
+      Backend-API, mit Mock-Tests
+- [x] In Claude Code/Desktop einbinden und manuell verifizieren
+      (Config-Snippet in `mcp_server/README.md`; Client live gegen echte API geprüft)
+- [x] n8n aufsetzen; Workflow: Webhook → `/ingest`; Export in `automation/`
 - **DoD:** Claude kann via MCP Bestand + Graphen abfragen; neue PDF wird ohne
-  manuellen Schritt abfragbar.
+  manuellen Schritt abfragbar. → MCP-Client live (search/ask/list/graph) ✓; n8n
+  live (:5678); `/ingest`-Pfad per Webhook. Desktop-Einbindung = manueller Nutzerschritt.
 
 ### Phase 8 — Living Knowledge: rekursiver Update-Loop  *(Kern-Feature Track B)*
 - [ ] `corpus/arxiv.py --since`: Delta-Fetch neuer Papers zu den Queries aus
