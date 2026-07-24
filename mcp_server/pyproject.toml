@@ -1,0 +1,15 @@
+[project]
+name = "kwms-mcp-server"
+version = "0.1.0"
+description = "MCP server exposing the KI-Wissensmanagement knowledge base to Claude"
+requires-python = ">=3.10"
+dependencies = [
+    "fastmcp>=2.0",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.ruff]
+line-length = 100

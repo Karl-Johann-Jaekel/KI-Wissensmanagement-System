@@ -47,6 +47,7 @@ services:
       - ./demo-data:/app/demo-data:ro
       - ./scripts:/app/scripts:ro
       - ./eval:/app/eval
+      - ./mcp_server:/app/mcp_server
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   # --- profile: local (confidential zone — nothing leaves the machine) ---
