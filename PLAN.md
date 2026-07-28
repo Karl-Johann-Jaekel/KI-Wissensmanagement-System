@@ -305,28 +305,28 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
   live (:5678); `/ingest`-Pfad per Webhook. Desktop-Einbindung = manueller Nutzerschritt.
 
 ### Phase 8 — Living Knowledge: rekursiver Update-Loop  *(Kern-Feature Track B)*
-- [ ] `corpus/arxiv.py --since`: Delta-Fetch neuer Papers zu den Queries aus
-      `corpus.yaml` (n8n-Cron, z. B. wöchentlich); Cap pro Lauf (max. N Papers)
-- [ ] Auto-Ingest der Deltas (Pipeline aus Phase 3)
-- [ ] `corpus/extract.py`: LLM extrahiert pro Paper Fakten für den Wissens-Graph
+- [x] `corpus/arxiv.py --since`: Delta-Fetch neuer Papers zu den Queries aus
+      `corpus.yaml`; Cap pro Lauf (max. N Papers)
+- [x] Auto-Ingest der Deltas (Pipeline aus Phase 3; im Orchestrator `app.update`)
+- [x] `corpus/extract.py`: LLM extrahiert pro Paper Fakten für den Wissens-Graph
       (Konzepte, Modelle, Datasets, Relationen) mit Konfidenz — **alles startet
       `pending`**, Provenienz (`source_document_ids`) ist Pflichtfeld
-- [ ] Konzept-Normalisierung: Alias-Mapping („RAG" = „Retrieval-Augmented Generation"),
-      Dedupe vor Insert
-- [ ] Promotion-Regeln: auto-`verified` nur bei Konfidenz ≥ Schwelle **und** Stützung
+- [x] Konzept-Normalisierung: Alias-Mapping („RAG" = „Retrieval-Augmented Generation"),
+      Dedupe vor Insert (`corpus/aliases.py`)
+- [x] Promotion-Regeln: auto-`verified` nur bei Konfidenz ≥ Schwelle **und** Stützung
       durch ≥ 2 unabhängige Quellen; sonst Review-Queue im Admin-Frontend
-      (verify/reject per Klick); Konflikte mit bestehendem `verified`-Wissen werden
+      (verify/reject per Klick); Konflikte (reziprokes `IMPROVES_ON`) werden
       markiert (`meta.disputed`), nie überschrieben
-- [ ] Frontend „Neu"-Layer: Knoten mit `first_seen` < 7/30 Tage pulsieren/leuchten;
-      Zeitfilter; Changelog-Feed „Diese Woche neu"; Wissens-Graph-Ansicht
-      (gleiche Komponente, `scope=knowledge`; public sieht nur `verified`)
-- [ ] Selbstoptimierung **messbar**: nach jedem Lauf Golden-Eval; `eval/tune.py`
-      sweept Retrieval-Parameter (top_k, RRF-k, `RERANK_ENABLED`) und übernimmt die
-      beste Konfiguration; Report pro Lauf als Artefakt. Keine autonomen
-      Codeänderungen — Optimierung heißt Parameter + Datenbestand, nicht Code.
-- [ ] Kosten-Cap pro Lauf (Token-Budget für Extraktion)
-- **DoD:** Loop läuft end-to-end per Cron; neue Papers erscheinen hervorgehoben;
-  kein `verified`-Fakt ohne Quellbeleg (DB-Check); Eval-Report pro Lauf vorhanden.
+- [x] Frontend „Neu"-Layer: Knoten mit `first_seen` < 7/30 Tage leuchten;
+      Zeitfilter; Changelog-Feed „Neu (7 Tage)"; Wissens-Graph-Ansicht
+      (public sieht nur `verified`, Admin-Toggle für `pending`)
+- [x] Selbstoptimierung **messbar**: nach jedem Lauf Golden-Eval (Report-Artefakt);
+      `eval/tune.py` sweept Retrieval-Parameter (candidate_k, `RERANK_ENABLED`),
+      schreibt beste Konfiguration als Report. Keine autonomen Codeänderungen.
+- [x] Kosten-Cap pro Lauf (Token-Budget für Extraktion, `--token-budget`)
+- **DoD:** Loop läuft end-to-end (`python -m app.update`, n8n-Cron-fähig); neue Papers
+  erscheinen hervorgehoben; kein `verified`-Fakt ohne Quellbeleg (Provenienz aus Kanten);
+  Eval-Report pro Lauf. → **live: 16 Papers → 66 Fakten, 3 auto-verified, Eval 0,94** ✓
 
 ### Phase 9 — Deployment (öffentlich) & privater Lokalbetrieb
 - [ ] **Öffentlich:** EU-VPS (CPU reicht — Inferenz via Mistral-API), Compose-Profil

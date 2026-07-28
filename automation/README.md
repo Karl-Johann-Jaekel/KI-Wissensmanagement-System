@@ -28,5 +28,15 @@ Content-Type: application/pdf
 After activating the workflow, dropping a PDF at that URL makes it queryable via
 `/chat` / `/search` / MCP without any manual ingest command (Phase 7 DoD).
 
-> The Phase 8 living-knowledge loop (delta-fetch → extract → review) will be added
-> here as a **Schedule**-triggered workflow.
+### `living-knowledge-cron.workflow.json` — weekly recursive update loop
+A **Schedule** trigger (weekly) runs the end-to-end loop
+(`app.update`: delta-fetch → ingest → LLM-extract → promote → eval). The command
+form uses n8n's Execute Command node; on a server run n8n with access to the compose
+project, or replace it with a plain host cron:
+
+```cron
+# weekly, Monday 03:00 — delta-fetch + extract + promote + eval
+0 3 * * 1 cd /srv/kwms && docker compose exec -T backend python -m app.update --since "$(date -d '7 days ago' +%F)" --cap 5
+```
+
+Each run writes a JSON report to `eval/reports/` (Hit-Rate@5 + counts) as an artifact.

@@ -10,6 +10,8 @@ interface Props {
   activeIds: Set<string> | null
   onNodeClick: (node: GraphNode) => void
   selectedId: string | null
+  /** Nodes first seen within this many days glow as "Neu". */
+  glowDays?: number
 }
 
 const DIM_ALPHA = 0.12
@@ -21,9 +23,19 @@ export default function GraphView({
   activeIds,
   onNodeClick,
   selectedId,
+  glowDays = 7,
 }: Props) {
   const fgRef = useRef<any>(null)
   const [hoverId, setHoverId] = useState<string | null>(null)
+
+  const isNew = useCallback(
+    (node: GraphNode) => {
+      if (!node.first_seen) return false
+      const ageDays = (Date.now() - new Date(node.first_seen).getTime()) / 86_400_000
+      return ageDays <= glowDays
+    },
+    [glowDays],
+  )
 
   // adjacency for hover-neighbour highlighting
   const neighbours = useMemo(() => {
@@ -57,6 +69,15 @@ export default function GraphView({
       const r = 2 + Math.sqrt(node.val) * 1.6
       const color = KIND_COLORS[node.kind] ?? '#94a3b8'
       ctx.globalAlpha = bright ? 1 : DIM_ALPHA
+      // "Neu"-glow: recently added nodes get a soft halo
+      if (bright && isNew(node)) {
+        ctx.globalAlpha = 0.35
+        ctx.beginPath()
+        ctx.arc(node.x ?? 0, node.y ?? 0, r + 4, 0, 2 * Math.PI)
+        ctx.fillStyle = color
+        ctx.fill()
+        ctx.globalAlpha = 1
+      }
       ctx.beginPath()
       ctx.arc(node.x ?? 0, node.y ?? 0, r, 0, 2 * Math.PI)
       ctx.fillStyle = color
@@ -78,7 +99,7 @@ export default function GraphView({
       }
       ctx.globalAlpha = 1
     },
-    [isBright, selectedId],
+    [isBright, isNew, selectedId],
   )
 
   const paintPointerArea = useCallback(

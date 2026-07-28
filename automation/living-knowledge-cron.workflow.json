@@ -1,0 +1,31 @@
+{
+  "name": "KWMS — Living Knowledge (weekly)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "weeks", "weeksInterval": 1 }] }
+      },
+      "id": "schedule",
+      "name": "Weekly",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "command": "docker compose exec -T backend python -m app.update --since {{ $today.minus({weeks: 1}).toFormat('yyyy-MM-dd') }} --cap 5"
+      },
+      "id": "run-update",
+      "name": "Run update loop",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [680, 300]
+    }
+  ],
+  "connections": {
+    "Weekly": { "main": [[{ "node": "Run update loop", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": {},
+  "tags": ["kwms"]
+}

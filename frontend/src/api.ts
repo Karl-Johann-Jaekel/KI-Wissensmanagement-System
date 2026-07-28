@@ -134,3 +134,45 @@ export async function uploadPdf(
   }
   return res.json()
 }
+
+// -------------------------------------------------- living knowledge (Phase 8)
+
+export interface ChangelogItem {
+  id: string
+  kind: string
+  name: string
+  first_seen: string
+}
+
+export async function fetchChangelog(days = 7): Promise<ChangelogItem[]> {
+  const res = await fetch(`${BASE}/graph/changelog?days=${days}`)
+  if (!res.ok) throw new Error(`changelog: HTTP ${res.status}`)
+  return (await res.json()).items as ChangelogItem[]
+}
+
+export interface PendingItem {
+  id: string
+  kind: string
+  name: string
+  sources: number
+  confidence: number
+  first_seen: string
+}
+
+export async function fetchReview(apiKey: string): Promise<PendingItem[]> {
+  const res = await fetch(`${BASE}/review`, { headers: { 'X-API-Key': apiKey } })
+  if (!res.ok) throw new Error(`review: HTTP ${res.status}`)
+  return (await res.json()).pending as PendingItem[]
+}
+
+export async function reviewNode(
+  id: string,
+  action: 'verify' | 'reject',
+  apiKey: string,
+): Promise<void> {
+  const res = await fetch(`${BASE}/review/node/${id}?action=${action}`, {
+    method: 'POST',
+    headers: { 'X-API-Key': apiKey },
+  })
+  if (!res.ok) throw new Error(`review ${action}: HTTP ${res.status}`)
+}
