@@ -1,0 +1,66 @@
+"""Review queue API — admin gating + verify action (PLAN §7 Phase 8)."""
+
+from __future__ import annotations
+
+from collections.abc import Iterator
+
+from fastapi.testclient import TestClient
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from app.core.config import get_settings
+from app.db.graph import upsert_edge, upsert_node
+from app.db.session import get_db
+from app.main import app
+
+ADMIN_KEY = get_settings().admin_api_key
+
+
+def _seed_pending(session: Session) -> str:
+    session.execute(text("DELETE FROM graph_nodes"))
+    paper = upsert_node(session, "paper", "Some Paper", status="verified")
+    concept = upsert_node(session, "concept", "Pending Concept", status="pending")
+    upsert_edge(
+        session,
+        paper,
+        concept,
+        "INTRODUCES",
+        meta={"source_document_ids": ["d1"], "confidence": 0.9},
+        status="pending",
+    )
+    session.commit()
+    return concept
+
+
+def _override(db_session: Session):
+    def _dep() -> Iterator[Session]:
+        yield db_session
+
+    return _dep
+
+
+def test_review_requires_admin(client: TestClient) -> None:
+    assert client.get("/review").status_code == 401
+
+
+def test_review_lists_and_verifies(db_session: Session, client: TestClient) -> None:
+    concept_id = _seed_pending(db_session)
+    app.dependency_overrides[get_db] = _override(db_session)
+    try:
+        listed = client.get("/review", headers={"X-API-Key": ADMIN_KEY}).json()
+        assert any(i["name"] == "Pending Concept" for i in listed["pending"])
+
+        resp = client.post(
+            f"/review/node/{concept_id}",
+            params={"action": "verify"},
+            headers={"X-API-Key": ADMIN_KEY},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "verified"
+    finally:
+        app.dependency_overrides.clear()
+
+    status = db_session.execute(
+        text("SELECT status FROM graph_nodes WHERE name='Pending Concept'")
+    ).scalar_one()
+    assert status == "verified"

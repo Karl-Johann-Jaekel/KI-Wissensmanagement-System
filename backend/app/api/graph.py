@@ -8,6 +8,7 @@ frontend can size nodes.
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
@@ -64,5 +65,40 @@ def get_graph(
                 "status": e.status,
             }
             for e in edges
+        ],
+    }
+
+
+@router.get("/graph/changelog")
+def changelog(
+    days: int = Query(default=7, ge=1, le=365),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Verified knowledge-graph nodes first seen within the last `days` — "Neu"-Feed."""
+    since = datetime.now(UTC) - timedelta(days=days)
+    rows = (
+        db.execute(
+            select(GraphNode)
+            .where(
+                GraphNode.kind.in_(KNOWLEDGE_KINDS),
+                GraphNode.status == "verified",
+                GraphNode.first_seen >= since,
+            )
+            .order_by(GraphNode.first_seen.desc())
+        )
+        .scalars()
+        .all()
+    )
+    return {
+        "days": days,
+        "count": len(rows),
+        "items": [
+            {
+                "id": str(n.id),
+                "kind": n.kind,
+                "name": n.name,
+                "first_seen": n.first_seen.isoformat(),
+            }
+            for n in rows
         ],
     }
