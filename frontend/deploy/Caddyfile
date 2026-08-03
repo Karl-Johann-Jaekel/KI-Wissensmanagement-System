@@ -1,0 +1,25 @@
+# Öffentliches Deployment (Compose-Profil "public", ADR-0009):
+# ein Container für TLS, statische SPA und den API-Reverse-Proxy.
+# SITE_ADDRESS z. B. "wissen.example.com" (automatisches Let's-Encrypt-TLS)
+# oder ":80" für lokale Tests ohne TLS.
+
+{$SITE_ADDRESS::80}
+
+encode zstd gzip
+
+handle /api/* {
+	uri strip_prefix /api
+	reverse_proxy backend:8000
+}
+
+handle {
+	root * /srv
+	try_files {path} /index.html
+	file_server
+}
+
+# Keine Header/Bodies im Log — Logging-Hygiene (PLAN Phase 10).
+log {
+	output stdout
+	format console
+}
