@@ -1,11 +1,12 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
-import { FolderKanban, Library, Search, Sparkles } from 'lucide-react'
+import { FolderKanban, Search, Sparkles } from 'lucide-react'
 import { AdminKeyProvider } from './app/AdminKeyContext'
 import AppShell from './app/AppShell'
 import { ToastProvider } from './components/ui/Toast'
 import { applyTheme, resolveTheme } from './lib/theme'
+import BibliothekPage from './pages/BibliothekPage'
 import ChatPage from './pages/ChatPage'
 import DocumentPage from './pages/DocumentPage'
 import InboxPage from './pages/InboxPage'
@@ -45,16 +46,7 @@ const router = createBrowserRouter([
           />
         ),
       },
-      {
-        path: '/bibliothek',
-        element: (
-          <PlaceholderPage
-            title="Bibliothek"
-            icon={Library}
-            hint="Privater Wissensspeicher (confidential) mit lokalem Ollama-Modell."
-          />
-        ),
-      },
+      { path: '/bibliothek', element: <BibliothekPage /> },
       {
         path: '/projekte',
         element: (

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Lock } from 'lucide-react'
-import { streamChat } from '../api'
+import { fetchModels, streamChat } from '../api'
 import { useAdminKey } from '../app/AdminKeyContext'
 import ChatInput from '../components/chat/ChatInput'
 import MessageList from '../components/chat/MessageList'
@@ -38,7 +38,23 @@ export default function ChatPage() {
   const [busy, setBusy] = useState(false)
   const [zone, setZone] = useState<Zone>('public')
   const [model, setModel] = useState<string | null>(null)
+  const [availableModels, setAvailableModels] = useState<string[] | null>(null)
   const metaRef = useRef<ChatMeta | null>(null)
+
+  // Lokale Ollama-Modelle für den Picker (nur Admin).
+  useEffect(() => {
+    if (!adminKey) {
+      setAvailableModels(null)
+      return
+    }
+    let cancelled = false
+    fetchModels(adminKey)
+      .then((info) => !cancelled && setAvailableModels(info.available ? info.models.map((m) => m.name) : null))
+      .catch(() => !cancelled && setAvailableModels(null))
+    return () => {
+      cancelled = true
+    }
+  }, [adminKey])
 
   // Chat laden bzw. für „Neuer Chat" zurücksetzen.
   useEffect(() => {
@@ -165,7 +181,7 @@ export default function ChatPage() {
         onZoneChange={setZone}
         model={model}
         onModelChange={setModel}
-        models={null}
+        models={availableModels}
         placeholder="Frage an den KI-Forschungskorpus … (DE/EN)"
       />
     </div>
