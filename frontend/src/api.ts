@@ -2,20 +2,16 @@ import type { GraphData } from './types'
 
 const BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? 'http://localhost:8000'
 
-/**
- * Fetch the knowledge graph. Falls back to a static ./graph.json bundled with
- * the site (runs without a backend, e.g. on GitHub Pages).
- */
-export async function fetchGraph(includePending = false): Promise<GraphData> {
-  try {
-    const res = await fetch(`${BASE}/graph?include_pending=${includePending}`)
-    if (!res.ok) throw new Error(`graph: HTTP ${res.status}`)
-    return (await res.json()) as GraphData
-  } catch (err) {
-    const fallback = await fetch(`${import.meta.env.BASE_URL}graph.json`)
-    if (!fallback.ok) throw err
-    return (await fallback.json()) as GraphData
-  }
+/** Fetch the knowledge graph (pending nodes only visible with an admin key). */
+export async function fetchGraph(
+  includePending = false,
+  apiKey?: string | null,
+): Promise<GraphData> {
+  const res = await fetch(`${BASE}/graph?include_pending=${includePending}`, {
+    headers: apiKey ? { 'X-API-Key': apiKey } : {},
+  })
+  if (!res.ok) throw new Error(`graph: HTTP ${res.status}`)
+  return (await res.json()) as GraphData
 }
 
 // ---------------------------------------------------------------- chat (SSE)
