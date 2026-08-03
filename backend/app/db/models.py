@@ -58,6 +58,8 @@ class Document(Base):
     content_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     sensitivity: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'public'"))
     lang: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'english'"))
+    # Volles Markdown fürs Frontend (Reader/Editor); NULL bei Alt-Dokumenten.
+    content_md: Mapped[str | None] = mapped_column(Text)
     meta: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'"))
     created_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
 
