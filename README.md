@@ -176,8 +176,34 @@ docker compose exec backend python eval/run_eval.py
 docker compose exec backend python -m app.ingest data/private --sensitivity confidential
 ```
 
-Fragen mit `max_sensitivity=confidential` (Admin-Key nötig) werden **garantiert nur vom
-lokalen Ollama-Modell** beantwortet — kein externer API-Call.
+Oder direkt im UI: Die **Bibliothek** ist der private Wissensspeicher — PDFs und
+Markdown-Notizen per Drag&Drop hochladen (Zone fest `confidential`), Markdown
+direkt im Browser bearbeiten (Speichern re-indexiert), und beim Chat das lokale
+**Ollama-Modell frei wählen** (`GET /models`). Fragen mit
+`max_sensitivity=confidential` (Admin-Key nötig) werden **garantiert nur vom
+lokalen Ollama-Modell** beantwortet — kein externer API-Call. Chats, Skills und
+Projekte liegen ausschließlich im Browser (localStorage, ADR-0006) — der Server
+speichert keine Konversationen.
+
+### Öffentliches Deployment (EU-VPS)
+
+```bash
+# 1. .env produktiv setzen: SITE_ADDRESS=wissen.example.com, APP_ENV=production,
+#    starker ADMIN_API_KEY, MISTRAL_API_KEY, CORS_ORIGINS=https://wissen.example.com
+# 2. Stack bauen & starten (Caddy: TLS + SPA + /api-Proxy, ADR-0009):
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile public up -d --build
+# 3. Deploy-Gate: öffentlicher Server darf NUR public-Daten enthalten
+docker compose exec -T backend python scripts/check_no_confidential_in_prod.py
+# 4. Smoke-Test (Health, Graph, Chat, Golden-Eval):
+BASE_URL=https://wissen.example.com/api ./scripts/smoke_prod.sh
+# 5. Nightly-Backup als Host-Cron (03:00) + Restore-Drill: docs/runbooks/restore.md
+#    0 3 * * * cd /opt/kwms && ./scripts/backup.sh >> backups/backup.log 2>&1
+# 6. Living-Knowledge-Loop wöchentlich (Caps inklusive):
+#    0 6 * * 1 cd /opt/kwms && docker compose exec -T backend \
+#      python -m app.update --since $(date -d '8 days ago' +\%F) --cap 5 --token-budget 200000
+```
+
+Uptime-Monitoring extern auf `https://<domain>/api/health` legen (z. B. UptimeRobot).
 
 ---
 
@@ -190,7 +216,9 @@ lokalen Ollama-Modell** beantwortet — kein externer API-Call.
 | `GET /graph` | Wissens-Graph (`verified`; Admin: `include_pending`) |
 | `GET /graph/changelog` | Neu hinzugekommene Fakten (N Tage) |
 | `GET /review` · `POST /review/node/{id}` | Review-Queue (Admin) |
-| `GET /documents` · `POST /ingest` | Dokumentliste · Upload (Admin) |
+| `GET /documents` · `GET /documents/{id}` | Dokumentliste · Inhalt für Reader/Editor |
+| `POST /ingest` · `PUT /documents/{id}/content` · `DELETE /documents/{id}` | Upload (PDF/MD) · MD-Edit mit Re-Index · Löschen (Admin) |
+| `GET /models` | Installierte Ollama-Modelle für die Modellwahl (Admin) |
 
 Interaktive Doku unter `/docs` (OpenAPI/Swagger).
 
@@ -211,18 +239,23 @@ Interaktive Doku unter `/docs` (OpenAPI/Swagger).
 
 ```
 backend/app/   ingestion · retrieval · generation · corpus (living loop) · api · db
-frontend/      React-App: Graph · Chat · Dokumente · Review-Queue
+frontend/      React-SPA: Chat · Suche · Inbox · Wissen (Docs+Graph) · Skills ·
+               Bibliothek · Projekte — hell/dunkel, mobile-friendly
 mcp_server/    MCP-Tools für Claude Desktop (search/ask/list/graph)
 automation/    n8n-Workflows (Webhook-Ingest, Wochen-Cron)
 eval/          Golden-Set + Hit-Rate-Messung + Parameter-Tuning
-docs/adr/      Architecture Decision Records
+scripts/       Korpus-Fetch · Deploy-Gate · Smoke-Test · Backup
+docs/adr/      Architecture Decision Records · docs/runbooks/ Restore-Drill
 ```
 
 ## Roadmap
 
 Umgesetzt: Ingestion · Hybrid-Retrieval · zitierte Generation · Zonen-Router ·
-Web-UI · MCP · Living-Knowledge-Loop. Als Nächstes: öffentliches Deployment
-(EU-VPS, Caddy-TLS, Deploy-Gate, nightly Backups).
+MCP · Living-Knowledge-Loop · **UI/UX-Redesign** (Sidebar-App mit Chat-Verläufen,
+Suche, Inbox, Wissen inkl. MD-Editor, Skills, Bibliothek mit Modellwahl, Projekte;
+hell/dunkel, mobile-friendly) · **Deployment-Werkzeuge** (Caddy-Prod-Stack,
+Deploy-Gate, Smoke-Test, Backups mit verifiziertem Restore). Als Nächstes:
+Go-Live auf dem EU-VPS (Domain, TLS, Monitoring, Prod-Cron).
 
 ## Lizenz
 
