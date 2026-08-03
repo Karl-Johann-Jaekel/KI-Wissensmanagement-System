@@ -40,11 +40,12 @@ def prepare_answer(
     top_k: int = 5,
     max_sensitivity: str = "public",
     rerank: bool | None = None,
+    model: str | None = None,
 ) -> AnswerPlan:
     hits = hybrid_search(
         session, query, top_k=top_k, max_sensitivity=max_sensitivity, rerank=rerank
     )
     zone = zone_of([h.sensitivity for h in hits])
-    client = choose_client(zone)
+    client = choose_client(zone, model=model)
     messages = build_messages(query, hits)
     return AnswerPlan(hits=hits, messages=messages, client=client, zone=zone)

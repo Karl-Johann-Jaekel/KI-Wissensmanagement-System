@@ -1,0 +1,19 @@
+# Produktions-Override (ADR-0009). Aufruf:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile public up -d --build
+#
+# Härtungen gegenüber dem Dev-Setup:
+# - backend: kein --reload, keine Source-Bind-Mounts, kein Host-Port
+#   (nur intern via Caddy erreichbar); data/ bleibt gemountet (Uploads).
+# - postgres: kein Host-Port (nur Compose-Netz).
+services:
+  backend:
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports: []
+    volumes:
+      - ./data:/app/data
+      - ./demo-data:/app/demo-data:ro
+      - ./scripts:/app/scripts:ro
+      - ./eval:/app/eval
+
+  postgres:
+    ports: []

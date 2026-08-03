@@ -1,10 +1,49 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App'
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
+import { AdminKeyProvider } from './app/AdminKeyContext'
+import AppShell from './app/AppShell'
+import { ToastProvider } from './components/ui/Toast'
+import { applyTheme, resolveTheme } from './lib/theme'
+import BibliothekPage from './pages/BibliothekPage'
+import ChatPage from './pages/ChatPage'
+import DocumentPage from './pages/DocumentPage'
+import InboxPage from './pages/InboxPage'
+import ProjektDetailPage from './pages/ProjektDetailPage'
+import ProjektePage from './pages/ProjektePage'
+import SearchPage from './pages/SearchPage'
+import SkillsPage from './pages/SkillsPage'
+import WissenPage from './pages/WissenPage'
 import './index.css'
+
+applyTheme(resolveTheme())
+
+const router = createBrowserRouter([
+  {
+    element: <AppShell />,
+    children: [
+      { path: '/', element: <Navigate to="/chat" replace /> },
+      { path: '/chat', element: <ChatPage /> },
+      { path: '/chat/:chatId', element: <ChatPage /> },
+      { path: '/suche', element: <SearchPage /> },
+      { path: '/inbox', element: <InboxPage /> },
+      { path: '/wissen', element: <WissenPage /> },
+      { path: '/wissen/doc/:docId', element: <DocumentPage /> },
+      { path: '/skills', element: <SkillsPage /> },
+      { path: '/bibliothek', element: <BibliothekPage /> },
+      { path: '/projekte', element: <ProjektePage /> },
+      { path: '/projekte/:projectId', element: <ProjektDetailPage /> },
+      { path: '*', element: <Navigate to="/chat" replace /> },
+    ],
+  },
+])
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <AdminKeyProvider>
+      <ToastProvider>
+        <RouterProvider router={router} />
+      </ToastProvider>
+    </AdminKeyProvider>
   </React.StrictMode>,
 )

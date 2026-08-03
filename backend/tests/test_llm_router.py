@@ -35,3 +35,23 @@ def test_public_uses_mistral_when_key_present() -> None:
 def test_public_falls_back_to_ollama_without_key() -> None:
     settings = Settings(mistral_api_key="")
     assert isinstance(choose_client("public", settings=settings), OllamaChatClient)
+
+
+def test_model_override_applies_to_ollama(  # ADR-0008
+) -> None:
+    settings = Settings(mistral_api_key="")
+    client = choose_client("confidential", settings=settings, model="gemma3:4b")
+    assert isinstance(client, OllamaChatClient)
+    assert client.model == "gemma3:4b"
+
+
+def test_model_override_ignored_for_mistral() -> None:
+    settings = Settings(mistral_api_key="sk-x")
+    client = choose_client("public", settings=settings, model="gemma3:4b")
+    assert isinstance(client, MistralChatClient)
+    assert client.model == settings.mistral_model
+
+
+def test_choose_client_positional_call_still_works() -> None:
+    # app/update.py ruft choose_client("public") ohne Keywords auf.
+    assert choose_client("public", settings=Settings(mistral_api_key="")).name == "ollama"

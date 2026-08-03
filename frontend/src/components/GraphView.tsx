@@ -12,9 +12,30 @@ interface Props {
   selectedId: string | null
   /** Nodes first seen within this many days glow as "Neu". */
   glowDays?: number
+  theme?: 'light' | 'dark'
 }
 
 const DIM_ALPHA = 0.12
+
+/** Canvas-Farben je Theme (Hintergrund, Labels, Kanten, Auswahl-Ring). */
+const THEME_STYLES = {
+  light: {
+    background: '#f8fafc', // slate-50
+    label: '#334155', // slate-700
+    ring: '#0f172a', // slate-900
+    linkHover: 'rgba(51,65,85,0.9)',
+    link: 'rgba(71,85,105,0.3)',
+    linkDim: 'rgba(71,85,105,0.06)',
+  },
+  dark: {
+    background: '#020617', // slate-950
+    label: '#e2e8f0', // slate-200
+    ring: '#ffffff',
+    linkHover: 'rgba(226,232,240,0.9)',
+    link: 'rgba(148,163,184,0.35)',
+    linkDim: 'rgba(148,163,184,0.05)',
+  },
+} as const
 
 export default function GraphView({
   data,
@@ -24,9 +45,12 @@ export default function GraphView({
   onNodeClick,
   selectedId,
   glowDays = 7,
+  theme = 'dark',
 }: Props) {
   const fgRef = useRef<any>(null)
   const [hoverId, setHoverId] = useState<string | null>(null)
+  const styles = THEME_STYLES[theme]
+  const kindColors = KIND_COLORS[theme]
 
   const isNew = useCallback(
     (node: GraphNode) => {
@@ -67,7 +91,7 @@ export default function GraphView({
     (node: GraphNode, ctx: CanvasRenderingContext2D, scale: number) => {
       const bright = isBright(node.id)
       const r = 2 + Math.sqrt(node.val) * 1.6
-      const color = KIND_COLORS[node.kind] ?? '#94a3b8'
+      const color = kindColors[node.kind] ?? '#94a3b8'
       ctx.globalAlpha = bright ? 1 : DIM_ALPHA
       // "Neu"-glow: recently added nodes get a soft halo
       if (bright && isNew(node)) {
@@ -84,7 +108,7 @@ export default function GraphView({
       ctx.fill()
       if (node.id === selectedId) {
         ctx.lineWidth = 2 / scale
-        ctx.strokeStyle = '#ffffff'
+        ctx.strokeStyle = styles.ring
         ctx.stroke()
       }
       // labels: papers always; others when zoomed in or bright
@@ -92,14 +116,14 @@ export default function GraphView({
       if (showLabel && bright) {
         const fontSize = Math.max(3, 11 / scale)
         ctx.font = `${fontSize}px ui-sans-serif, system-ui, sans-serif`
-        ctx.fillStyle = '#e2e8f0'
+        ctx.fillStyle = styles.label
         ctx.textAlign = 'center'
         ctx.textBaseline = 'top'
         ctx.fillText(node.name, node.x ?? 0, (node.y ?? 0) + r + 1)
       }
       ctx.globalAlpha = 1
     },
-    [isBright, isNew, selectedId],
+    [isBright, isNew, selectedId, styles, kindColors],
   )
 
   const paintPointerArea = useCallback(
@@ -120,10 +144,10 @@ export default function GraphView({
       const inFilter = activeIds === null || (activeIds.has(s) && activeIds.has(t))
       const inHover = hoverId === null || s === hoverId || t === hoverId
       if (inFilter && inHover && hoverId !== null && (s === hoverId || t === hoverId))
-        return 'rgba(226,232,240,0.9)'
-      return inFilter && inHover ? 'rgba(148,163,184,0.35)' : 'rgba(148,163,184,0.05)'
+        return styles.linkHover
+      return inFilter && inHover ? styles.link : styles.linkDim
     },
-    [activeIds, hoverId],
+    [activeIds, hoverId, styles],
   )
 
   return (
@@ -132,7 +156,7 @@ export default function GraphView({
       graphData={data}
       width={width}
       height={height}
-      backgroundColor="#020617"
+      backgroundColor={styles.background}
       nodeVal={(n: GraphNode) => n.val}
       nodeLabel={(n: GraphNode) => `${n.kind}: ${n.name}`}
       nodeCanvasObject={paintNode}

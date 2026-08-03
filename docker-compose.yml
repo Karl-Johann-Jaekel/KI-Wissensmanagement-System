@@ -1,8 +1,10 @@
 # KI-Wissensmanagement-System — Compose
-#   docker compose up                  -> postgres + backend (public core)
-#   docker compose --profile local up  -> + Ollama (confidential zone, local LLM/embeddings)
-#   docker compose --profile full  up  -> + frontend + n8n
-# See PLAN §4, §7 Phase 0.
+#   docker compose up                   -> postgres + backend (public core)
+#   docker compose --profile local up   -> + Ollama (confidential zone, local LLM/embeddings)
+#   docker compose --profile full  up   -> + frontend (dev) + n8n
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile public up -d --build
+#                                       -> Produktion: Caddy (TLS + SPA + /api-Proxy), s. ADR-0009
+# See PLAN §4, §7 Phase 0 + Phase 10.
 
 services:
   postgres:
@@ -62,11 +64,34 @@ services:
 
   # --- profile: full (frontend available from Phase 2, n8n from Phase 7) ---
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      target: dev
     profiles: ["full"]
     restart: unless-stopped
     ports:
       - "5173:5173"
+    depends_on:
+      - backend
+
+  # --- profile: public (Produktion: TLS + statische SPA + /api-Proxy, ADR-0009) ---
+  caddy:
+    build:
+      context: ./frontend
+      target: prod
+      args:
+        VITE_API_BASE: /api
+    profiles: ["public"]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Domain für automatisches TLS, z. B. wissen.example.com (":80" = lokal ohne TLS)
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
     depends_on:
       - backend
 
@@ -85,3 +110,5 @@ volumes:
   pgdata:
   ollama_data:
   n8n_data:
+  caddy_data:
+  caddy_config:

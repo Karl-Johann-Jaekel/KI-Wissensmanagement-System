@@ -11,6 +11,7 @@ from app.retrieval.search import SearchHit
 
 class FakeClient:
     name = "fake"
+    model = "fake-model"
 
     def chat_stream(self, messages: list[dict]):
         yield "Self-attention "
@@ -47,9 +48,31 @@ def test_chat_streams_tokens_then_sources(
     assert '"type": "token"' in body
     assert '"type": "sources"' in body
     assert "Attention Is All You Need" in body
+    assert '"model": "fake-model"' in body
+    assert '"provider": "fake"' in body
     assert "[DONE]" in body
 
 
 def test_chat_rejects_overlong_query(client: TestClient) -> None:
     resp = client.post("/chat", json={"query": "x" * 5000})
     assert resp.status_code == 422  # exceeds MAX_INPUT_CHARS
+
+
+def test_chat_model_override_requires_admin(client: TestClient) -> None:
+    resp = client.post("/chat", json={"query": "x", "model": "qwen3:8b"})
+    assert resp.status_code == 401
+
+
+def test_chat_model_override_unknown_model(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core.config import get_settings
+
+    monkeypatch.setattr("app.api.chat.list_ollama_models", lambda _url: [{"name": "qwen3:8b"}])
+    resp = client.post(
+        "/chat",
+        json={"query": "x", "model": "nicht-installiert"},
+        headers={"X-API-Key": get_settings().admin_api_key},
+    )
+    assert resp.status_code == 400
+    assert "unknown model" in resp.text

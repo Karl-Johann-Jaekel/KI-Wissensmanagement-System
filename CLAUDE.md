@@ -5,14 +5,18 @@ Wissens-Graph (Papers ↔ Konzepte ↔ Modelle ↔ Datasets) + rekursiver Update
 Vollständiger Plan in [PLAN.md](PLAN.md) — vor jeder Aufgabe lesen, aktuelle Phase
 dort abhaken. GitHub-Portfolio-Track wurde entfernt (ADR-0004).
 
-**Stand:** Phasen 0–6 fertig (Korpus indexiert: 16 Papers/1801 Chunks; Hybrid-Retrieval
-Hit@5 0,94; `/chat` mit Zitaten; Frontend mit Chat/Graph/Dokumenten/Admin-Modus).
-Offen: Phase 7 (MCP + n8n), Phase 8 (Living-Knowledge-Loop), Phase 9 (Deployment).
+**Stand:** Phasen 0–9 fertig (Korpus: 16 Papers/1801 Chunks; Hit@5 0,94; MCP + n8n;
+Living-Knowledge-Loop; UI/UX-Redesign: Sidebar-App mit Chat-Verläufen (localStorage,
+ADR-0006), Suche, Inbox, Wissen inkl. MD-Editor (ADR-0007), Skills, Bibliothek mit
+Ollama-Modellwahl (ADR-0008), Projekte; hell/dunkel, mobile-friendly). Phase 10:
+Deployment-Werkzeuge fertig (Caddy-Prod-Stack ADR-0009, Deploy-Gate, Smoke-Test,
+Backup + Restore-Drill) — offen ist nur der Go-Live auf dem EU-VPS.
 
 ## Regeln
 - Zonen: `public` (Korpus, EU-API erlaubt) vs. `confidential` (nur lokal, Ollama).
   Router: nicht-public ⇒ **nur** Ollama; `max_sensitivity != public` nur mit Admin-Key.
-- Öffentliches Deployment enthält NIE `confidential`-Daten (Deploy-Gate-Skript, Ph. 9).
+- Öffentliches Deployment enthält NIE `confidential`-Daten
+  (Deploy-Gate: `scripts/check_no_confidential_in_prod.py`).
 - Paper-PDFs nie committen (arXiv-Lizenz); nur `demo-data/corpus.yaml` ist im Repo.
 - Extrahierte Graph-Fakten starten als `pending`; Promotion nur regelbasiert/Review;
   Provenienz (`source_document_ids`) ist Pflicht; kein Silent-Overwrite

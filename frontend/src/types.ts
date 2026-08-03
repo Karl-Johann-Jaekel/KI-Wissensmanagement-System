@@ -26,11 +26,20 @@ export interface GraphData {
   links: GraphLink[]
 }
 
-export const KIND_COLORS: Record<NodeKind, string> = {
-  paper: '#34d399', // emerald-400
-  concept: '#fbbf24', // amber-400
-  model: '#f87171', // red-400
-  dataset: '#22d3ee', // cyan-400
+/** Knoten-Farben je Theme — paper trägt das Markengrün (primary). */
+export const KIND_COLORS: Record<'light' | 'dark', Record<NodeKind, string>> = {
+  light: {
+    paper: '#2f8a57', // primary-600
+    concept: '#d97706', // amber-600
+    model: '#dc2626', // red-600
+    dataset: '#0891b2', // cyan-600
+  },
+  dark: {
+    paper: '#66b28b', // primary-400
+    concept: '#fbbf24', // amber-400
+    model: '#f87171', // red-400
+    dataset: '#22d3ee', // cyan-400
+  },
 }
 
 /** Resolve a link endpoint to a node id whether it's a string or a node object. */

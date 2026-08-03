@@ -54,3 +54,6 @@ ollama_data/
 
 # --- Eval run artifacts ---
 eval/reports/
+
+# --- DB backups (scripts/backup.sh) ---
+backups/

@@ -328,16 +328,45 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
   erscheinen hervorgehoben; kein `verified`-Fakt ohne Quellbeleg (Provenienz aus Kanten);
   Eval-Report pro Lauf. → **live: 16 Papers → 66 Fakten, 3 auto-verified, Eval 0,94** ✓
 
-### Phase 9 — Deployment (öffentlich) & privater Lokalbetrieb
-- [ ] **Öffentlich:** EU-VPS (CPU reicht — Inferenz via Mistral-API), Compose-Profil
-      `public`, Caddy TLS; öffentlich nur `/graph` + `/chat`/`/search` im
-      public-Scope, Rest hinter API-Key; DB frisch aus Korpus-Fetch + Ingest
-- [ ] `scripts/check_no_confidential_in_prod.py` als Deploy-Gate
-- [ ] n8n-Cron für den Living-Knowledge-Loop produktiv schalten (inkl. Caps)
-- [ ] Backups: nightly `pg_dump` + Volume-Snapshot; **Restore einmal real testen**
-- [ ] Logging ohne Chunk-Inhalte; Uptime-Monitoring; Golden-Eval als Prod-Smoke-Test
-- [ ] **Lokal:** Profil `local` mit Ollama; `data/private/` ingesten; README-Abschnitt
-      „Privater Betrieb"
+### Phase 9 — UI/UX-Redesign & Backend-Erweiterung  *(v5: RelationFlow-Vorbild, Branch UI-UX)*
+- [x] **9a Design-Foundation:** Tailwind-Tokens (Primär-Grün `#3ca66a`, CSS-Var-Flächen,
+      hell = Default + Dark-Toggle), UI-Primitives (Button/Card/Modal/Toast/…),
+      neue Deps (Router, lucide, react-markdown, vitest) — ADR-0005
+- [x] **9a App-Shell:** Sidebar-Layout (Neuer Chat, Suche, Inbox, Wissen, Skills,
+      Bibliothek, Projekte, Aktuelle Chats), react-router-Deep-Links, Mobile-Drawer,
+      Admin-Key-Modal im Footer; stale `graph.json`-Fallback entfernt
+- [x] **9b Client-Datenschicht:** versionierter localStorage-Layer `kwms.v1.*`
+      (Chats/Skills/Projekte, Caps + Quota-Handling, `useSyncExternalStore`) — ADR-0006
+- [x] **9b Chat:** persistierte Konversationen („Aktuelle Chats", Umbenennen/Löschen),
+      Markdown-Antworten, Auto-Grow-Input, Skill-Einfügung, Modell-Select
+- [x] **9c Backend:** `documents.content_md` (Migration 0002) + `GET /documents/{id}`
+      (stored/reassembled) — ADR-0007; Markdown-Ingest ohne Docling;
+      `PUT /documents/{id}/content` (Re-Ingest) + `DELETE /documents/{id}`;
+      `GET /models` + Chat-Modell-Override (nur Ollama, admin-gated) — ADR-0008;
+      Fix: `include_pending` verlangt jetzt Admin
+- [x] **9d Feature-Seiten:** Wissen (Liste/Upload/Reader/MD-Editor + theme-aware Graph),
+      Bibliothek (confidential + Ollama-Modellwahl), Inbox (Review + Changelog),
+      Suche (`POST /search`-UI mit Score-Balken), Skills, Projekte
+- [x] **9d Qualität:** Frontend-CI-Job (vitest + build), 14 Frontend-Tests,
+      76 Backend-Tests, Mobile-Pass (Drawer, Karten-Listen, Bottom-Sheet)
+- **DoD:** Alle Bereiche im Browser erreichbar (Desktop + Mobile), Checks grün. ✓
+
+### Phase 10 — Deployment (öffentlich) & privater Lokalbetrieb  *(übernimmt alte Phase 9)*
+- [x] Compose-Profil `public`: Multi-Stage-Frontend-Image, **Caddy** (TLS via
+      `SITE_ADDRESS`, statische SPA, `/api`-Reverse-Proxy) + `docker-compose.prod.yml`
+      (kein reload/Bind-Mounts/Host-Ports) — ADR-0009
+- [x] `scripts/check_no_confidential_in_prod.py` als Deploy-Gate (DB + Env-Checks, getestet)
+- [x] `scripts/smoke_prod.sh`: Health, Graph, public-Chat, Golden-Eval
+- [x] Backups: `scripts/backup.sh` (nightly `pg_dump -Fc`, 14-Tage-Rotation);
+      **Restore real getestet** (2026-08-03, Protokoll in `docs/runbooks/restore.md`)
+- [x] Logging-Audit: keine Chunk-Inhalte in Request-Logs
+- [x] Living-Knowledge-Cron produktionsfertig dokumentiert (Host-Cron empfohlen,
+      n8n-Alternative im `full`-Profil) — ADR-0009
+- [x] **Lokal:** README-Abschnitte „Privater Betrieb" (Bibliothek, Modellwahl) und
+      „Öffentliches Deployment" (Schritt-für-Schritt)
+- [ ] **Go-Live EU-VPS:** Domain + `.env` produktiv, Stack hochfahren, Gate + Smoke
+      auf dem VPS grün, Uptime-Monitoring auf `/api/health`, Prod-Cron aktivieren,
+      Restore-Drill auf dem VPS wiederholen
 - **DoD:** Wissens-Graph und Chat live unter eigener Domain;
   Deploy-Gate grün; Backup-Restore verifiziert.
 

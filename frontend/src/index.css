@@ -2,6 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme-Variablen (rgb-Tripel, damit Tailwind-Alpha funktioniert). Hell = Default. */
+:root {
+  --c-canvas: 248 250 252; /* slate-50 */
+  --c-surface: 255 255 255;
+  --c-sunken: 241 245 249; /* slate-100 */
+  --c-edge: 226 232 240; /* slate-200 */
+  --c-ink: 15 23 42; /* slate-900 */
+  --c-muted: 100 116 139; /* slate-500 */
+}
+
+.dark {
+  --c-canvas: 2 6 23; /* slate-950 — passt zum Graph-Canvas #020617 */
+  --c-surface: 15 23 42; /* slate-900 */
+  --c-sunken: 30 41 59; /* slate-800 */
+  --c-edge: 30 41 59;
+  --c-ink: 241 245 249; /* slate-100 */
+  --c-muted: 148 163 184; /* slate-400 */
+}
+
 html,
 body,
 #root {
@@ -10,6 +29,55 @@ body,
 }
 
 body {
-  @apply bg-slate-950 text-slate-100;
+  @apply bg-canvas text-ink;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+/* Schlanke Prosa-Styles für gerenderte Markdown-Inhalte (Reader, Chat-Antworten) —
+   bewusst ohne @tailwindcss/typography. */
+.prose-md {
+  @apply text-sm leading-relaxed;
+}
+.prose-md h1 {
+  @apply mb-3 mt-5 text-xl font-semibold first:mt-0;
+}
+.prose-md h2 {
+  @apply mb-2 mt-5 text-lg font-semibold first:mt-0;
+}
+.prose-md h3 {
+  @apply mb-2 mt-4 text-base font-semibold first:mt-0;
+}
+.prose-md p {
+  @apply mb-3;
+}
+.prose-md ul {
+  @apply mb-3 list-disc space-y-1 pl-5;
+}
+.prose-md ol {
+  @apply mb-3 list-decimal space-y-1 pl-5;
+}
+.prose-md a {
+  @apply text-primary-600 underline underline-offset-2 dark:text-primary-400;
+}
+.prose-md code {
+  @apply rounded bg-sunken px-1 py-0.5 font-mono text-[0.85em];
+}
+.prose-md pre {
+  @apply mb-3 overflow-x-auto rounded-lg bg-sunken p-3;
+}
+.prose-md pre code {
+  @apply bg-transparent p-0;
+}
+.prose-md blockquote {
+  @apply mb-3 border-l-2 border-edge pl-3 text-muted;
+}
+.prose-md table {
+  @apply mb-3 w-full border-collapse text-left;
+}
+.prose-md th,
+.prose-md td {
+  @apply border border-edge px-2 py-1;
+}
+.prose-md hr {
+  @apply my-4 border-edge;
 }
