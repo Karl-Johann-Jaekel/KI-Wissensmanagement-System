@@ -9,8 +9,8 @@ interface ScopeChipProps {
 }
 
 /**
- * Zeigt die Datenzone der Anfrage und schaltet zwischen Korpus (public) und
- * Bibliothek (confidential) um. Umschalten nur mit Admin-Key — nicht-public
+ * Zeigt die Datenzone der Anfrage und schaltet zwischen Neuralem Gedächtnis (public)
+ * und Bibliothek (confidential) um. Umschalten nur mit Admin-Key — nicht-public
  * verlangt ihn serverseitig ohnehin.
  */
 export default function ScopeChip({ zone, onChange }: ScopeChipProps) {
@@ -25,7 +25,7 @@ export default function ScopeChip({ zone, onChange }: ScopeChipProps) {
       title={
         adminKey
           ? 'Datenzone umschalten — confidential antwortet ausschließlich über das lokale Modell'
-          : 'Nur öffentlicher Korpus — Admin-Key nötig für die Bibliothek'
+          : 'Nur das öffentliche Neurale Gedächtnis — Admin-Key nötig für die Bibliothek'
       }
       className={cn(
         'inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs transition-colors',
@@ -36,7 +36,9 @@ export default function ScopeChip({ zone, onChange }: ScopeChipProps) {
       )}
     >
       {confidential ? <Lock className="h-3.5 w-3.5" /> : <Globe className="h-3.5 w-3.5" />}
-      <span className="hidden sm:inline">{confidential ? 'Bibliothek' : 'Korpus'}</span>
+      <span className="hidden sm:inline">
+        {confidential ? 'Bibliothek' : 'Neurales Gedächtnis'}
+      </span>
     </button>
   )
 }

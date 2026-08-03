@@ -16,8 +16,11 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session, attributes
 
+from app.core.config import get_settings
 from app.db.models import GraphEdge, GraphNode
 
+# Voreinstellung (PLAN §2.7). Über PROMOTE_MIN_SOURCES / PROMOTE_CONFIDENCE bzw. die
+# CLI-Flags von app.update anpassbar — Provenienzpflicht bleibt davon unberührt.
 MIN_SOURCES = 2
 CONFIDENCE_THRESHOLD = 0.7
 PROMOTABLE_KINDS = ("concept", "model", "dataset")
@@ -43,9 +46,16 @@ def _sources_and_confidence(edges: list[GraphEdge]) -> tuple[set[str], float]:
 def promote_graph(
     session: Session,
     *,
-    min_sources: int = MIN_SOURCES,
-    confidence_threshold: float = CONFIDENCE_THRESHOLD,
+    min_sources: int | None = None,
+    confidence_threshold: float | None = None,
 ) -> PromoteStats:
+    """Promote well-supported pending facts. Schwellen: Argument > Env > Default."""
+    settings = get_settings()
+    if min_sources is None:
+        min_sources = settings.promote_min_sources
+    if confidence_threshold is None:
+        confidence_threshold = settings.promote_confidence
+
     stats = PromoteStats()
     nodes = session.execute(select(GraphNode)).scalars().all()
     edges = session.execute(select(GraphEdge)).scalars().all()

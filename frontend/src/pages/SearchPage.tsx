@@ -122,7 +122,7 @@ export default function SearchPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && search()}
-            placeholder="Hybrid-Suche im Korpus … (DE/EN)"
+            placeholder="Hybrid-Suche im Neuralen Gedächtnis … (DE/EN)"
             className="text-base sm:text-sm"
             autoFocus
           />

@@ -284,3 +284,25 @@ export async function reviewNode(
   })
   if (!res.ok) throw new Error(`review ${action}: HTTP ${res.status}`)
 }
+
+export interface BulkReviewResult {
+  action: 'verify' | 'reject'
+  processed: number
+  edges_verified: number
+  not_found: string[]
+}
+
+/** Sammelfreigabe: mehrere pending-Fakten in einem Aufruf. */
+export async function reviewBulk(
+  ids: string[],
+  action: 'verify' | 'reject',
+  apiKey: string,
+): Promise<BulkReviewResult> {
+  const res = await fetch(`${BASE}/review/bulk`, {
+    method: 'POST',
+    headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids, action }),
+  })
+  if (!res.ok) throw new Error(`review bulk ${action}: HTTP ${res.status}`)
+  return (await res.json()) as BulkReviewResult
+}

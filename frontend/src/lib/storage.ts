@@ -256,7 +256,8 @@ export function seedSkillsOnce(): void {
     {
       id: newId(),
       name: 'Konzept-Vergleich',
-      content: 'Vergleiche die folgenden zwei Konzepte anhand des Korpus (Gemeinsamkeiten, Unterschiede, typische Anwendungsfälle): ',
+      content:
+        'Vergleiche die folgenden zwei Konzepte anhand des Neuralen Gedächtnisses (Gemeinsamkeiten, Unterschiede, typische Anwendungsfälle): ',
       createdAt: now,
       updatedAt: now,
     },

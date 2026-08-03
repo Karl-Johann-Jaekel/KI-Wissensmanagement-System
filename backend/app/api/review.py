@@ -11,7 +11,8 @@ from collections import defaultdict
 from datetime import UTC, datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session, attributes
 
@@ -20,6 +21,8 @@ from app.db.models import GraphEdge, GraphNode
 from app.db.session import get_db
 
 router = APIRouter(tags=["review"], dependencies=[Depends(require_admin)])
+
+MAX_BULK = 500
 
 
 @router.get("/review")
@@ -55,11 +58,48 @@ def list_pending(db: Session = Depends(get_db)) -> dict:
     return {"pending": items, "count": len(items)}
 
 
+def _verify_nodes(db: Session, nodes: list[GraphNode]) -> int:
+    """Verify nodes, attach provenance, then verify edges between verified endpoints.
+
+    Kanten werden in einem Durchgang für alle Knoten geprüft — dadurch kostet eine
+    Sammelfreigabe genauso viele Abfragen wie eine Einzelfreigabe.
+    """
+    edges = db.execute(select(GraphEdge)).scalars().all()
+    incident: dict = defaultdict(list)
+    for e in edges:
+        incident[e.source].append(e)
+        incident[e.target].append(e)
+
+    now = datetime.now(UTC).isoformat()
+    for node in nodes:
+        sources: set[str] = set()
+        for e in incident[node.id]:
+            sources.update((e.meta or {}).get("source_document_ids", []) or [])
+        node.status = "verified"
+        node.meta = {
+            **(node.meta or {}),
+            "source_document_ids": sorted(sources),
+            "verified_at": now,
+        }
+        attributes.flag_modified(node, "meta")
+    db.flush()
+
+    verified_ids = set(
+        db.execute(select(GraphNode.id).where(GraphNode.status == "verified")).scalars()
+    )
+    verified_edges = 0
+    for e in edges:
+        if e.status == "pending" and e.source in verified_ids and e.target in verified_ids:
+            e.status = "verified"
+            verified_edges += 1
+    db.commit()
+    return verified_edges
+
+
 @router.post("/review/node/{node_id}")
 def review_node(
     node_id: str,
     action: Literal["verify", "reject"],
-    request: Request,
     db: Session = Depends(get_db),
 ) -> dict:
     node = db.get(GraphNode, uuid.UUID(node_id))
@@ -71,32 +111,37 @@ def review_node(
         db.commit()
         return {"id": node_id, "status": "rejected"}
 
-    # verify: attach provenance from incident edges, then verify edges to verified nodes
-    edges = (
-        db.execute(
-            select(GraphEdge).where((GraphEdge.source == node.id) | (GraphEdge.target == node.id))
-        )
-        .scalars()
-        .all()
-    )
-    sources: set[str] = set()
-    for e in edges:
-        sources.update((e.meta or {}).get("source_document_ids", []) or [])
-    node.status = "verified"
-    node.meta = {
-        **(node.meta or {}),
-        "source_document_ids": sorted(sources),
-        "verified_at": datetime.now(UTC).isoformat(),
-    }
-    attributes.flag_modified(node, "meta")
-
-    verified_ids = {
-        n.id for n in db.execute(select(GraphNode).where(GraphNode.status == "verified")).scalars()
-    }
-    verified_edges = 0
-    for e in edges:
-        if e.status == "pending" and e.source in verified_ids and e.target in verified_ids:
-            e.status = "verified"
-            verified_edges += 1
-    db.commit()
+    verified_edges = _verify_nodes(db, [node])
     return {"id": node_id, "status": "verified", "edges_verified": verified_edges}
+
+
+class BulkReview(BaseModel):
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=MAX_BULK)
+    action: Literal["verify", "reject"]
+
+
+@router.post("/review/bulk")
+def review_bulk(body: BulkReview, db: Session = Depends(get_db)) -> dict:
+    """Sammelfreigabe/-ablehnung mehrerer pending-Fakten in einem Aufruf."""
+    nodes = db.execute(select(GraphNode).where(GraphNode.id.in_(body.ids))).scalars().all()
+    found = {n.id for n in nodes}
+    missing = [str(i) for i in body.ids if i not in found]
+
+    if body.action == "reject":
+        for node in nodes:
+            node.status = "rejected"
+        db.commit()
+        return {
+            "action": "reject",
+            "processed": len(nodes),
+            "edges_verified": 0,
+            "not_found": missing,
+        }
+
+    verified_edges = _verify_nodes(db, list(nodes))
+    return {
+        "action": "verify",
+        "processed": len(nodes),
+        "edges_verified": verified_edges,
+        "not_found": missing,
+    }

@@ -138,9 +138,9 @@ export default function LandingPage() {
             <span className="text-primary-600 dark:text-primary-400">Antworten belegt</span>
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-base text-muted sm:text-lg">
-            Ein durchsuchbarer Korpus aus KI-Forschungsartikeln, ein daraus gewachsener
-            Wissens-Graph und ein Chat, der jede Aussage mit Paper und Abschnitt belegt.
-            Vertrauliche Dokumente bleiben dabei auf dem eigenen Rechner.
+            Ein durchsuchbares Neurales Gedächtnis aus KI-Forschungsartikeln, ein daraus
+            gewachsener Wissens-Graph und ein Chat, der jede Aussage mit Paper und Abschnitt
+            belegt. Vertrauliche Dokumente bleiben dabei auf dem eigenen Rechner.
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <Button onClick={() => navigate('/chat')} icon={ArrowRight}>
@@ -153,7 +153,7 @@ export default function LandingPage() {
 
           {/* Kennzahlen */}
           <div className="mx-auto mt-10 grid max-w-3xl grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatCard value={stats ? String(stats.papers) : '—'} label="Papers indexiert" />
+            <StatCard value={stats ? String(stats.papers) : '—'} label="Papers im Gedächtnis" />
             <StatCard
               value={stats ? stats.chunks.toLocaleString('de-DE') : '—'}
               label="Chunks im Index"
@@ -175,7 +175,8 @@ export default function LandingPage() {
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-semibold sm:text-2xl">Der Graph, live aus der Datenbank</h2>
             <p className="mt-1 text-sm text-muted">
-              Verifizierte Fakten aus dem Korpus — Knotengröße nach Verknüpfungsgrad, Farbe nach Typ.
+              Verifizierte Fakten aus dem Neuralen Gedächtnis — Knotengröße nach Verknüpfungsgrad,
+              Farbe nach Typ.
               Unbestätigte Extraktionen bleiben ausgeblendet, bis sie belegt sind.
             </p>
           </div>

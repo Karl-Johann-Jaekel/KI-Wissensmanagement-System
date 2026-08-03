@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     mistral_api_key: str = ""
     mistral_model: str = "mistral-medium-latest"
 
+    # Promotion pending -> verified (Phase 8). Lockern erhöht die Ausbeute, senkt aber
+    # die Belegtiefe — Provenienz bleibt in jedem Fall Pflicht (PLAN §2.7, ADR-0010).
+    promote_min_sources: int = 2
+    promote_confidence: float = 0.7
+
     # Hardening (Phase 5)
     admin_api_key: str = "change-me"
     daily_token_cap: int = 200_000

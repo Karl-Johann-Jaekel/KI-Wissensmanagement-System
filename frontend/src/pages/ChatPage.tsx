@@ -187,7 +187,7 @@ export default function ChatPage() {
         emptyHint={
           zone === 'confidential'
             ? 'Privater Chat über die Bibliothek — Antworten kommen ausschließlich vom lokalen Modell.'
-            : 'Frag den Korpus — z. B. „Was ist Retrieval-Augmented Generation?" Antworten kommen mit Quellenbelegen.'
+            : 'Frag das Neurale Gedächtnis — z. B. „Was ist Retrieval-Augmented Generation?" Antworten kommen mit Quellenbelegen.'
         }
       />
 
@@ -205,7 +205,7 @@ export default function ChatPage() {
         onTopKChange={setTopK}
         rerank={rerank}
         onRerankChange={setRerank}
-        placeholder="Frage an den KI-Forschungskorpus … (DE/EN)"
+        placeholder="Frage an das Neurale Gedächtnis … (DE/EN)"
       />
     </div>
   )

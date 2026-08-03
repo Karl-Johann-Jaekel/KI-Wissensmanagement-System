@@ -39,6 +39,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--corpus-dir", default="data/corpus")
     parser.add_argument("--corpus-yaml", default="demo-data/corpus.yaml")
     parser.add_argument("--no-eval", action="store_true")
+    parser.add_argument(
+        "--min-sources",
+        type=int,
+        default=None,
+        help="unabhängige Quellen für Auto-Promotion (Default: PROMOTE_MIN_SOURCES)",
+    )
+    parser.add_argument(
+        "--confidence",
+        type=float,
+        default=None,
+        help="Konfidenz-Schwelle für Auto-Promotion (Default: PROMOTE_CONFIDENCE)",
+    )
     args = parser.parse_args(argv)
 
     client = choose_client("public")
@@ -73,7 +85,9 @@ def main(argv: list[str] | None = None) -> int:
         report["extract"] = {"papers": ex.papers, "nodes": ex.nodes, "edges": ex.edges}
 
         print("Promoting facts …")
-        pr = promote_graph(session)
+        pr = promote_graph(
+            session, min_sources=args.min_sources, confidence_threshold=args.confidence
+        )
         report["promote"] = {
             "nodes": pr.promoted_nodes,
             "edges": pr.promoted_edges,
