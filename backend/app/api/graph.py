@@ -10,10 +10,11 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.security import require_admin
 from app.db.models import GraphEdge, GraphNode
 from app.db.session import get_db
 
@@ -24,9 +25,13 @@ KNOWLEDGE_KINDS = ("paper", "concept", "model", "dataset")
 
 @router.get("/graph")
 def get_graph(
+    request: Request,
     include_pending: bool = Query(default=False, description="also return pending facts"),
     db: Session = Depends(get_db),
 ) -> dict[str, list[dict]]:
+    if include_pending:
+        # pending = ungeprüfte LLM-Extraktion — nur Admin (schließt bisherigen Leak).
+        require_admin(request)
     node_q = select(GraphNode).where(GraphNode.kind.in_(KNOWLEDGE_KINDS))
     if not include_pending:
         node_q = node_q.where(GraphNode.status == "verified")

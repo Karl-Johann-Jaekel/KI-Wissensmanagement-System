@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api import chat, documents, graph, health, review, search
+from app.api import chat, documents, graph, health, models, review, search
 from app.core.config import get_settings
 
 app = FastAPI(
@@ -28,6 +28,7 @@ app.include_router(search.router)
 app.include_router(chat.router)
 app.include_router(documents.router)
 app.include_router(review.router)
+app.include_router(models.router)
 
 
 @app.get("/")

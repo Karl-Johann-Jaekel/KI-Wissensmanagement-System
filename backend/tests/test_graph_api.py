@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.db.graph import graph_counts, upsert_edge, upsert_node
 from app.db.session import get_db
 from app.main import app
@@ -62,7 +63,12 @@ def test_graph_endpoint_hides_pending_by_default(db_session: Session, client: Te
     app.dependency_overrides[get_db] = _override
     try:
         default_view = client.get("/graph").json()
-        review_view = client.get("/graph", params={"include_pending": "true"}).json()
+        anon_pending = client.get("/graph", params={"include_pending": "true"})
+        review_view = client.get(
+            "/graph",
+            params={"include_pending": "true"},
+            headers={"X-API-Key": get_settings().admin_api_key},
+        ).json()
     finally:
         app.dependency_overrides.clear()
 
@@ -70,6 +76,9 @@ def test_graph_endpoint_hides_pending_by_default(db_session: Session, client: Te
     assert "Attention Is All You Need" in default_names
     assert "Fresh Pending Concept" not in default_names
     assert all(link["status"] == "verified" for link in default_view["links"])
+
+    # pending = ungeprüfte LLM-Ausgabe -> ohne Admin-Key kein Zugriff (Phase 9 fix)
+    assert anon_pending.status_code == 401
 
     review_names = {n["name"] for n in review_view["nodes"]}
     assert "Fresh Pending Concept" in review_names
