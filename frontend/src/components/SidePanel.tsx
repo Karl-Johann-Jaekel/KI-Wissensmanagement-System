@@ -1,10 +1,14 @@
+import { ExternalLink, X } from 'lucide-react'
 import type { GraphNode } from '../types'
+import Badge from './ui/Badge'
+import Button from './ui/Button'
 
 interface Props {
   node: GraphNode
   onClose: () => void
 }
 
+/** Detailpanel zum ausgewählten Graph-Knoten: rechts als Spalte, mobil als Bottom-Sheet. */
 export default function SidePanel({ node, onClose }: Props) {
   const meta = node.meta as {
     abstract?: string
@@ -15,41 +19,38 @@ export default function SidePanel({ node, onClose }: Props) {
   }
 
   return (
-    <aside className="w-80 shrink-0 overflow-y-auto border-l border-slate-800 bg-slate-900/80 p-4">
+    <aside
+      className={
+        'z-30 border-edge bg-surface p-4 ' +
+        'fixed inset-x-0 bottom-0 max-h-[60%] overflow-y-auto rounded-t-2xl border-t shadow-2xl ' +
+        'md:static md:max-h-none md:w-80 md:shrink-0 md:rounded-none md:border-l md:border-t-0 md:shadow-none'
+      }
+    >
       <div className="mb-3 flex items-start justify-between">
         <div>
-          <div className="text-xs uppercase tracking-wide text-slate-400">{node.kind}</div>
-          <h2 className="text-lg font-semibold text-slate-100">{node.name}</h2>
+          <div className="text-xs uppercase tracking-wide text-muted">{node.kind}</div>
+          <h2 className="text-lg font-semibold text-ink">{node.name}</h2>
         </div>
         <button
           onClick={onClose}
-          className="rounded px-2 py-1 text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+          className="rounded-lg p-1.5 text-muted hover:bg-sunken hover:text-ink"
           aria-label="Schließen"
         >
-          ✕
+          <X className="h-4 w-4" />
         </button>
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-        <span
-          className={
-            'rounded-full border px-2 py-0.5 ' +
-            (node.status === 'verified'
-              ? 'border-emerald-500/40 bg-emerald-900/50 text-emerald-200'
-              : 'border-amber-500/40 bg-amber-900/50 text-amber-200')
-          }
-        >
-          {node.status}
-        </span>
-        <span className="text-slate-500">
+        <Badge tone={node.status === 'verified' ? 'green' : 'amber'}>{node.status}</Badge>
+        <span className="text-muted">
           seit {new Date(node.first_seen).toLocaleDateString('de-DE')}
         </span>
       </div>
 
-      {meta.abstract && <p className="mb-3 text-sm text-slate-300">{meta.abstract}</p>}
+      {meta.abstract && <p className="mb-3 text-sm text-muted">{meta.abstract}</p>}
 
       {typeof meta.confidence === 'number' && (
-        <div className="mb-3 text-xs text-slate-400">Konfidenz: {meta.confidence}</div>
+        <div className="mb-3 text-xs text-muted">Konfidenz: {meta.confidence}</div>
       )}
 
       {(meta.uri ?? meta.arxiv) && (
@@ -57,14 +58,16 @@ export default function SidePanel({ node, onClose }: Props) {
           href={meta.uri ?? `https://arxiv.org/abs/${meta.arxiv}`}
           target="_blank"
           rel="noreferrer"
-          className="mb-4 inline-block rounded bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-500"
+          className="mb-4 inline-block"
         >
-          Quelle öffnen ↗
+          <Button size="sm" icon={ExternalLink}>
+            Quelle öffnen
+          </Button>
         </a>
       )}
 
       {meta.source_document_ids && meta.source_document_ids.length > 0 && (
-        <div className="text-xs text-slate-400">
+        <div className="text-xs text-muted">
           Provenienz: {meta.source_document_ids.length} Quell-Dokument(e)
         </div>
       )}

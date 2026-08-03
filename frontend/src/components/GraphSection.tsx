@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fetchChangelog, fetchGraph, type ChangelogItem } from '../api'
 import { useAdminKey } from '../app/AdminKeyContext'
+import { useTheme } from '../lib/theme'
 import { endpointId, KIND_COLORS, type GraphData, type GraphNode, type NodeKind } from '../types'
 import { useElementSize } from '../useElementSize'
 import GraphView from './GraphView'
@@ -12,6 +13,8 @@ const EMPTY: GraphData = { nodes: [], links: [] }
 /** Wissens-Graph mit Zeitfilter, pending-Toggle (Admin), Changelog-Overlay und Detailpanel. */
 export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }) {
   const { adminKey } = useAdminKey()
+  const { theme } = useTheme()
+  const kindColors = KIND_COLORS[theme]
   const [data, setData] = useState<GraphData>(EMPTY)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [error, setError] = useState('')
@@ -92,7 +95,7 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
               <span key={k} className="inline-flex items-center gap-1">
                 <span
                   className="inline-block h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: KIND_COLORS[k] }}
+                  style={{ backgroundColor: kindColors[k] }}
                 />
                 {k}
               </span>
@@ -119,6 +122,7 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
           )}
           {status === 'ready' && view.nodes.length > 0 && width > 0 && (
             <GraphView
+              key={theme} // Remount beim Theme-Wechsel — vermeidet Canvas-Farbreste
               data={view}
               width={width}
               height={height}
@@ -126,6 +130,7 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
               selectedId={selected?.id ?? null}
               glowDays={filterDays ?? 7}
               onNodeClick={(n) => setSelected(n)}
+              theme={theme}
             />
           )}
           {changelog.length > 0 && (
@@ -136,7 +141,7 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
                   <li key={c.id} className="flex items-center gap-1.5 text-muted">
                     <span
                       className="inline-block h-2 w-2 rounded-full"
-                      style={{ backgroundColor: KIND_COLORS[c.kind as NodeKind] ?? '#94a3b8' }}
+                      style={{ backgroundColor: kindColors[c.kind as NodeKind] ?? '#94a3b8' }}
                     />
                     <span className="truncate">{c.name}</span>
                   </li>
