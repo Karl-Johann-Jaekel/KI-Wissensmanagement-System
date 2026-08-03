@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Lock } from 'lucide-react'
+import { FolderKanban, Lock } from 'lucide-react'
 import { fetchModels, streamChat } from '../api'
 import { useAdminKey } from '../app/AdminKeyContext'
 import ChatInput from '../components/chat/ChatInput'
@@ -11,6 +11,7 @@ import {
   createChat,
   getChatMessages,
   getChatMeta,
+  getProject,
   saveChat,
   type ChatMeta,
   type StoredMessage,
@@ -149,11 +150,18 @@ export default function ChatPage() {
   }
 
   const title = chatId ? metaRef.current?.title : 'Neuer Chat'
+  const projectId = metaRef.current?.projectId ?? navState.projectId ?? null
+  const project = projectId ? getProject(projectId) : null
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex items-center gap-2 border-b border-edge bg-surface px-4 py-2.5">
         <h1 className="min-w-0 flex-1 truncate text-sm font-semibold">{title ?? 'Chat'}</h1>
+        {project && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-edge bg-sunken px-2 py-0.5 text-[10px] text-muted">
+            <FolderKanban className="h-3 w-3" /> {project.name}
+          </span>
+        )}
         {zone === 'confidential' && (
           <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/40 bg-rose-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-rose-800 dark:bg-rose-900/60 dark:text-rose-200">
             <Lock className="h-3 w-3" /> confidential

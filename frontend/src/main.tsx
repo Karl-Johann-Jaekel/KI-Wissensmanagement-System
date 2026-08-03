@@ -1,7 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
-import { FolderKanban, Search, Sparkles } from 'lucide-react'
 import { AdminKeyProvider } from './app/AdminKeyContext'
 import AppShell from './app/AppShell'
 import { ToastProvider } from './components/ui/Toast'
@@ -10,7 +9,10 @@ import BibliothekPage from './pages/BibliothekPage'
 import ChatPage from './pages/ChatPage'
 import DocumentPage from './pages/DocumentPage'
 import InboxPage from './pages/InboxPage'
-import PlaceholderPage from './pages/PlaceholderPage'
+import ProjektDetailPage from './pages/ProjektDetailPage'
+import ProjektePage from './pages/ProjektePage'
+import SearchPage from './pages/SearchPage'
+import SkillsPage from './pages/SkillsPage'
 import WissenPage from './pages/WissenPage'
 import './index.css'
 
@@ -23,40 +25,14 @@ const router = createBrowserRouter([
       { path: '/', element: <Navigate to="/chat" replace /> },
       { path: '/chat', element: <ChatPage /> },
       { path: '/chat/:chatId', element: <ChatPage /> },
-      {
-        path: '/suche',
-        element: (
-          <PlaceholderPage
-            title="Suche"
-            icon={Search}
-            hint="Hybrid-Suche mit Scores über den gesamten Korpus."
-          />
-        ),
-      },
+      { path: '/suche', element: <SearchPage /> },
       { path: '/inbox', element: <InboxPage /> },
       { path: '/wissen', element: <WissenPage /> },
       { path: '/wissen/doc/:docId', element: <DocumentPage /> },
-      {
-        path: '/skills',
-        element: (
-          <PlaceholderPage
-            title="Skills"
-            icon={Sparkles}
-            hint="Wiederverwendbare Prompt-Vorlagen für den Chat."
-          />
-        ),
-      },
+      { path: '/skills', element: <SkillsPage /> },
       { path: '/bibliothek', element: <BibliothekPage /> },
-      {
-        path: '/projekte',
-        element: (
-          <PlaceholderPage
-            title="Projekte"
-            icon={FolderKanban}
-            hint="Arbeitsbereiche, die Chats und Dokumente bündeln."
-          />
-        ),
-      },
+      { path: '/projekte', element: <ProjektePage /> },
+      { path: '/projekte/:projectId', element: <ProjektDetailPage /> },
       { path: '*', element: <Navigate to="/chat" replace /> },
     ],
   },
