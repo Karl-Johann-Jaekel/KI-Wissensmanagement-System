@@ -2,11 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   chatTitleFrom,
   createChat,
+  DEFAULT_TOP_K,
   deleteChat,
   deleteProject,
   deleteSkill,
   getAdminKey,
   getChatMessages,
+  getChatMeta,
   listChats,
   listProjects,
   listSkills,
@@ -54,6 +56,13 @@ describe('chats', () => {
     expect(chats).toHaveLength(2)
     expect(getChatMessages(b.id)).toEqual([{ role: 'user', text: 'hi' }])
     expect(getChatMessages(a.id)).toEqual([])
+  })
+
+  it('defaults retrieval settings and keeps overrides', () => {
+    expect(createChat({}).topK).toBe(DEFAULT_TOP_K)
+    expect(createChat({}).rerank).toBe(false)
+    const tuned = createChat({ topK: 10, rerank: true })
+    expect(getChatMeta(tuned.id)).toMatchObject({ topK: 10, rerank: true })
   })
 
   it('rename and delete', () => {

@@ -9,6 +9,7 @@ import { useToast } from '../components/ui/Toast'
 import {
   chatTitleFrom,
   createChat,
+  DEFAULT_TOP_K,
   getChatMessages,
   getChatMeta,
   getProject,
@@ -39,6 +40,8 @@ export default function ChatPage() {
   const [busy, setBusy] = useState(false)
   const [zone, setZone] = useState<Zone>('public')
   const [model, setModel] = useState<string | null>(null)
+  const [topK, setTopK] = useState(DEFAULT_TOP_K)
+  const [rerank, setRerank] = useState(false)
   const [availableModels, setAvailableModels] = useState<string[] | null>(null)
   const metaRef = useRef<ChatMeta | null>(null)
 
@@ -70,12 +73,16 @@ export default function ChatPage() {
       setMessages(getChatMessages(chatId))
       setZone(meta.zone)
       setModel(meta.model)
+      setTopK(meta.topK ?? DEFAULT_TOP_K)
+      setRerank(meta.rerank ?? false)
       setInput('')
     } else {
       metaRef.current = null
       setMessages([])
       setZone(navState.zone ?? 'public')
       setModel(navState.model ?? null)
+      setTopK(DEFAULT_TOP_K)
+      setRerank(false)
       setInput(navState.prefill ?? '')
     }
     // navState bewusst nicht als Dependency: nur beim Routenwechsel anwenden.
@@ -94,12 +101,14 @@ export default function ChatPage() {
         title: chatTitleFrom(query),
         zone,
         model,
+        topK,
+        rerank,
         projectId: navState.projectId ?? null,
       })
       metaRef.current = meta
       navigate(`/chat/${meta.id}`, { replace: true })
     } else {
-      meta = { ...meta, zone, model }
+      meta = { ...meta, zone, model, topK, rerank }
       metaRef.current = meta
     }
     const chatRef = meta.id
@@ -112,9 +121,11 @@ export default function ChatPage() {
     const last = () => conv[conv.length - 1]
     sync()
 
-    const body: Record<string, unknown> = { query }
+    const body: Record<string, unknown> = { query, top_k: topK }
     if (zone === 'confidential' && adminKey) body.max_sensitivity = 'confidential'
     if (model) body.model = model
+    // false = Server-Default (RERANK_ENABLED) belassen, true = erzwingen.
+    if (rerank) body.rerank = true
 
     const persist = () => {
       if (!saveChat(meta, conv)) {
@@ -190,6 +201,10 @@ export default function ChatPage() {
         model={model}
         onModelChange={setModel}
         models={availableModels}
+        topK={topK}
+        onTopKChange={setTopK}
+        rerank={rerank}
+        onRerankChange={setRerank}
         placeholder="Frage an den KI-Forschungskorpus … (DE/EN)"
       />
     </div>

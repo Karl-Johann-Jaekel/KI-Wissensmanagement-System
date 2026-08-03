@@ -13,6 +13,7 @@ const LEGACY_ADMIN_KEY = 'kwms-admin-key'
 
 export const MAX_CHATS = 100
 export const MAX_MESSAGES_PER_CHAT = 200
+export const DEFAULT_TOP_K = 5
 
 export type Zone = 'public' | 'confidential'
 
@@ -24,6 +25,9 @@ export interface ChatMeta {
   zone: Zone
   model: string | null
   projectId: string | null
+  /** Retrieval-Einstellungen; bei Chats aus früheren Versionen undefined. */
+  topK?: number
+  rerank?: boolean
 }
 
 export interface StoredMessage {
@@ -147,7 +151,11 @@ export function chatTitleFrom(text: string): string {
   return line.length > 60 ? `${line.slice(0, 60)}…` : line || 'Neuer Chat'
 }
 
-export function createChat(init: Partial<Pick<ChatMeta, 'title' | 'zone' | 'model' | 'projectId'>> = {}): ChatMeta {
+export function createChat(
+  init: Partial<
+    Pick<ChatMeta, 'title' | 'zone' | 'model' | 'projectId' | 'topK' | 'rerank'>
+  > = {},
+): ChatMeta {
   const now = Date.now()
   const meta: ChatMeta = {
     id: newId(),
@@ -157,6 +165,8 @@ export function createChat(init: Partial<Pick<ChatMeta, 'title' | 'zone' | 'mode
     zone: init.zone ?? 'public',
     model: init.model ?? null,
     projectId: init.projectId ?? null,
+    topK: init.topK ?? DEFAULT_TOP_K,
+    rerank: init.rerank ?? false,
   }
   const index = chatIndex()
   index.push(meta)

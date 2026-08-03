@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   BookOpen,
+  Brain,
   FolderKanban,
   Inbox,
   Library,
@@ -87,7 +88,9 @@ export default function Sidebar({
       <div
         className={cn('flex items-center gap-2 px-4 pb-2 pt-4', collapsed && 'justify-center px-2')}
       >
-        <img src="/icon.svg" alt="" className="h-8 w-8 shrink-0 rounded-lg" />
+        <span className="shrink-0 rounded-lg bg-primary-600 p-1.5 text-white">
+          <Brain className="h-5 w-5" />
+        </span>
         {!collapsed && (
           <span className="min-w-0 break-words text-[13px] font-semibold leading-tight">
             KI-Wissensmanagement-System
