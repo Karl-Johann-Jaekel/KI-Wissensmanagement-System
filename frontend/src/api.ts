@@ -29,7 +29,7 @@ export interface ChatSource {
 
 export interface StreamHandlers {
   onToken: (text: string) => void
-  onSources: (sources: ChatSource[], zone?: string) => void
+  onSources: (sources: ChatSource[], zone?: string, model?: string) => void
   onDone: () => void
   onError: (message: string) => void
 }
@@ -82,9 +82,11 @@ export async function streamChat(
           text?: string
           sources?: ChatSource[]
           zone?: string
+          model?: string
         }
         if (obj.type === 'token' && obj.text) handlers.onToken(obj.text)
-        else if (obj.type === 'sources' && obj.sources) handlers.onSources(obj.sources, obj.zone)
+        else if (obj.type === 'sources' && obj.sources)
+          handlers.onSources(obj.sources, obj.zone, obj.model)
       } catch {
         // ignore malformed event
       }

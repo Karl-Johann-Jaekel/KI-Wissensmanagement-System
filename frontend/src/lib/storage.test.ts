@@ -41,9 +41,14 @@ describe('admin key', () => {
 
 describe('chats', () => {
   it('create + save + list roundtrip, sorted by updatedAt', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000)
     const a = createChat({ title: 'A' })
+    vi.setSystemTime(2_000)
     const b = createChat({ title: 'B' })
+    vi.setSystemTime(3_000)
     saveChat(b, [{ role: 'user', text: 'hi' }])
+    vi.useRealTimers()
     const chats = listChats()
     expect(chats.map((c) => c.title)[0]).toBe('B')
     expect(chats).toHaveLength(2)
