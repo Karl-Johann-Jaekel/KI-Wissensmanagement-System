@@ -34,6 +34,32 @@ export interface StreamHandlers {
   onError: (message: string) => void
 }
 
+/**
+ * Dispatch one SSE event block to the handlers. Returns true when the stream
+ * signalled [DONE]. Exported for tests.
+ */
+export function handleSseEvent(event: string, handlers: StreamHandlers): boolean {
+  const line = event.trim()
+  if (!line.startsWith('data:')) return false
+  const payload = line.slice(5).trim()
+  if (payload === '[DONE]') return true
+  try {
+    const obj = JSON.parse(payload) as {
+      type?: string
+      text?: string
+      sources?: ChatSource[]
+      zone?: string
+      model?: string
+    }
+    if (obj.type === 'token' && obj.text) handlers.onToken(obj.text)
+    else if (obj.type === 'sources' && obj.sources)
+      handlers.onSources(obj.sources, obj.zone, obj.model)
+  } catch {
+    // ignore malformed event
+  }
+  return false
+}
+
 /** POST to an SSE chat endpoint and dispatch token/sources events. */
 export async function streamChat(
   path: string,
@@ -69,26 +95,9 @@ export async function streamChat(
     const events = buffer.split('\n\n')
     buffer = events.pop() ?? ''
     for (const event of events) {
-      const line = event.trim()
-      if (!line.startsWith('data:')) continue
-      const payload = line.slice(5).trim()
-      if (payload === '[DONE]') {
+      if (handleSseEvent(event, handlers)) {
         handlers.onDone()
         return
-      }
-      try {
-        const obj = JSON.parse(payload) as {
-          type?: string
-          text?: string
-          sources?: ChatSource[]
-          zone?: string
-          model?: string
-        }
-        if (obj.type === 'token' && obj.text) handlers.onToken(obj.text)
-        else if (obj.type === 'sources' && obj.sources)
-          handlers.onSources(obj.sources, obj.zone, obj.model)
-      } catch {
-        // ignore malformed event
       }
     }
   }
