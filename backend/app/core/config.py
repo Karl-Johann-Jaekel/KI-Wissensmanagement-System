@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     embed_model: str = "qwen3-embedding:0.6b"
     embed_dim: int = 1024
 
+    # Docling-Parsing. OCR aus: arXiv-PDFs sind born-digital, die OCR-Stufe war der
+    # Speicher-Peak, der den Ingest-Prozess bei 40 Papers zerlegt hat (ADR-0011).
+    docling_ocr: bool = False
+    docling_table_structure: bool = True
+
     # Ollama (confidential zone)
     ollama_base_url: str = "http://ollama:11434"
     ollama_llm_model: str = "qwen3:8b"
