@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   BookOpen,
-  BrainCircuit,
   FolderKanban,
   Inbox,
   Library,
@@ -85,11 +84,15 @@ export default function Sidebar({
   return (
     <div className="flex h-full flex-col border-r border-edge bg-surface">
       {/* Brand */}
-      <div className={cn('flex items-center gap-2 px-4 pb-2 pt-4', collapsed && 'justify-center px-2')}>
-        <span className="rounded-lg bg-primary-600 p-1.5 text-white">
-          <BrainCircuit className="h-4 w-4" />
-        </span>
-        {!collapsed && <span className="truncate text-sm font-semibold">KI-Wissen</span>}
+      <div
+        className={cn('flex items-center gap-2 px-4 pb-2 pt-4', collapsed && 'justify-center px-2')}
+      >
+        <img src="/icon.svg" alt="" className="h-8 w-8 shrink-0 rounded-lg" />
+        {!collapsed && (
+          <span className="min-w-0 break-words text-[13px] font-semibold leading-tight">
+            KI-Wissensmanagement-System
+          </span>
+        )}
         <button
           onClick={onToggleCollapsed}
           aria-label={collapsed ? 'Sidebar ausklappen' : 'Sidebar einklappen'}

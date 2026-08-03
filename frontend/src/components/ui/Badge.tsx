@@ -1,7 +1,7 @@
 import type { HTMLAttributes } from 'react'
 import { cn } from '../../lib/cn'
 
-export type BadgeTone = 'neutral' | 'green' | 'amber' | 'rose' | 'sky'
+export type BadgeTone = 'neutral' | 'green' | 'amber' | 'rose' | 'sky' | 'violet'
 
 const TONES: Record<BadgeTone, string> = {
   neutral: 'border-edge bg-sunken text-muted',
@@ -11,6 +11,8 @@ const TONES: Record<BadgeTone, string> = {
     'border-amber-500/40 bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200',
   rose: 'border-rose-500/40 bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-200',
   sky: 'border-sky-500/40 bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-200',
+  violet:
+    'border-violet-500/40 bg-violet-100 text-violet-800 dark:bg-violet-900/60 dark:text-violet-200',
 }
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {

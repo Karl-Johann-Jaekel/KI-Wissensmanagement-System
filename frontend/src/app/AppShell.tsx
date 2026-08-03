@@ -103,7 +103,10 @@ export default function AppShell() {
           >
             <Menu className="h-5 w-5" />
           </button>
-          <span className="text-sm font-semibold">KI-Wissen</span>
+          <img src="/icon.svg" alt="" className="h-6 w-6 shrink-0 rounded" />
+          <span className="min-w-0 truncate text-sm font-semibold">
+            KI-Wissensmanagement-System
+          </span>
         </header>
 
         <main className="min-h-0 flex-1">

@@ -26,19 +26,20 @@ export interface GraphData {
   links: GraphLink[]
 }
 
-/** Knoten-Farben je Theme — paper trägt das Markengrün (primary). */
+/** Knoten-Farben je Theme — paper trägt das Markenblau (primary). */
 export const KIND_COLORS: Record<'light' | 'dark', Record<NodeKind, string>> = {
   light: {
-    paper: '#2f8a57', // primary-600
+    paper: '#2563eb', // primary-600
     concept: '#d97706', // amber-600
     model: '#dc2626', // red-600
-    dataset: '#0891b2', // cyan-600
+    // violett statt cyan: neben dem blauen paper-Knoten sonst nicht unterscheidbar
+    dataset: '#7c3aed', // violet-600
   },
   dark: {
-    paper: '#66b28b', // primary-400
+    paper: '#60a5fa', // primary-400
     concept: '#fbbf24', // amber-400
     model: '#f87171', // red-400
-    dataset: '#22d3ee', // cyan-400
+    dataset: '#a78bfa', // violet-400
   },
 }
 

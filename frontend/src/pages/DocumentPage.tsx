@@ -114,7 +114,9 @@ export default function DocumentPage() {
           )}
         </div>
         <div className="mx-auto mt-1.5 flex max-w-4xl flex-wrap items-center gap-2 text-xs text-muted">
-          <Badge tone={doc.source_type === 'markdown' ? 'sky' : 'neutral'}>{doc.source_type}</Badge>
+          <Badge tone={doc.source_type === 'markdown' ? 'violet' : 'neutral'}>
+            {doc.source_type}
+          </Badge>
           <SensitivityBadge value={doc.sensitivity} />
           <span>{doc.chunks} Chunks</span>
           {doc.content_source === 'reassembled' && (

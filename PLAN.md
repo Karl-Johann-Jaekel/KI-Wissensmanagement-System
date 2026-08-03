@@ -329,7 +329,8 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
   Eval-Report pro Lauf. → **live: 16 Papers → 66 Fakten, 3 auto-verified, Eval 0,94** ✓
 
 ### Phase 9 — UI/UX-Redesign & Backend-Erweiterung  *(v5: RelationFlow-Vorbild, Branch UI-UX)*
-- [x] **9a Design-Foundation:** Tailwind-Tokens (Primär-Grün `#3ca66a`, CSS-Var-Flächen,
+- [x] **9a Design-Foundation:** Tailwind-Tokens (Primär-Blau `#3b82f6` passend zum
+      App-Icon, CSS-Var-Flächen,
       hell = Default + Dark-Toggle), UI-Primitives (Button/Card/Modal/Toast/…),
       neue Deps (Router, lucide, react-markdown, vitest) — ADR-0005
 - [x] **9a App-Shell:** Sidebar-Layout (Neuer Chat, Suche, Inbox, Wissen, Skills,

@@ -48,7 +48,7 @@ export default function DocumentTable({ docs, emptyHint }: DocumentTableProps) {
             >
               <td className="max-w-md truncate py-2.5 pr-3 font-medium text-ink">{d.title}</td>
               <td className="py-2.5 pr-3">
-                <Badge tone={d.source_type === 'markdown' ? 'sky' : 'neutral'}>
+                <Badge tone={d.source_type === 'markdown' ? 'violet' : 'neutral'}>
                   {d.source_type}
                 </Badge>
               </td>
@@ -72,7 +72,7 @@ export default function DocumentTable({ docs, emptyHint }: DocumentTableProps) {
             >
               <div className="truncate text-sm font-medium text-ink">{d.title}</div>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
-                <Badge tone={d.source_type === 'markdown' ? 'sky' : 'neutral'}>
+                <Badge tone={d.source_type === 'markdown' ? 'violet' : 'neutral'}>
                   {d.source_type}
                 </Badge>
                 <SensitivityBadge value={d.sensitivity} />
