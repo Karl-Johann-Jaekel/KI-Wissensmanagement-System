@@ -7,6 +7,7 @@ import AppShell from './app/AppShell'
 import { ToastProvider } from './components/ui/Toast'
 import { applyTheme, resolveTheme } from './lib/theme'
 import ChatPage from './pages/ChatPage'
+import DocumentPage from './pages/DocumentPage'
 import InboxPage from './pages/InboxPage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import WissenPage from './pages/WissenPage'
@@ -33,6 +34,7 @@ const router = createBrowserRouter([
       },
       { path: '/inbox', element: <InboxPage /> },
       { path: '/wissen', element: <WissenPage /> },
+      { path: '/wissen/doc/:docId', element: <DocumentPage /> },
       {
         path: '/skills',
         element: (

@@ -115,15 +115,43 @@ export async function fetchDocuments(apiKey?: string | null): Promise<DocumentRo
   return (await res.json()) as DocumentRow[]
 }
 
-export async function uploadPdf(
+export interface DocumentDetail {
+  id: string
+  title: string
+  source_type: string
+  sensitivity: string
+  lang: string
+  uri: string | null
+  meta: Record<string, unknown>
+  created_at: string
+  chunks: number
+  content: string
+  content_source: 'stored' | 'reassembled'
+  editable: boolean
+}
+
+export async function fetchDocument(id: string, apiKey?: string | null): Promise<DocumentDetail> {
+  const res = await fetch(`${BASE}/documents/${id}`, {
+    headers: apiKey ? { 'X-API-Key': apiKey } : {},
+  })
+  if (!res.ok) throw new Error(`document: HTTP ${res.status}`)
+  return (await res.json()) as DocumentDetail
+}
+
+/** Upload a PDF or Markdown file (raw bytes, admin-only). */
+export async function uploadDocument(
   file: File,
   sensitivity: string,
   apiKey: string,
 ): Promise<{ filename: string; status: string; chunks: number }> {
+  const isMarkdown = file.name.toLowerCase().endsWith('.md')
   const params = new URLSearchParams({ filename: file.name, sensitivity })
   const res = await fetch(`${BASE}/ingest?${params}`, {
     method: 'POST',
-    headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/pdf' },
+    headers: {
+      'X-API-Key': apiKey,
+      'Content-Type': isMarkdown ? 'text/markdown' : 'application/pdf',
+    },
     body: file,
   })
   if (!res.ok) {
@@ -131,6 +159,79 @@ export async function uploadPdf(
     throw new Error(`Upload fehlgeschlagen (HTTP ${res.status}): ${detail}`)
   }
   return res.json()
+}
+
+export async function updateDocumentContent(
+  id: string,
+  content: string,
+  apiKey: string,
+): Promise<{ id: string; status: string; chunks: number }> {
+  const res = await fetch(`${BASE}/documents/${id}/content`, {
+    method: 'PUT',
+    headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  })
+  if (!res.ok) {
+    const detail = await res.text()
+    throw new Error(`Speichern fehlgeschlagen (HTTP ${res.status}): ${detail}`)
+  }
+  return res.json()
+}
+
+export async function deleteDocument(id: string, apiKey: string): Promise<void> {
+  const res = await fetch(`${BASE}/documents/${id}`, {
+    method: 'DELETE',
+    headers: { 'X-API-Key': apiKey },
+  })
+  if (!res.ok) throw new Error(`Löschen fehlgeschlagen (HTTP ${res.status})`)
+}
+
+// ---------------------------------------------------------------- models
+
+export interface ModelsInfo {
+  available: boolean
+  default: string
+  models: { name: string; parameter_size?: string | null; size?: number | null }[]
+}
+
+export async function fetchModels(apiKey: string): Promise<ModelsInfo> {
+  const res = await fetch(`${BASE}/models`, { headers: { 'X-API-Key': apiKey } })
+  if (!res.ok) throw new Error(`models: HTTP ${res.status}`)
+  return (await res.json()) as ModelsInfo
+}
+
+// ---------------------------------------------------------------- search
+
+export interface SearchHitRow {
+  chunk_id: string
+  document_id: string
+  title: string
+  uri: string | null
+  sensitivity: string
+  content: string
+  scores: Record<string, number | null>
+}
+
+export async function postSearch(
+  query: string,
+  options: { topK?: number; maxSensitivity?: string; rerank?: boolean | null } = {},
+  apiKey?: string | null,
+): Promise<SearchHitRow[]> {
+  const res = await fetch(`${BASE}/search`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(apiKey ? { 'X-API-Key': apiKey } : {}),
+    },
+    body: JSON.stringify({
+      query,
+      top_k: options.topK ?? 5,
+      max_sensitivity: options.maxSensitivity ?? 'public',
+      rerank: options.rerank ?? null,
+    }),
+  })
+  if (!res.ok) throw new Error(`search: HTTP ${res.status}`)
+  return ((await res.json()) as { hits: SearchHitRow[] }).hits
 }
 
 // -------------------------------------------------- living knowledge (Phase 8)
