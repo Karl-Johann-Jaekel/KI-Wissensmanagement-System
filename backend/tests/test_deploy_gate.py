@@ -8,7 +8,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
-from app.db.models import Document
+from app.db.models import Chunk, Document
 
 # Skript liegt außerhalb des app-Pakets — per Pfad importieren. Layouts:
 # Container: /app/tests + /app/scripts (Mount) · CI/Host: backend/tests + ../scripts
@@ -35,7 +35,19 @@ def _results(checks: list[tuple[str, bool, str]]) -> dict[str, bool]:
 
 
 def test_gate_green_with_ready_environment(db_session: Session) -> None:
-    db_session.add(Document(source_type="pdf", title="P", content_hash="gate-doc"))
+    # Das Gate zählt Dokumente *und* Chunks — ein Dokument allein hält es rot.
+    # Ohne den Chunk lief der Test nur auf einer bereits befüllten Datenbank grün.
+    doc = Document(source_type="pdf", title="P", content_hash="gate-doc")
+    db_session.add(doc)
+    db_session.flush()
+    db_session.add(
+        Chunk(
+            document_id=doc.id,
+            chunk_index=0,
+            content="Inhalt",
+            embed_model=PROD_SETTINGS.embed_model,
+        )
+    )
     db_session.commit()
     results = _results(gate.run_checks(settings=PROD_SETTINGS, session=db_session))
     assert results["DB: Korpus ist befüllt"] is True
