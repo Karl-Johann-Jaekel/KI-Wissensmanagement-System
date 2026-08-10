@@ -4,7 +4,7 @@
 Wissens-Graphen, der nur aufnimmt, was durch eine Prüfung gekommen ist.**
 
 56 arXiv-Papers · 6.950 indexierte Chunks · 370 Graph-Knoten · Hit-Rate@5 **0,94**
-· 113 automatisierte Tests
+· 140 automatisierte Tests · 16 Architecture Decision Records
 
 ```
 Frage ──▶ Hybrid-Retrieval ──▶ Kontext ──▶ LLM ──▶ Antwort mit Quellenangabe
@@ -12,6 +12,37 @@ Frage ──▶ Hybrid-Retrieval ──▶ Kontext ──▶ LLM ──▶ Antwo
            RRF-fusioniert)                          └─▶ Faktenextraktion ──▶ Graph
                                                           (pending ──▶ verified)
 ```
+
+---
+
+## Auf einen Blick
+
+|  |  |
+|---|---|
+| **Problem** | Forschungsliteratur wächst schneller, als man sie lesen kann. Ein Chatbot, der plausibel klingende Antworten erfindet, macht es schlimmer. |
+| **Lösung** | Hybrid-Retrieval mit Zitationspflicht, plus ein Wissens-Graph, in den ein Fakt erst nach Prüfung einzieht. |
+| **Stack** | FastAPI · Postgres 16 + pgvector · SQLAlchemy/Alembic · Docling · Mistral EU-API · React 18 + TypeScript + Tailwind · Docker · GitHub Actions |
+| **Umfang** | Solo-Projekt, 22.07.–10.08.2026 · rund 50 Commits · ~190 Dateien · 11 Phasen nach [PLAN.md](PLAN.md) |
+| **Datenschutz** | EU-Verarbeitung, keine Konversation auf dem Server (localStorage), keine Paper-PDFs im Repo |
+| **Stand** | Lokal und im Prod-Stack lauffähig, Deploy-Gate + Restore erprobt; offen ist der Go-Live auf dem EU-VPS |
+
+## Was dieses Projekt zeigt
+
+| Fähigkeit | Wo sie im Code sichtbar wird |
+|---|---|
+| **RAG jenseits des Tutorials** | Reciprocal Rank Fusion aus Vektor- und Volltextarm, optionaler Cross-Encoder — [`backend/app/retrieval/`](backend/app/retrieval/) |
+| **Messen statt behaupten** | Golden-Set (16 Fragen, de/en), Hit-Rate pro Lauf, Parameter-Sweep — [`eval/`](eval/) |
+| **Datenqualität als Regelwerk** | `pending → verified` nur mit Provenienz, kein Silent-Overwrite — [`backend/app/corpus/promote.py`](backend/app/corpus/promote.py) |
+| **Datenmodellierung** | Chunks, Vektoren (HNSW), Graph-Tabellen, versionierte Migrationen — [`backend/app/db/`](backend/app/db/) |
+| **Frontend-Handwerk** | Canvas-Graph-Explorer mit vier Layouts, hell/dunkel, mobiltauglich — [`frontend/src/components/graph/`](frontend/src/components/graph/) |
+| **Betrieb** | Caddy-Prod-Stack, Deploy-Gate, Smoke-Test, erprobtes Restore — [`scripts/`](scripts/), [`docs/runbooks/`](docs/runbooks/) |
+| **Entscheidungen begründen** | 16 ADRs, inklusive der revidierten — [`docs/adr/`](docs/adr/) |
+
+**Drei Dateien, wenn die Zeit knapp ist:**
+[`retrieval/rrf.py`](backend/app/retrieval/rrf.py) (wie zwei Suchverfahren fusioniert werden),
+[`corpus/promote.py`](backend/app/corpus/promote.py) (wann ein Fakt als wahr gilt),
+[`docs/adr/0015-remove-confidential-zone.md`](docs/adr/0015-remove-confidential-zone.md)
+(wie eine Kernannahme fiel und was daraus folgte).
 
 ---
 
@@ -34,7 +65,7 @@ Widersprüchliche Behauptungen werden als `disputed` markiert statt still
 und englisch) misst die Hit-Rate bei jedem Durchlauf. Als die Embeddings gewechselt
 wurden, lag die Zahl vorher und nachher auf dem Tisch: 0,88 → 0,94.
 
-**Entscheidungen sind dokumentiert.** 15 Architecture Decision Records halten fest,
+**Entscheidungen sind dokumentiert.** 16 Architecture Decision Records halten fest,
 was warum entschieden wurde — inklusive der Fälle, in denen sich eine Annahme als
 falsch herausstellte und der Weg korrigiert wurde.
 
@@ -56,8 +87,9 @@ docker compose exec backend python -m app.ingest data/corpus
 cd frontend && npm install && npm run dev     # http://localhost:5173
 ```
 
-Ohne API-Schlüssel läuft alles gegen ein lokales Ollama-Modell weiter — nur eben
-langsamer.
+Ohne API-Schlüssel läuft alles gegen ein lokales Ollama-Modell weiter — langsamer,
+und die Wahl muss **vor** dem Indexieren fallen: Index und Query brauchen dasselbe
+Embedding-Modell (ADR-0002), ein Wechsel erzwingt `scripts/reindex.py`.
 
 ---
 
@@ -79,14 +111,17 @@ Der Graph zeichnet vielzitierte Grundlagenarbeiten mit einem goldenen Ring aus
 Vernetzungsgrad vorbehalten — zwei Signale, zwei visuelle Kanäle.
 
 **Der Graph-Explorer** (ADR-0016) zeigt denselben Bestand in vier Layouts:
-*Cloud* (Kräftesimulation mit getrennten Cluster-Zentren), *Globus* (rotierende
-Kugel mit Tiefenschärfe), *Ring* (Systemkern in der Mitte, außen Wissenswelten
-als Sektoren, dann Projekte und externe Dienste auf Orbits) und *Ebenen* (die
-Systemschichten vertikal gestapelt). Kanten bleiben unsichtbar, bis man einen
-Knoten überfährt; ein verschiebbares Menü trägt Suche, Regler (Knotengröße,
-Cluster-Abstand, Streuung, Detail-Tiefe) und das Kollabieren ganzer Cluster zu
-einem Hub. Ein Klick öffnet die Leseansicht mit dem Volltext des Quell-Dokuments
-direkt neben dem Graphen.
+
+- **Cloud** — Kräftesimulation, jedes Thema an sein eigenes Zentrum gezogen
+- **Globus** — rotierende Kugel, Tiefe steuert Größe und Deckkraft
+- **Ring** — Systemkern mittig, außen Wissenswelten als Sektoren, dann Projekte
+  und externe Dienste auf Orbits
+- **Ebenen** — die Systemschichten vertikal gestapelt
+
+Kanten erscheinen erst beim Überfahren eines Knotens; ein verschiebbares Menü
+trägt Suche, Regler (Knotengröße, Cluster-Abstand, Streuung, Detail-Tiefe) und das
+Kollabieren ganzer Cluster zu einem Hub. Ein Klick öffnet den Volltext des
+Quell-Dokuments direkt neben dem Graphen.
 
 ---
 
@@ -123,7 +158,8 @@ Mistral EU-API · Ollama (lokal)
 
 **Qualitätssicherung**
 
-- 113 automatisierte Tests (Retrieval, Extraktion, Promotion, API, Deploy-Gate).
+- 140 automatisierte Tests: 98 im Backend (Retrieval, Extraktion, Promotion, API,
+  Deploy-Gate) und 42 im Frontend (Speicherschicht, Graph-Layouts, Clusterbildung).
   DB-Tests laufen in Transaktionen mit Rollback, LLM und HTTP sind gemockt.
 - `ruff`, `mypy` und `gitleaks` in GitHub Actions, dazu ein Frontend-Job mit
   Typprüfung, Vitest und Produktionsbuild.
@@ -183,7 +219,7 @@ frontend/      React-SPA: Chat · Suche · Inbox · Wissen · Skills · Projekte
 mcp_server/    MCP-Werkzeuge für Claude Desktop
 eval/          Golden-Set, Hit-Rate-Messung, Parameter-Tuning
 scripts/       Korpus-Fetch · Reindex · Deploy-Gate · Smoke-Test · Backup
-docs/adr/      15 Architecture Decision Records · docs/runbooks/
+docs/adr/      16 Architecture Decision Records · docs/runbooks/
 ```
 
 ## Lizenz
