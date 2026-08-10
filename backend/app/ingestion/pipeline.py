@@ -39,6 +39,23 @@ def content_hash_bytes(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def assert_zone_allows_provider(sensitivity: str) -> None:
+    """Zonenregel (PLAN §2): Nicht-öffentlicher Inhalt verlässt den Rechner nie.
+
+    Embeddings sehen den vollen Chunk-Text. Ein entfernter Anbieter ist damit für
+    ``confidential``/``internal`` ausgeschlossen — lieber ein klarer Abbruch als
+    ein stiller Zonenbruch.
+    """
+    settings = get_settings()
+    if sensitivity != "public" and settings.embed_provider != "ollama":
+        raise ValueError(
+            f"Zone '{sensitivity}' erlaubt keinen entfernten Embedding-Anbieter "
+            f"(EMBED_PROVIDER={settings.embed_provider}). Für vertrauliche Dokumente "
+            "EMBED_PROVIDER=ollama setzen — und dafür einen eigenen Bestand führen, "
+            "da ein Index nur ein Modell tragen darf (ADR-0014)."
+        )
+
+
 def document_exists(session: Session, content_hash: str) -> bool:
     return (
         session.execute(select(Document.id).where(Document.content_hash == content_hash)).first()
@@ -66,6 +83,7 @@ def ingest_file(
     embed_fn: EmbedFn = embed_texts,
 ) -> tuple[str, int]:
     """Ingest one PDF. Returns (status, n_chunks); status in added|skipped|empty."""
+    assert_zone_allows_provider(sensitivity)
     raw = pdf_path.read_bytes()
     content_hash = content_hash_bytes(raw)
     if document_exists(session, content_hash):
@@ -110,6 +128,7 @@ def ingest_markdown(
     embed_fn: EmbedFn = embed_texts,
 ) -> tuple[str, int]:
     """Ingest one Markdown file (no Docling). Returns (status, n_chunks)."""
+    assert_zone_allows_provider(sensitivity)
     raw = md_path.read_bytes()
     content_hash = content_hash_bytes(raw)
     if document_exists(session, content_hash):

@@ -41,6 +41,21 @@ weiterhin Treffer, nur die falschen. Drei Sicherungen dagegen:
 den Bestand auf das Zielmodell um: fortsetzbar, stapelweise, mit Dimensionsprüfung
 vor dem ersten Schreibvorgang und optionalem Filter auf eine Zone.
 
+## Gemessen
+
+Umstellung des Bestands (6.950 Chunks) auf `mistral-embed`, Golden-Eval davor
+und danach:
+
+| | Hit-Rate@5 | Latenz p50 | Latenz p95 |
+|---|---|---|---|
+| `qwen3-embedding:0.6b` (Ollama) | 0,88 (14/16) | 220 ms | 250 ms |
+| `mistral-embed` (EU-API) | **0,94 (15/16)** | 281 ms | 436 ms |
+
+Die Befürchtung, ein nicht ausdrücklich multilinguales Modell könnte bei
+deutschen Fragen einbrechen, hat sich nicht bestätigt — im Gegenteil, ein
+zusätzlicher Treffer. Die höhere Latenz ist der Netzweg zur API und liegt weit
+unter der Antwortzeit des Sprachmodells. Der Reindex dauerte rund vier Minuten.
+
 ## Konsequenzen
 
 - **Rollenteilung:** Der Korpus wird lokal gebaut (Docling ist speicherhungrig —
@@ -53,4 +68,12 @@ vor dem ersten Schreibvorgang und optionalem Filter auf eine Zone.
   (Deploy-Gate).
 - Der Wechsel kostet einen vollständigen Reindex des öffentlichen Bestands
   (aktuell 6.950 Chunks) über die API.
-- Lokal bleibt alles wie gehabt: Ollama für Embeddings und für vertrauliche Chats.
+- **Ein Bestand kann nicht beide Zonen tragen, sobald ein entfernter Anbieter im
+  Spiel ist.** Embeddings sehen den vollen Chunk-Text; vertraulicher Inhalt darf
+  ihn nicht erreichen. Der Ingest bricht deshalb ab, wenn `sensitivity != public`
+  auf `EMBED_PROVIDER != ollama` trifft, und `reindex.py` überspringt solche
+  Chunks. Eine private Bibliothek braucht damit einen **eigenen lokalen Bestand**
+  mit `EMBED_PROVIDER=ollama` — nicht dieselbe Datenbank wie der öffentliche
+  Korpus.
+- Tests dürfen nicht an der `.env` hängen: Eine autouse-Fixture legt den Anbieter
+  für die Suite auf `ollama` fest.

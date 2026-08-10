@@ -44,6 +44,7 @@ def main(argv: list[str] | None = None) -> int:
 
     settings = get_settings()
     target_model = settings.embed_model
+    remote = settings.embed_provider != "ollama"
     print(f"Zielmodell: {target_model} ({settings.embed_provider}, {settings.embed_dim} dim)")
 
     with SessionLocal() as session:
@@ -51,6 +52,23 @@ def main(argv: list[str] | None = None) -> int:
         if args.sensitivity:
             stmt = stmt.join(Document, Document.id == Chunk.document_id).where(
                 Document.sensitivity == args.sensitivity
+            )
+        if remote:
+            # Zonenregel (PLAN §2): Inhalt außerhalb von `public` verlässt den Rechner
+            # nie. Ein externer Anbieter bekommt deshalb nur öffentliche Chunks.
+            skipped = session.execute(
+                select(func.count())
+                .select_from(Chunk)
+                .join(Document, Document.id == Chunk.document_id)
+                .where(Chunk.embed_model != target_model, Document.sensitivity != "public")
+            ).scalar_one()
+            if skipped:
+                print(
+                    f"HINWEIS: {skipped} Chunks außerhalb der Zone 'public' werden "
+                    f"übersprungen — für sie bleibt nur ein lokaler Anbieter zulässig."
+                )
+            stmt = stmt.join(Document, Document.id == Chunk.document_id).where(
+                Document.sensitivity == "public"
             )
         count_stmt = select(func.count()).select_from(stmt.subquery())
         todo = session.execute(count_stmt).scalar_one()

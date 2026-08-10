@@ -54,6 +54,28 @@ def test_mistral_provider_uses_v1_embeddings(monkeypatch: pytest.MonkeyPatch) ->
     assert vectors == [[0.1], [0.9]]  # Reihenfolge der Eingabe wiederhergestellt
 
 
+def test_confidential_ingest_refuses_remote_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Vertraulicher Inhalt darf nie an einen entfernten Embedder gehen (PLAN §2)."""
+    from pathlib import Path
+
+    from app.ingestion.pipeline import assert_zone_allows_provider, ingest_markdown
+
+    monkeypatch.setattr(get_settings(), "embed_provider", "mistral", raising=False)
+
+    with pytest.raises(ValueError, match="erlaubt keinen entfernten"):
+        assert_zone_allows_provider("confidential")
+    with pytest.raises(ValueError):
+        assert_zone_allows_provider("internal")
+    assert_zone_allows_provider("public")  # öffentlich ist erlaubt
+
+    # Der Abbruch greift, bevor die Datei überhaupt gelesen wird.
+    with pytest.raises(ValueError):
+        ingest_markdown(None, Path("/nicht/vorhanden.md"), "confidential")  # type: ignore[arg-type]
+
+    monkeypatch.setattr(get_settings(), "embed_provider", "ollama", raising=False)
+    assert_zone_allows_provider("confidential")  # lokal wieder erlaubt
+
+
 def test_index_mismatch_raises(db_session: Session) -> None:
     doc = Document(
         source_type="pdf", title="Mismatch Doc", content_hash="emb-mismatch", sensitivity="public"
