@@ -37,11 +37,18 @@ const KIND_LABELS: Record<SceneKind, string> = {
   service: 'Dienste',
 }
 
-/** Farben je Knotenart; Wissensarten erben die bestehende Graph-Palette. */
+/**
+ * Farben je Knotenart; Wissensarten erben die bestehende Graph-Palette.
+ * Dienste tragen Türkis (vorher Grau); Projekte weichen deshalb auf Smaragd aus,
+ * damit die beiden äußeren Schichten unterscheidbar bleiben.
+ */
 export const SCENE_COLORS: Record<Theme, Record<SceneKind, string>> = {
-  light: { ...KIND_COLORS.light, system: '#ea580c', project: '#0d9488', service: '#64748b' },
-  dark: { ...KIND_COLORS.dark, system: '#fb923c', project: '#2dd4bf', service: '#94a3b8' },
+  light: { ...KIND_COLORS.light, system: '#ea580c', project: '#059669', service: '#0d9488' },
+  dark: { ...KIND_COLORS.dark, system: '#fb923c', project: '#34d399', service: '#2dd4bf' },
 }
+
+/** Sammelsektor „Weitere Inseln" — gedämpftes Türkis, klar neben den Diensten. */
+const REST_COLOR: Record<Theme, string> = { light: '#0f766e', dark: '#5eead4' }
 
 /** Farbkreis für Themen-Cluster (Gruppenmodus „Themen"). */
 const CLUSTER_PALETTE: Record<Theme, string[]> = {
@@ -252,7 +259,7 @@ export function buildScene(data: GraphData, opts: BuildOptions): Scene {
       addGroup({
         id: REST_GROUP,
         label: 'Weitere Inseln',
-        color: kindColors.service,
+        color: REST_COLOR[theme],
         tier: 1,
         count: rest.length,
       })

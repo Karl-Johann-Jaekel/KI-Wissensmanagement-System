@@ -4,6 +4,7 @@
  * zeichnet gedrosselt — ein React-Render pro Frame wäre unnötige Last.
  */
 import { useCallback, useEffect, useRef } from 'react'
+import { FALLBACK_COLOR } from '../../types'
 import type { Scene, Theme } from './scene'
 
 interface Props {
@@ -54,7 +55,7 @@ export default function Minimap({ scene, fg, graphWidth, graphHeight, theme }: P
     const colors = new Map(scene.groups.map((g) => [g.id, g.color]))
     for (const n of scene.nodes) {
       if (n.x === undefined || n.y === undefined) continue
-      ctx.fillStyle = colors.get(n.group) ?? '#94a3b8'
+      ctx.fillStyle = colors.get(n.group) ?? FALLBACK_COLOR[theme]
       ctx.globalAlpha = 0.85
       const r = n.members || n.kind === 'system' ? 2.4 : 1.2
       ctx.beginPath()

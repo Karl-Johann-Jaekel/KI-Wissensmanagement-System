@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchChangelog, type ChangelogItem } from '../../api'
 import { useTheme } from '../../lib/theme'
-import { KIND_COLORS, type NodeKind } from '../../types'
+import { FALLBACK_COLOR, KIND_COLORS, type NodeKind } from '../../types'
 
 /** „Neu (7 Tage)": zuletzt verifizierte Graph-Knoten — öffentlich sichtbar. */
 export default function ChangelogFeed({ days = 7 }: { days?: number }) {
@@ -27,7 +27,7 @@ export default function ChangelogFeed({ days = 7 }: { days?: number }) {
         <li key={c.id} className="flex items-center gap-2.5 py-2 text-sm">
           <span
             className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-            style={{ backgroundColor: kindColors[c.kind as NodeKind] ?? '#94a3b8' }}
+            style={{ backgroundColor: kindColors[c.kind as NodeKind] ?? FALLBACK_COLOR[theme] }}
           />
           <span className="min-w-0 flex-1 truncate text-ink">{c.name}</span>
           <span className="shrink-0 text-xs uppercase tracking-wide text-muted">{c.kind}</span>

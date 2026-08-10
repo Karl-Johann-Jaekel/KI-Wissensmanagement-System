@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import {
   endpointId,
+  FALLBACK_COLOR,
   KIND_COLORS,
   LANDMARK_COLOR,
   type GraphData,
@@ -97,7 +98,7 @@ export default function GraphView({
     (node: GraphNode, ctx: CanvasRenderingContext2D, scale: number) => {
       const bright = isBright(node.id)
       const r = 2 + Math.sqrt(node.val) * 1.6
-      const color = kindColors[node.kind] ?? '#94a3b8'
+      const color = kindColors[node.kind] ?? FALLBACK_COLOR[theme]
       ctx.globalAlpha = bright ? 1 : DIM_ALPHA
       // "Neu"-glow: recently added nodes get a soft halo
       if (bright && isNew(node)) {

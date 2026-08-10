@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
-import { LANDMARK_COLOR } from '../../types'
+import { FALLBACK_COLOR, LANDMARK_COLOR } from '../../types'
 import {
   clusterCenters,
   layoutTargets,
@@ -16,7 +16,15 @@ import {
   tierLabelPositions,
   type Target,
 } from './layouts'
-import { endpoint, SCENE_COLORS, TIER_LABELS, type Scene, type SceneLink, type SceneNode, type Theme } from './scene'
+import {
+  endpoint,
+  SCENE_COLORS,
+  TIER_LABELS,
+  type Scene,
+  type SceneLink,
+  type SceneNode,
+  type Theme,
+} from './scene'
 import type { GraphSettings } from './settings'
 
 interface Props {
@@ -103,7 +111,8 @@ export default function GraphCanvas({
 
   const groupColor = useMemo(() => {
     const map = new Map(scene.groups.map((g) => [g.id, g.color]))
-    return (node: SceneNode) => map.get(node.group) ?? SCENE_COLORS[theme][node.kind] ?? '#94a3b8'
+    return (node: SceneNode) =>
+      map.get(node.group) ?? SCENE_COLORS[theme][node.kind] ?? FALLBACK_COLOR[theme]
   }, [scene.groups, theme])
 
   const layoutOpts = useMemo(
