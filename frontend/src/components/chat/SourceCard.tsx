@@ -1,5 +1,4 @@
 import type { ChatSource } from '../../api'
-import SensitivityBadge from '../SensitivityBadge'
 
 export default function SourceCard({ source }: { source: ChatSource }) {
   return (
@@ -18,7 +17,6 @@ export default function SourceCard({ source }: { source: ChatSource }) {
           <span className="font-medium text-ink">{source.title ?? source.repo}</span>
         )}
         {source.section && <span className="text-muted">§ {source.section}</span>}
-        <SensitivityBadge value={source.sensitivity} />
       </div>
       {source.preview && <p className="mt-1 line-clamp-2 text-muted">{source.preview}</p>}
     </li>

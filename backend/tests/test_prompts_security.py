@@ -16,7 +16,6 @@ def _hit(**kw) -> SearchHit:
         "document_id": "d",
         "title": "Attention Is All You Need",
         "uri": "http://arxiv.org/abs/1706.03762",
-        "sensitivity": "public",
         "content": "Self-attention relates positions of a single sequence.",
         "heading": "Model Architecture",
     }

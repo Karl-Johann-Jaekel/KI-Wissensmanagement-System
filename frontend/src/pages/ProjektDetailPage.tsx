@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
   FileText,
-  Lock,
   MessageSquare,
   MessageSquarePlus,
   Plus,
@@ -111,7 +110,6 @@ export default function ProjektDetailPage() {
                     to={`/chat/${c.id}`}
                     className="flex items-center gap-2 py-2 text-sm text-ink hover:text-primary-700 dark:hover:text-primary-300"
                   >
-                    {c.zone === 'confidential' && <Lock className="h-3 w-3 shrink-0 text-rose-400" />}
                     <span className="min-w-0 flex-1 truncate">{c.title}</span>
                     <span className="shrink-0 text-xs text-muted">
                       {new Date(c.updatedAt).toLocaleDateString('de-DE')}
@@ -188,7 +186,7 @@ export default function ProjektDetailPage() {
                     onChange={() => toggleDocument(d.id)}
                   />
                   <span className="min-w-0 flex-1 truncate">{d.title}</span>
-                  <span className="shrink-0 text-xs text-muted">{d.sensitivity}</span>
+                  <span className="shrink-0 text-xs text-muted">{d.source_type}</span>
                 </label>
               </li>
             ))}

@@ -39,23 +39,6 @@ def content_hash_bytes(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def assert_zone_allows_provider(sensitivity: str) -> None:
-    """Zonenregel (PLAN §2): Nicht-öffentlicher Inhalt verlässt den Rechner nie.
-
-    Embeddings sehen den vollen Chunk-Text. Ein entfernter Anbieter ist damit für
-    ``confidential``/``internal`` ausgeschlossen — lieber ein klarer Abbruch als
-    ein stiller Zonenbruch.
-    """
-    settings = get_settings()
-    if sensitivity != "public" and settings.embed_provider != "ollama":
-        raise ValueError(
-            f"Zone '{sensitivity}' erlaubt keinen entfernten Embedding-Anbieter "
-            f"(EMBED_PROVIDER={settings.embed_provider}). Für vertrauliche Dokumente "
-            "EMBED_PROVIDER=ollama setzen — und dafür einen eigenen Bestand führen, "
-            "da ein Index nur ein Modell tragen darf (ADR-0014)."
-        )
-
-
 def document_exists(session: Session, content_hash: str) -> bool:
     return (
         session.execute(select(Document.id).where(Document.content_hash == content_hash)).first()
@@ -76,14 +59,12 @@ def _load_sidecar(pdf_path: Path) -> dict:
 def ingest_file(
     session: Session,
     pdf_path: Path,
-    sensitivity: str,
     lang: str | None = None,
     *,
     to_md: ToMarkdown = to_markdown,
     embed_fn: EmbedFn = embed_texts,
 ) -> tuple[str, int]:
     """Ingest one PDF. Returns (status, n_chunks); status in added|skipped|empty."""
-    assert_zone_allows_provider(sensitivity)
     raw = pdf_path.read_bytes()
     content_hash = content_hash_bytes(raw)
     if document_exists(session, content_hash):
@@ -103,7 +84,6 @@ def ingest_file(
         title=sidecar.get("title") or pdf_path.stem,
         uri=sidecar.get("uri") or str(pdf_path),
         content_hash=content_hash,
-        sensitivity=sensitivity,
         lang=doc_lang,
         content_md=md,
         meta={
@@ -122,13 +102,11 @@ def ingest_file(
 def ingest_markdown(
     session: Session,
     md_path: Path,
-    sensitivity: str,
     lang: str | None = None,
     *,
     embed_fn: EmbedFn = embed_texts,
 ) -> tuple[str, int]:
     """Ingest one Markdown file (no Docling). Returns (status, n_chunks)."""
-    assert_zone_allows_provider(sensitivity)
     raw = md_path.read_bytes()
     content_hash = content_hash_bytes(raw)
     if document_exists(session, content_hash):
@@ -151,7 +129,6 @@ def ingest_markdown(
         title=title,
         uri=str(md_path),
         content_hash=content_hash,
-        sensitivity=sensitivity,
         lang=doc_lang,
         content_md=text,
     )
@@ -226,7 +203,6 @@ def _add_chunks(
 def ingest_path(
     session: Session,
     root: Path,
-    sensitivity: str,
     lang: str | None = None,
     *,
     to_md: ToMarkdown = to_markdown,
@@ -237,7 +213,7 @@ def ingest_path(
     pdfs = [root] if root.is_file() else sorted(root.glob("**/*.pdf"))
     for pdf in pdfs:
         try:
-            status, n = ingest_file(session, pdf, sensitivity, lang, to_md=to_md, embed_fn=embed_fn)
+            status, n = ingest_file(session, pdf, lang, to_md=to_md, embed_fn=embed_fn)
         except Exception as exc:  # noqa: BLE001 — one bad PDF must not abort the run
             session.rollback()
             print(f"  ! {pdf.name}: {exc}")

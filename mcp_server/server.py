@@ -3,11 +3,6 @@
 Run (from the repo root):
     KWMS_API_BASE=http://localhost:8000 python -m mcp_server.server
 
-All tools default to the ``public`` zone. ``max_sensitivity="confidential"`` (and
-listing/graph over confidential/pending data) requires KWMS_ADMIN_KEY to be set —
-the backend enforces this, so nothing confidential leaks without the key.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -22,31 +17,31 @@ _client = KWMSClient()
 
 @mcp.tool()
 def search_knowledge(
-    query: str, top_k: int = 5, max_sensitivity: str = "public"
+    query: str, top_k: int = 5
 ) -> list[dict[str, Any]]:
     """Hybrid (vector + keyword) search over the AI-research corpus.
 
     Returns the top passages with their source paper, section and a text preview.
     """
-    return _client.search_knowledge(query, top_k, max_sensitivity)
+    return _client.search_knowledge(query, top_k)
 
 
 @mcp.tool()
-def ask_knowledge(question: str, top_k: int = 5, max_sensitivity: str = "public") -> dict[str, Any]:
+def ask_knowledge(question: str, top_k: int = 5) -> dict[str, Any]:
     """Ask a question and get a cited answer grounded in the corpus.
 
     Returns {"answer": str, "sources": [...]}. Answers only from retrieved context.
     """
-    return _client.ask_knowledge(question, top_k, max_sensitivity)
+    return _client.ask_knowledge(question, top_k)
 
 
 @mcp.tool()
-def list_documents(sensitivity: str | None = None) -> list[dict[str, Any]]:
+def list_documents() -> list[dict[str, Any]]:
     """List indexed documents (title, type, zone, chunk count).
 
     Without the admin key only public documents are returned.
     """
-    return _client.list_documents(sensitivity)
+    return _client.list_documents()
 
 
 @mcp.tool()

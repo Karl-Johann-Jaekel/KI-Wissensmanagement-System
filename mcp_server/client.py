@@ -34,12 +34,12 @@ class KWMSClient:
         return {"X-API-Key": self.admin_key} if self.admin_key else {}
 
     def search_knowledge(
-        self, query: str, top_k: int = 5, max_sensitivity: str = "public"
+        self, query: str, top_k: int = 5
     ) -> list[dict[str, Any]]:
         """Hybrid search over the corpus; returns compact passages with sources."""
         resp = self._client.post(
             "/search",
-            json={"query": query, "top_k": top_k, "max_sensitivity": max_sensitivity},
+            json={"query": query, "top_k": top_k},
             headers=self._headers(),
         )
         resp.raise_for_status()
@@ -49,14 +49,13 @@ class KWMSClient:
                 "title": h["title"],
                 "section": h.get("heading"),
                 "uri": h.get("uri"),
-                "sensitivity": h["sensitivity"],
                 "text": h["content"][:500],
             }
             for h in hits
         ]
 
     def ask_knowledge(
-        self, question: str, top_k: int = 5, max_sensitivity: str = "public"
+        self, question: str, top_k: int = 5
     ) -> dict[str, Any]:
         """RAG answer with citations (consumes the /chat SSE stream)."""
         answer: list[str] = []
@@ -64,7 +63,7 @@ class KWMSClient:
         with self._client.stream(
             "POST",
             "/chat",
-            json={"query": question, "top_k": top_k, "max_sensitivity": max_sensitivity},
+            json={"query": question, "top_k": top_k},
             headers=self._headers(),
         ) as resp:
             resp.raise_for_status()
@@ -81,13 +80,11 @@ class KWMSClient:
                     sources = event.get("sources", [])
         return {"answer": "".join(answer), "sources": sources}
 
-    def list_documents(self, sensitivity: str | None = None) -> list[dict[str, Any]]:
+    def list_documents(self) -> list[dict[str, Any]]:
         """List indexed documents (admin key returns confidential too)."""
         resp = self._client.get("/documents", headers=self._headers())
         resp.raise_for_status()
         docs = resp.json()
-        if sensitivity:
-            docs = [d for d in docs if d["sensitivity"] == sensitivity]
         return docs
 
     def query_graph(self, include_pending: bool = False) -> dict[str, Any]:

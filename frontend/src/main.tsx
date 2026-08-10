@@ -5,7 +5,6 @@ import { AdminKeyProvider } from './app/AdminKeyContext'
 import AppShell from './app/AppShell'
 import { ToastProvider } from './components/ui/Toast'
 import { applyTheme, resolveTheme } from './lib/theme'
-import BibliothekPage from './pages/BibliothekPage'
 import ChatPage from './pages/ChatPage'
 import DocumentPage from './pages/DocumentPage'
 import InboxPage from './pages/InboxPage'
@@ -32,7 +31,6 @@ const router = createBrowserRouter([
       { path: '/wissen', element: <WissenPage /> },
       { path: '/wissen/doc/:docId', element: <DocumentPage /> },
       { path: '/skills', element: <SkillsPage /> },
-      { path: '/bibliothek', element: <BibliothekPage /> },
       { path: '/projekte', element: <ProjektePage /> },
       { path: '/projekte/:projectId', element: <ProjektDetailPage /> },
       { path: '*', element: <Navigate to="/chat" replace /> },

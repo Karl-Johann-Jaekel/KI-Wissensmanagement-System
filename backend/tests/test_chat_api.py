@@ -29,7 +29,6 @@ def test_chat_streams_tokens_then_sources(
         document_id="d1",
         title="Attention Is All You Need",
         uri="http://arxiv.org/abs/1706.03762",
-        sensitivity="public",
         content="self-attention ...",
         heading="Model",
     )
@@ -37,7 +36,6 @@ def test_chat_streams_tokens_then_sources(
         hits=[hit],
         messages=[{"role": "system", "content": "s"}, {"role": "user", "content": "u"}],
         client=FakeClient(),
-        zone="public",
     )
     monkeypatch.setattr("app.api.chat.prepare_answer", lambda *a, **k: plan)
 
@@ -56,23 +54,3 @@ def test_chat_streams_tokens_then_sources(
 def test_chat_rejects_overlong_query(client: TestClient) -> None:
     resp = client.post("/chat", json={"query": "x" * 5000})
     assert resp.status_code == 422  # exceeds MAX_INPUT_CHARS
-
-
-def test_chat_model_override_requires_admin(client: TestClient) -> None:
-    resp = client.post("/chat", json={"query": "x", "model": "qwen3:8b"})
-    assert resp.status_code == 401
-
-
-def test_chat_model_override_unknown_model(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from app.core.config import get_settings
-
-    monkeypatch.setattr("app.api.chat.list_ollama_models", lambda _url: [{"name": "qwen3:8b"}])
-    resp = client.post(
-        "/chat",
-        json={"query": "x", "model": "nicht-installiert"},
-        headers={"X-API-Key": get_settings().admin_api_key},
-    )
-    assert resp.status_code == 400
-    assert "unknown model" in resp.text

@@ -15,15 +15,11 @@ export const MAX_CHATS = 100
 export const MAX_MESSAGES_PER_CHAT = 200
 export const DEFAULT_TOP_K = 5
 
-export type Zone = 'public' | 'confidential'
-
 export interface ChatMeta {
   id: string
   title: string
   createdAt: number
   updatedAt: number
-  zone: Zone
-  model: string | null
   projectId: string | null
   /** Retrieval-Einstellungen; bei Chats aus früheren Versionen undefined. */
   topK?: number
@@ -34,7 +30,6 @@ export interface StoredMessage {
   role: 'user' | 'assistant'
   text: string
   sources?: ChatSource[]
-  zone?: string
   model?: string
   error?: string
 }
@@ -153,7 +148,7 @@ export function chatTitleFrom(text: string): string {
 
 export function createChat(
   init: Partial<
-    Pick<ChatMeta, 'title' | 'zone' | 'model' | 'projectId' | 'topK' | 'rerank'>
+    Pick<ChatMeta, 'title' | 'projectId' | 'topK' | 'rerank'>
   > = {},
 ): ChatMeta {
   const now = Date.now()
@@ -162,8 +157,6 @@ export function createChat(
     title: init.title ?? 'Neuer Chat',
     createdAt: now,
     updatedAt: now,
-    zone: init.zone ?? 'public',
-    model: init.model ?? null,
     projectId: init.projectId ?? null,
     topK: init.topK ?? DEFAULT_TOP_K,
     rerank: init.rerank ?? false,

@@ -5,7 +5,6 @@ import {
   Brain,
   FolderKanban,
   Inbox,
-  Library,
   Lock,
   MessageSquare,
   Moon,
@@ -32,7 +31,6 @@ const NAV_ITEMS = [
   { to: '/inbox', label: 'Inbox', icon: Inbox },
   { to: '/wissen', label: 'Wissen', icon: BookOpen },
   { to: '/skills', label: 'Skills', icon: Sparkles },
-  { to: '/bibliothek', label: 'Bibliothek', icon: Library },
   { to: '/projekte', label: 'Projekte', icon: FolderKanban },
 ]
 
@@ -182,9 +180,6 @@ export default function Sidebar({
                           : 'text-muted hover:bg-sunken hover:text-ink',
                       )}
                     >
-                      {chat.zone === 'confidential' && (
-                        <Lock className="h-3 w-3 shrink-0 text-rose-400" aria-label="confidential" />
-                      )}
                       <span className="min-w-0 flex-1 truncate">{chat.title}</span>
                     </button>
                     <button

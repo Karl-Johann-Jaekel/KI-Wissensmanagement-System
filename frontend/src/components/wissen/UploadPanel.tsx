@@ -3,18 +3,14 @@ import { UploadCloud } from 'lucide-react'
 import { uploadDocument } from '../../api'
 import { useAdminKey } from '../../app/AdminKeyContext'
 import { cn } from '../../lib/cn'
-import Select from '../ui/Select'
 import Spinner from '../ui/Spinner'
 
 interface UploadPanelProps {
   onUploaded: () => void
-  /** Feste Zone (Bibliothek) oder wählbar (Wissen). */
-  fixedSensitivity?: string
 }
 
-export default function UploadPanel({ onUploaded, fixedSensitivity }: UploadPanelProps) {
+export default function UploadPanel({ onUploaded }: UploadPanelProps) {
   const { adminKey } = useAdminKey()
-  const [sensitivity, setSensitivity] = useState(fixedSensitivity ?? 'public')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [dragOver, setDragOver] = useState(false)
@@ -43,7 +39,7 @@ export default function UploadPanel({ onUploaded, fixedSensitivity }: UploadPane
         : `„${file.name}" wird indexiert …`,
     )
     try {
-      const result = await uploadDocument(file, fixedSensitivity ?? sensitivity, adminKey)
+      const result = await uploadDocument(file, adminKey)
       setMessage(
         result.status === 'added'
           ? `✓ ${result.filename}: ${result.chunks} Chunks indexiert`
@@ -94,19 +90,6 @@ export default function UploadPanel({ onUploaded, fixedSensitivity }: UploadPane
           </button>
         </p>
         <p className="text-xs text-muted">PDF oder Markdown (.md), max. 2 MB für Markdown</p>
-        {!fixedSensitivity && (
-          <label className="mt-1 flex items-center gap-2 text-xs text-muted">
-            Zone:
-            <Select
-              value={sensitivity}
-              onChange={(e) => setSensitivity(e.target.value)}
-              className="px-1.5 py-0.5 text-xs"
-            >
-              <option value="public">public</option>
-              <option value="confidential">confidential</option>
-            </Select>
-          </label>
-        )}
         <input
           ref={fileRef}
           type="file"

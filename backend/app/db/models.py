@@ -1,6 +1,6 @@
 """ORM models — schema per PLAN §6.
 
-Two data zones live in one schema (``sensitivity``). Graphs are relational
+Graphs are relational
 (``graph_nodes``/``graph_edges``) rather than a graph DB — PLAN §4. The raw DDL
 (pgvector extension, generated ``content_tsv``, HNSW/GIN indexes) lives in the
 first Alembic migration; these ORM classes mirror it for querying.
@@ -33,7 +33,6 @@ from app.db.base import Base
 EMBED_DIM = get_settings().embed_dim
 
 # Allowed enum-like values (kept in Python to validate before insert; DB enforces too).
-SENSITIVITIES = ("public", "internal", "confidential")
 NODE_KINDS = ("repo", "technology", "domain", "paper", "concept", "model", "dataset")
 EDGE_RELATIONS = (
     "USES",
@@ -56,7 +55,6 @@ class Document(Base):
     title: Mapped[str] = mapped_column(Text, nullable=False)
     uri: Mapped[str | None] = mapped_column(Text)
     content_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
-    sensitivity: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'public'"))
     lang: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'english'"))
     # Volles Markdown fürs Frontend (Reader/Editor); NULL bei Alt-Dokumenten.
     content_md: Mapped[str | None] = mapped_column(Text)
@@ -65,13 +63,6 @@ class Document(Base):
 
     chunks: Mapped[list[Chunk]] = relationship(
         back_populates="document", cascade="all, delete-orphan"
-    )
-
-    __table_args__ = (
-        CheckConstraint(
-            "sensitivity IN ('public','internal','confidential')",
-            name="ck_documents_sensitivity",
-        ),
     )
 
 
@@ -164,7 +155,6 @@ __all__ = [
     "Chunk",
     "GraphNode",
     "GraphEdge",
-    "SENSITIVITIES",
     "NODE_KINDS",
     "EDGE_RELATIONS",
     "STATUSES",

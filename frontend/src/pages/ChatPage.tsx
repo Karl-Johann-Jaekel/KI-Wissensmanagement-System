@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { FolderKanban, Lock } from 'lucide-react'
-import { fetchModels, streamChat } from '../api'
+import { FolderKanban } from 'lucide-react'
+import { streamChat } from '../api'
 import { useAdminKey } from '../app/AdminKeyContext'
 import ChatInput from '../components/chat/ChatInput'
 import MessageList from '../components/chat/MessageList'
@@ -16,14 +16,11 @@ import {
   saveChat,
   type ChatMeta,
   type StoredMessage,
-  type Zone,
 } from '../lib/storage'
 
 /** Router-State, mit dem andere Seiten einen Chat vorbereiten können. */
 interface ChatNavState {
   prefill?: string
-  zone?: Zone
-  model?: string | null
   projectId?: string | null
 }
 
@@ -38,27 +35,10 @@ export default function ChatPage() {
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<StoredMessage[]>([])
   const [busy, setBusy] = useState(false)
-  const [zone, setZone] = useState<Zone>('public')
-  const [model, setModel] = useState<string | null>(null)
   const [topK, setTopK] = useState(DEFAULT_TOP_K)
   const [rerank, setRerank] = useState(false)
-  const [availableModels, setAvailableModels] = useState<string[] | null>(null)
   const metaRef = useRef<ChatMeta | null>(null)
 
-  // Lokale Ollama-Modelle für den Picker (nur Admin).
-  useEffect(() => {
-    if (!adminKey) {
-      setAvailableModels(null)
-      return
-    }
-    let cancelled = false
-    fetchModels(adminKey)
-      .then((info) => !cancelled && setAvailableModels(info.available ? info.models.map((m) => m.name) : null))
-      .catch(() => !cancelled && setAvailableModels(null))
-    return () => {
-      cancelled = true
-    }
-  }, [adminKey])
 
   // Chat laden bzw. für „Neuer Chat" zurücksetzen.
   useEffect(() => {
@@ -71,16 +51,12 @@ export default function ChatPage() {
       }
       metaRef.current = meta
       setMessages(getChatMessages(chatId))
-      setZone(meta.zone)
-      setModel(meta.model)
       setTopK(meta.topK ?? DEFAULT_TOP_K)
       setRerank(meta.rerank ?? false)
       setInput('')
     } else {
       metaRef.current = null
       setMessages([])
-      setZone(navState.zone ?? 'public')
-      setModel(navState.model ?? null)
       setTopK(DEFAULT_TOP_K)
       setRerank(false)
       setInput(navState.prefill ?? '')
@@ -99,8 +75,6 @@ export default function ChatPage() {
     if (!meta) {
       meta = createChat({
         title: chatTitleFrom(query),
-        zone,
-        model,
         topK,
         rerank,
         projectId: navState.projectId ?? null,
@@ -108,7 +82,7 @@ export default function ChatPage() {
       metaRef.current = meta
       navigate(`/chat/${meta.id}`, { replace: true })
     } else {
-      meta = { ...meta, zone, model, topK, rerank }
+      meta = { ...meta, topK, rerank }
       metaRef.current = meta
     }
     const chatRef = meta.id
@@ -122,8 +96,6 @@ export default function ChatPage() {
     sync()
 
     const body: Record<string, unknown> = { query, top_k: topK }
-    if (zone === 'confidential' && adminKey) body.max_sensitivity = 'confidential'
-    if (model) body.model = model
     // false = Server-Default (RERANK_ENABLED) belassen, true = erzwingen.
     if (rerank) body.rerank = true
 
@@ -141,8 +113,8 @@ export default function ChatPage() {
           last().text += t
           sync()
         },
-        onSources: (sources, zoneFromServer, modelFromServer) => {
-          Object.assign(last(), { sources, zone: zoneFromServer, model: modelFromServer })
+        onSources: (sources, modelFromServer) => {
+          Object.assign(last(), { sources, model: modelFromServer })
           sync()
         },
         onDone: () => {
@@ -173,22 +145,12 @@ export default function ChatPage() {
             <FolderKanban className="h-3 w-3" /> {project.name}
           </span>
         )}
-        {zone === 'confidential' && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/40 bg-rose-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-rose-800 dark:bg-rose-900/60 dark:text-rose-200">
-            <Lock className="h-3 w-3" /> confidential
-          </span>
-        )}
-        {model && <span className="text-xs text-muted">{model}</span>}
       </header>
 
       <MessageList
         messages={messages}
         busy={busy}
-        emptyHint={
-          zone === 'confidential'
-            ? 'Privater Chat über die Bibliothek — Antworten kommen ausschließlich vom lokalen Modell.'
-            : 'Frag das Neurale Gedächtnis — z. B. „Was ist Retrieval-Augmented Generation?" Antworten kommen mit Quellenbelegen.'
-        }
+        emptyHint='Frag das Neurale Gedächtnis — z. B. „Was ist Retrieval-Augmented Generation?" Antworten kommen mit Quellenbelegen.'
       />
 
       <ChatInput
@@ -196,11 +158,6 @@ export default function ChatPage() {
         onChange={setInput}
         onSend={send}
         busy={busy}
-        zone={zone}
-        onZoneChange={setZone}
-        model={model}
-        onModelChange={setModel}
-        models={availableModels}
         topK={topK}
         onTopKChange={setTopK}
         rerank={rerank}

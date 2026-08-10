@@ -1,7 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { FileText } from 'lucide-react'
 import type { DocumentRow } from '../../api'
-import SensitivityBadge from '../SensitivityBadge'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
 
@@ -36,7 +35,6 @@ export default function DocumentTable({ docs, emptyHint }: DocumentTableProps) {
             <th className="py-2 pr-3">Typ</th>
             <th className="py-2 pr-3">Sprache</th>
             <th className="py-2 pr-3">Chunks</th>
-            <th className="py-2 pr-3">Zone</th>
           </tr>
         </thead>
         <tbody>
@@ -54,9 +52,6 @@ export default function DocumentTable({ docs, emptyHint }: DocumentTableProps) {
               </td>
               <td className="py-2.5 pr-3 text-muted">{d.lang}</td>
               <td className="py-2.5 pr-3 text-muted">{d.chunks}</td>
-              <td className="py-2.5 pr-3">
-                <SensitivityBadge value={d.sensitivity} />
-              </td>
             </tr>
           ))}
         </tbody>
@@ -75,7 +70,6 @@ export default function DocumentTable({ docs, emptyHint }: DocumentTableProps) {
                 <Badge tone={d.source_type === 'markdown' ? 'violet' : 'neutral'}>
                   {d.source_type}
                 </Badge>
-                <SensitivityBadge value={d.sensitivity} />
                 <span>{d.chunks} Chunks</span>
               </div>
             </button>

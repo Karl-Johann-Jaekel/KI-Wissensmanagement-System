@@ -1,13 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowUp, Library, Plus, Upload } from 'lucide-react'
+import { ArrowUp, Network, Plus, Upload } from 'lucide-react'
 import { cn } from '../../lib/cn'
-import type { Zone } from '../../lib/storage'
 import Popover from '../ui/Popover'
 import Spinner from '../ui/Spinner'
 import ChatSettingsMenu from './ChatSettingsMenu'
-import ModelMenu from './ModelMenu'
-import ScopeChip from './ScopeChip'
 import SkillPicker from './SkillPicker'
 
 const MAX_CHARS = 2000
@@ -17,11 +14,6 @@ interface ChatInputProps {
   onChange: (value: string) => void
   onSend: () => void
   busy: boolean
-  zone: Zone
-  onZoneChange: (zone: Zone) => void
-  models: string[] | null
-  model: string | null
-  onModelChange: (model: string | null) => void
   topK: number
   onTopKChange: (topK: number) => void
   rerank: boolean
@@ -31,18 +23,13 @@ interface ChatInputProps {
 
 /**
  * Eingabeleiste: Textfeld und Werkzeugzeile in einer Karte. Links Kontext-Aktionen
- * (Wissen hinzufügen, Skills, Datenzone), rechts Einstellungen, Modell und Senden.
+ * (Wissen hinzufügen, Skills), rechts Einstellungen und Senden.
  */
 export default function ChatInput({
   value,
   onChange,
   onSend,
   busy,
-  zone,
-  onZoneChange,
-  models,
-  model,
-  onModelChange,
   topK,
   onTopKChange,
   rerank,
@@ -135,19 +122,18 @@ export default function ChatInput({
                     role="menuitem"
                     onClick={() => {
                       close()
-                      navigate('/bibliothek')
+                      navigate('/wissen?tab=graph')
                     }}
                     className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm hover:bg-sunken"
                   >
-                    <Library className="h-4 w-4 shrink-0 text-muted" />
-                    Bibliothek öffnen
+                    <Network className="h-4 w-4 shrink-0 text-muted" />
+                    Wissens-Graph öffnen
                   </button>
                 </>
               )}
             </Popover>
 
             <SkillPicker onInsert={insertAtCursor} />
-            <ScopeChip zone={zone} onChange={onZoneChange} />
 
             <div className="ml-auto flex items-center gap-1">
               {value.length > MAX_CHARS * 0.75 && (
@@ -161,7 +147,6 @@ export default function ChatInput({
                 rerank={rerank}
                 onRerankChange={onRerankChange}
               />
-              <ModelMenu models={models} model={model} onChange={onModelChange} />
               <button
                 type="button"
                 onClick={onSend}

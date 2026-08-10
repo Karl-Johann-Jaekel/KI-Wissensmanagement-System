@@ -37,15 +37,12 @@ def _write_pdf(tmp_path: Path) -> Path:
 def test_ingest_is_idempotent_and_stores_chunks(db_session: Session, tmp_path: Path) -> None:
     pdf = _write_pdf(tmp_path)
 
-    status, n = ingest_file(
-        db_session, pdf, "public", to_md=lambda _p: FAKE_MD, embed_fn=_fake_embed
-    )
+    status, n = ingest_file(db_session, pdf, to_md=lambda _p: FAKE_MD, embed_fn=_fake_embed)
     assert status == "added"
     assert n >= 2
 
     doc = db_session.execute(select(Document).where(Document.title == "RAG")).scalar_one()
     assert doc.source_type == "arxiv_pdf"
-    assert doc.sensitivity == "public"
     assert doc.meta["authors"] == ["Lewis"]
 
     chunk_count = db_session.execute(
@@ -60,9 +57,7 @@ def test_ingest_is_idempotent_and_stores_chunks(db_session: Session, tmp_path: P
     assert a_chunk.embedding is not None
 
     # second run over the same file -> skipped, no duplicates
-    status2, n2 = ingest_file(
-        db_session, pdf, "public", to_md=lambda _p: FAKE_MD, embed_fn=_fake_embed
-    )
+    status2, n2 = ingest_file(db_session, pdf, to_md=lambda _p: FAKE_MD, embed_fn=_fake_embed)
     assert status2 == "skipped"
     assert n2 == 0
     total_docs = db_session.execute(
@@ -73,7 +68,7 @@ def test_ingest_is_idempotent_and_stores_chunks(db_session: Session, tmp_path: P
 
 def test_ingest_stores_content_md(db_session: Session, tmp_path: Path) -> None:
     pdf = _write_pdf(tmp_path)
-    ingest_file(db_session, pdf, "public", to_md=lambda _p: FAKE_MD, embed_fn=_fake_embed)
+    ingest_file(db_session, pdf, to_md=lambda _p: FAKE_MD, embed_fn=_fake_embed)
     doc = db_session.execute(select(Document).where(Document.title == "RAG")).scalar_one()
     assert doc.content_md == FAKE_MD
 
@@ -85,7 +80,7 @@ def test_ingest_markdown_roundtrip_and_idempotent(db_session: Session, tmp_path:
     md = tmp_path / "notizen.md"
     md.write_text(MD_TEXT, encoding="utf-8")
 
-    status, n = ingest_markdown(db_session, md, "confidential", embed_fn=_fake_embed)
+    status, n = ingest_markdown(db_session, md, embed_fn=_fake_embed)
     assert status == "added"
     assert n >= 1
 
@@ -93,17 +88,16 @@ def test_ingest_markdown_roundtrip_and_idempotent(db_session: Session, tmp_path:
         select(Document).where(Document.title == "Notizen zu RAG")
     ).scalar_one()
     assert doc.source_type == "markdown"
-    assert doc.sensitivity == "confidential"
     assert doc.content_md == MD_TEXT
 
-    status2, _ = ingest_markdown(db_session, md, "confidential", embed_fn=_fake_embed)
+    status2, _ = ingest_markdown(db_session, md, embed_fn=_fake_embed)
     assert status2 == "skipped"
 
 
 def test_reingest_replaces_chunks_and_hash(db_session: Session, tmp_path: Path) -> None:
     md = tmp_path / "edit.md"
     md.write_text(MD_TEXT, encoding="utf-8")
-    ingest_markdown(db_session, md, "confidential", embed_fn=_fake_embed)
+    ingest_markdown(db_session, md, embed_fn=_fake_embed)
     doc = db_session.execute(
         select(Document).where(Document.title == "Notizen zu RAG")
     ).scalar_one()

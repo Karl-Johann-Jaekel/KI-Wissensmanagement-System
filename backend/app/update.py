@@ -53,7 +53,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    client = choose_client("public")
+    client = choose_client()
     report: dict = {"started_at": datetime.now(UTC).isoformat(), "llm": client.name}
 
     with SessionLocal() as session:
@@ -71,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
             report["fetched"] = fetched
 
         print("Ingesting corpus …")
-        ingest = ingest_path(session, Path(args.corpus_dir), "public")
+        ingest = ingest_path(session, Path(args.corpus_dir))
         report["ingest"] = {
             "added": ingest.added,
             "skipped": ingest.skipped,

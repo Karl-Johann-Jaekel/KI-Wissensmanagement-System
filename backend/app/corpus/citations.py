@@ -94,13 +94,7 @@ def refresh_citations(
 ) -> tuple[int, int]:
     """Metriken für öffentliche arXiv-Papers holen und spiegeln. -> (abgefragt, aktualisiert)."""
     docs = (
-        session.execute(
-            select(Document).where(
-                Document.source_type == "arxiv_pdf", Document.sensitivity == "public"
-            )
-        )
-        .scalars()
-        .all()
+        session.execute(select(Document).where(Document.source_type == "arxiv_pdf")).scalars().all()
     )
     pairs: list[tuple[Document, str]] = [
         (d, str(arxiv_id))

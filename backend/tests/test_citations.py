@@ -60,26 +60,15 @@ def test_empty_input_makes_no_request() -> None:
     assert fetch_citation_metrics([], client=_client(handle)) == {}
 
 
-def test_refresh_skips_confidential_documents(db_session: Session) -> None:
-    # Frei erfundene IDs, damit der Test nicht mit dem echten Korpus kollidiert.
-    public_id, secret_id = "9999.00001", "9999.00002"
-    db_session.add_all(
-        [
-            Document(
-                source_type="arxiv_pdf",
-                title="Public Cited Paper",
-                content_hash="cit-pub",
-                sensitivity="public",
-                meta={"id": public_id},
-            ),
-            Document(
-                source_type="arxiv_pdf",
-                title="Secret Paper",
-                content_hash="cit-conf",
-                sensitivity="confidential",
-                meta={"id": secret_id},
-            ),
-        ]
+def test_refresh_stores_metrics_on_document(db_session: Session) -> None:
+    arxiv_id = "9999.00001"
+    db_session.add(
+        Document(
+            source_type="arxiv_pdf",
+            title="Cited Paper",
+            content_hash="cit-doc",
+            meta={"id": arxiv_id},
+        )
     )
     db_session.commit()
 
@@ -96,15 +85,6 @@ def test_refresh_skips_confidential_documents(db_session: Session) -> None:
 
     refresh_citations(db_session, client=_client(handle))
 
-    # Die vertrauliche arXiv-ID darf den Rechner nicht verlassen (PLAN §2).
-    assert f"arXiv:{secret_id}" not in asked
-    assert f"arXiv:{public_id}" in asked
-
-    doc = db_session.execute(
-        select(Document).where(Document.title == "Public Cited Paper")
-    ).scalar_one()
+    assert f"arXiv:{arxiv_id}" in asked
+    doc = db_session.execute(select(Document).where(Document.title == "Cited Paper")).scalar_one()
     assert doc.meta["citations"]["citations"] == 42
-    secret = db_session.execute(
-        select(Document).where(Document.title == "Secret Paper")
-    ).scalar_one()
-    assert "citations" not in (secret.meta or {})
