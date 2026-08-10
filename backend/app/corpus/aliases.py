@@ -1,8 +1,16 @@
 """Concept/entity normalization (PLAN §7 Phase 8, §11 "Entity-Wildwuchs").
 
-Maps common surface forms to a canonical name so "RAG" and "Retrieval-Augmented
-Generation" become one node. Unknown entities are only whitespace-normalised (case
-preserved — acronyms like BERT must survive).
+Two layers:
+
+* ``normalize_entity`` picks the **display name** — known aliases collapse to a
+  canonical spelling, unknown entities keep their case (acronyms like BERT must
+  survive).
+* ``canonical_key`` builds the **identity key** a node is stored under. Case,
+  punctuation, hyphenation and simple plurals are folded away, so "Cross-Encoder",
+  "cross encoder" and "Cross Encoders" all address the same node (ADR-0012).
+
+Without the second layer every paper coined its own spelling and the graph
+fragmented: after 56 papers all 316 pending facts still had exactly one source.
 """
 
 from __future__ import annotations
@@ -67,11 +75,109 @@ ALIASES: dict[str, str] = {
 }
 
 _WS = re.compile(r"\s+")
+_PUNCT = re.compile(r"[\"'`´“”„()\[\]{},.;:!?]+")
+_SEP = re.compile(r"[-_/\\+]+")
+# Klammerzusätze sind fast immer Abkürzungen: "knowledge graph (KG)" -> "knowledge graph"
+_PAREN = re.compile(r"\s*[(\[][^)\]]*[)\]]")
+
+# Füllwörter, die Extraktionen beliebig anhängen ("attention mechanism" == "attention").
+_FILLER = {"the", "a", "an", "of", "for", "based", "method", "methods", "approach", "technique"}
+
+# Marker für Satzfragmente statt Begriffe ("existing efforts within these three frameworks").
+_PROSE_MARKERS = {
+    "existing",
+    "various",
+    "several",
+    "these",
+    "those",
+    "which",
+    "within",
+    "such",
+    "our",
+    "their",
+    "its",
+    "this",
+    "other",
+    "more",
+    "between",
+    "using",
+    "including",
+}
+MAX_ENTITY_WORDS = 6
+MAX_ENTITY_CHARS = 60
+
+
+def _flatten(text: str) -> str:
+    """Kleinschreibung, Klammerzusätze, Satzzeichen und Trenner weg."""
+    s = _PAREN.sub(" ", text.strip())
+    s = _PUNCT.sub(" ", s.lower())
+    s = _SEP.sub(" ", s)
+    return _WS.sub(" ", s).strip()
+
+
+# Aliasschlüssel enthalten Bindestriche ("re-ranking"), die _flatten auflöst — deshalb
+# eine zweite Tabelle in flacher Form, sonst greift der Lookup nie.
+_FLAT_ALIASES: dict[str, str] = {}
+
+
+def _singular(word: str) -> str:
+    """Grobe Singularform — nur die Fälle, die bei Fachbegriffen wirklich auftreten."""
+    if len(word) <= 4 or not word.endswith("s") or word.endswith(("ss", "us", "is", "as", "os")):
+        return word
+    if word.endswith("ies"):
+        return word[:-3] + "y"
+    if word.endswith("es") and word[:-2].endswith(("ch", "sh", "x", "z")):
+        return word[:-2]
+    return word[:-1]
 
 
 def normalize_entity(name: str) -> str:
-    """Canonical form for an entity name. Known aliases collapse; unknowns keep case."""
-    cleaned = _WS.sub(" ", name.strip().strip(".,;:")).strip()
+    """Display name for an entity. Known aliases collapse; unknowns keep their case."""
+    cleaned = _WS.sub(" ", _PAREN.sub(" ", name).strip().strip(".,;:")).strip()
     if not cleaned:
         return ""
     return ALIASES.get(cleaned.lower(), cleaned)
+
+
+def split_entities(raw: str) -> list[str]:
+    """Aufzählungen in einem Feld trennen.
+
+    Extraktionen liefern gelegentlich mehrere Begriffe in einem String
+    ("KG-enhanced LLMs, LLM-augmented KGs, Synergized LLMs + KGs"). Kommas und
+    Semikolons trennen; Bindestriche und Schrägstriche bleiben Wortbestandteil.
+    """
+    parts = [p.strip(" .;:") for p in re.split(r"[,;]| and (?=[A-Za-z])", raw)]
+    return [p for p in parts if p]
+
+
+def is_plausible_entity(name: str) -> bool:
+    """Filtert Satzfragmente heraus, die keine Begriffe sind."""
+    cleaned = _flatten(name)
+    if not cleaned or len(cleaned) < 2:
+        return False
+    if len(name) > MAX_ENTITY_CHARS:
+        return False
+    words = cleaned.split(" ")
+    if len(words) > MAX_ENTITY_WORDS:
+        return False
+    return not _PROSE_MARKERS.intersection(words)
+
+
+def canonical_key(name: str) -> str:
+    """Identity key of an entity — surface variants of one concept share it.
+
+    ``Cross-Encoder``, ``cross encoder`` and ``Cross Encoders`` all yield
+    ``cross encoder``; aliases map onto the canonical spelling first.
+    """
+    flat = _flatten(name)
+    if not flat:
+        return ""
+    alias = _FLAT_ALIASES.get(flat)
+    if alias:
+        flat = _flatten(alias)
+    words = [_singular(w) for w in flat.split(" ")]
+    meaningful = [w for w in words if w not in _FILLER]
+    return " ".join(meaningful or words)
+
+
+_FLAT_ALIASES.update({_flatten(k): v for k, v in ALIASES.items()})
