@@ -19,7 +19,7 @@ docker compose start backend caddy
 docker compose exec -T backend alembic upgrade head
 
 # 4. Verifikation
-docker compose exec -T backend python scripts/check_no_confidential_in_prod.py
+docker compose exec -T backend python scripts/check_prod_ready.py
 BASE_URL=http://localhost/api ./scripts/smoke_prod.sh
 ```
 

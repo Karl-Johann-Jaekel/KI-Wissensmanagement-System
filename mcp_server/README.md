@@ -7,12 +7,12 @@ backend HTTP API — no direct DB access — so the backend must be running
 ## Tools
 | Tool | Purpose | Zone |
 |---|---|---|
-| `search_knowledge(query, top_k, max_sensitivity)` | hybrid search → passages + sources | public by default |
-| `ask_knowledge(question, top_k, max_sensitivity)` | cited RAG answer | public by default |
+| `search_knowledge(query, top_k)` | hybrid search → passages + sources | offen |
+| `ask_knowledge(question, top_k)` | cited RAG answer | offen |
 | `list_documents(sensitivity?)` | list indexed docs | public unless admin key |
 | `query_graph(include_pending?)` | knowledge graph nodes/links | public unless admin key |
 
-`max_sensitivity="confidential"` and confidential/pending listing require
+Der Graph mit `include_pending=True` verlangt den Admin-Key (`KWMS_ADMIN_KEY`).
 `KWMS_ADMIN_KEY`; the backend rejects them otherwise (no leak without the key).
 
 ## Run

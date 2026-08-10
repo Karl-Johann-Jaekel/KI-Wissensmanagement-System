@@ -140,7 +140,7 @@ ki-wissensmanagement-system/
 │   ├── corpus/                 # gefetchte arXiv-PDFs
 │   └── private/                # eigene Dokumente, nur lokal
 ├── scripts/                    # fetch_corpus.py, export_graph_json.py,
-│                               # reindex.py, check_no_confidential_in_prod.py
+│                               # reindex.py, check_prod_ready.py
 └── docs/adr/
 ```
 
@@ -356,7 +356,7 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
 - [x] Compose-Profil `public`: Multi-Stage-Frontend-Image, **Caddy** (TLS via
       `SITE_ADDRESS`, statische SPA, `/api`-Reverse-Proxy) + `docker-compose.prod.yml`
       (kein reload/Bind-Mounts/Host-Ports) — ADR-0009
-- [x] `scripts/check_no_confidential_in_prod.py` als Deploy-Gate (DB + Env-Checks, getestet)
+- [x] `scripts/check_prod_ready.py` als Deploy-Gate (Bestand + Env-Checks, getestet)
 - [x] `scripts/smoke_prod.sh`: Health, Graph, public-Chat, Golden-Eval
 - [x] Backups: `scripts/backup.sh` (nightly `pg_dump -Fc`, 14-Tage-Rotation);
       **Restore real getestet** (2026-08-03, Protokoll in `docs/runbooks/restore.md`)
@@ -446,3 +446,23 @@ für den öffentlichen Server ist keine GPU nötig.
 - **Missbrauch öffentlicher Endpoints:** Rate-Limit + Kosten-Cap (DoD Phase 5).
 - **Leak ins öffentliche Repo:** gitleaks + Review; im Ernstfall `git filter-repo`
   + Secret-Rotation, nicht nur löschen.
+
+
+---
+
+## Nachtrag (Phase 9/10, Stand 2026-08-10)
+
+Abweichungen vom ursprünglichen Plan, jeweils als ADR begründet:
+
+- **Zwei-Zonen-Architektur entfernt** (ADR-0015). Der Korpus ist vollständig
+  öffentlich; die Idee der vertraulichen Zone mit lokalem Modellzwang wird als
+  eigenständiges Projekt umgesetzt. Damit entfallen `documents.sensitivity`,
+  `max_sensitivity`, `GET /models`, das Modell-Override und die Bibliothek-Seite.
+- **Embeddings über die Mistral EU-API** (ADR-0014), damit ein kleiner VPS ohne
+  Ollama auskommt. Hit-Rate stieg dabei von 0,88 auf 0,94.
+- **Zitationsmetriken** von Semantic Scholar als Qualitätssignal (ADR-0013).
+- **Kanonische Entitätsnamen** in der Extraktion (ADR-0012) — die Zwei-Quellen-
+  Regel scheiterte zuvor an uneinheitlicher Benennung, nicht an der Korpusgröße.
+- **Sammelfreigabe** in der Review-Queue plus konfigurierbare Promotion-Schwellen
+  (ADR-0010).
+- **Docling ohne OCR** (ADR-0011) nach einem OOM-Abbruch bei 40 Papers.
