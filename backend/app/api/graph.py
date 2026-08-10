@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.security import require_admin
 from app.db.models import GraphEdge, GraphNode
 from app.db.session import get_db
@@ -48,6 +49,13 @@ def get_graph(
         val[str(e.source)] += e.weight
         val[str(e.target)] += e.weight
 
+    landmark_min = get_settings().citation_landmark_min
+
+    def _citations(node: GraphNode) -> int | None:
+        raw = (node.meta or {}).get("citations") or {}
+        count = raw.get("citations")
+        return int(count) if isinstance(count, int | float) else None
+
     return {
         "nodes": [
             {
@@ -57,6 +65,10 @@ def get_graph(
                 "status": n.status,
                 "first_seen": n.first_seen.isoformat(),
                 "val": round(val.get(str(n.id), 0.0), 4) or 1.0,
+                # Zitationszahl als eigenes Signal — die Knotengröße kodiert bereits
+                # den Vernetzungsgrad und bleibt davon unberührt (ADR-0013).
+                "citations": _citations(n),
+                "landmark": (_citations(n) or 0) >= landmark_min,
                 "meta": n.meta,
             }
             for n in nodes

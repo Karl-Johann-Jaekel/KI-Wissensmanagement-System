@@ -7,6 +7,10 @@ export interface GraphNode {
   status: string
   first_seen: string
   val: number
+  /** Zitationen laut Semantic Scholar; null = nicht abgefragt/unbekannt. */
+  citations?: number | null
+  /** Vielzitierte Primärquelle (Schwelle: CITATION_LANDMARK_MIN). */
+  landmark?: boolean
   meta: Record<string, unknown>
   // react-force-graph adds x/y/vx/vy at runtime
   x?: number
@@ -25,6 +29,9 @@ export interface GraphData {
   nodes: GraphNode[]
   links: GraphLink[]
 }
+
+/** Goldton für vielzitierte Primärquellen — bewusst außerhalb der Typ-Palette. */
+export const LANDMARK_COLOR = { light: '#b45309', dark: '#fbbf24' } as const
 
 /** Knoten-Farben je Theme — paper trägt das Markenblau (primary). */
 export const KIND_COLORS: Record<'light' | 'dark', Record<NodeKind, string>> = {

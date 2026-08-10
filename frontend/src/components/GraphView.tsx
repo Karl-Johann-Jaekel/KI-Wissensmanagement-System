@@ -1,6 +1,12 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
-import { endpointId, KIND_COLORS, type GraphData, type GraphNode } from '../types'
+import {
+  endpointId,
+  KIND_COLORS,
+  LANDMARK_COLOR,
+  type GraphData,
+  type GraphNode,
+} from '../types'
 
 interface Props {
   data: GraphData
@@ -106,6 +112,15 @@ export default function GraphView({
       ctx.arc(node.x ?? 0, node.y ?? 0, r, 0, 2 * Math.PI)
       ctx.fillStyle = color
       ctx.fill()
+      // Vielzitierte Primärquelle: goldener Ring. Getrennt von der Knotengröße,
+      // die weiterhin allein den Vernetzungsgrad zeigt.
+      if (bright && node.landmark) {
+        ctx.beginPath()
+        ctx.arc(node.x ?? 0, node.y ?? 0, r + 2.2, 0, 2 * Math.PI)
+        ctx.lineWidth = 1.6 / scale
+        ctx.strokeStyle = LANDMARK_COLOR[theme]
+        ctx.stroke()
+      }
       if (node.id === selectedId) {
         ctx.lineWidth = 2 / scale
         ctx.strokeStyle = styles.ring
@@ -158,7 +173,10 @@ export default function GraphView({
       height={height}
       backgroundColor={styles.background}
       nodeVal={(n: GraphNode) => n.val}
-      nodeLabel={(n: GraphNode) => `${n.kind}: ${n.name}`}
+      nodeLabel={(n: GraphNode) =>
+        `${n.kind}: ${n.name}` +
+        (typeof n.citations === 'number' ? ` · ${n.citations.toLocaleString('de-DE')} Zitationen` : '')
+      }
       nodeCanvasObject={paintNode}
       nodePointerAreaPaint={paintPointerArea}
       linkColor={linkColor}

@@ -2,7 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { fetchChangelog, fetchGraph, type ChangelogItem } from '../api'
 import { useAdminKey } from '../app/AdminKeyContext'
 import { useTheme } from '../lib/theme'
-import { endpointId, KIND_COLORS, type GraphData, type GraphNode, type NodeKind } from '../types'
+import {
+  endpointId,
+  KIND_COLORS,
+  LANDMARK_COLOR,
+  type GraphData,
+  type GraphNode,
+  type NodeKind,
+} from '../types'
 import { useElementSize } from '../useElementSize'
 import GraphView from './GraphView'
 import SidePanel from './SidePanel'
@@ -100,6 +107,18 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
                 {k}
               </span>
             ))}
+            {view.nodes.some((n) => n.landmark) && (
+              <span
+                className="inline-flex items-center gap-1"
+                title="Vielzitierte Primärquelle (Semantic Scholar)"
+              >
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-full border-2 bg-transparent"
+                  style={{ borderColor: LANDMARK_COLOR[theme] }}
+                />
+                Primärquelle
+              </span>
+            )}
           </span>
         </div>
 

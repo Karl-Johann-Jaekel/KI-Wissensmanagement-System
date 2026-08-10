@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     promote_min_sources: int = 2
     promote_confidence: float = 0.7
 
+    # Zitationsmetriken (ADR-0013). Ohne Key gilt das freie Kontingent von
+    # Semantic Scholar; ab dieser Zitationszahl gilt ein Paper als Primärquelle.
+    semantic_scholar_api_key: str = ""
+    citation_landmark_min: int = 100
+
     # Hardening (Phase 5)
     admin_api_key: str = "change-me"
     daily_token_cap: int = 200_000

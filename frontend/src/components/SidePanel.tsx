@@ -40,6 +40,22 @@ export default function SidePanel({ node, onClose }: Props) {
         </button>
       </div>
 
+      {typeof node.citations === 'number' && (
+        <div className="mb-3 flex items-baseline gap-2">
+          <span
+            className={
+              'text-lg font-semibold tabular-nums ' +
+              (node.landmark ? 'text-amber-600 dark:text-amber-400' : 'text-ink')
+            }
+          >
+            {node.citations.toLocaleString('de-DE')}
+          </span>
+          <span className="text-xs text-muted">
+            Zitationen{node.landmark ? ' · etablierte Primärquelle' : ''}
+          </span>
+        </div>
+      )}
+
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
         <Badge tone={node.status === 'verified' ? 'green' : 'amber'}>{node.status}</Badge>
         <span className="text-muted">
