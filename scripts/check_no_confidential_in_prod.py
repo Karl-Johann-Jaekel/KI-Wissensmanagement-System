@@ -25,6 +25,7 @@ def run_checks(settings=None, session=None) -> list[tuple[str, bool, str]]:  # t
     from app.core.config import get_settings
     from app.db.models import Chunk, Document
     from app.db.session import SessionLocal
+    from app.ingestion.embedding import index_embed_models
 
     settings = settings or get_settings()
     own_session = session is None
@@ -88,6 +89,23 @@ def run_checks(settings=None, session=None) -> list[tuple[str, bool, str]]:  # t
             "Env: CORS ohne localhost",
             not any("localhost" in o or "127.0.0.1" in o for o in settings.cors_origins_list),
             settings.cors_origins,
+        )
+    )
+    # Ein öffentlicher Server ohne Ollama, aber mit EMBED_PROVIDER=ollama, beantwortet
+    # jede Suchanfrage mit einem Fehler — der Deploy-Gate fängt das vorher ab (ADR-0014).
+    checks.append(
+        (
+            "Env: EMBED_PROVIDER läuft ohne lokales Modell (mistral)",
+            settings.embed_provider == "mistral",
+            f"EMBED_PROVIDER={settings.embed_provider}",
+        )
+    )
+    index_models = index_embed_models(session)
+    checks.append(
+        (
+            "Index: Embeddings passen zum konfigurierten Modell",
+            not index_models or index_models == [settings.embed_model],
+            f"Index={index_models or 'leer'} vs. {settings.embed_model}",
         )
     )
 

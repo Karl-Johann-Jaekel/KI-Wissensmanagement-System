@@ -30,7 +30,10 @@ class Settings(BaseSettings):
     postgres_port: int = 5432
     database_url: str | None = None
 
-    # Embeddings (fixed in Phase 3 — see docs/adr/0002; one model for index AND query)
+    # Embeddings (fixed in Phase 3 — see docs/adr/0002; one model for index AND query).
+    # provider: "ollama" (lokal, nichts verlässt den Rechner) | "mistral" (EU-API,
+    # mistral-embed, ebenfalls 1024 dim) — ADR-0014.
+    embed_provider: str = "ollama"
     embed_model: str = "qwen3-embedding:0.6b"
     embed_dim: int = 1024
 
