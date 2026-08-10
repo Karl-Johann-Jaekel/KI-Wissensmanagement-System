@@ -1,4 +1,4 @@
-"""Deploy-Gate-Checks (scripts/check_no_confidential_in_prod.py, Phase 10)."""
+"""Deploy-Gate-Checks (scripts/check_prod_ready.py, Phase 10)."""
 
 from __future__ import annotations
 
@@ -13,8 +13,7 @@ from app.db.models import Document
 # Skript liegt außerhalb des app-Pakets — per Pfad importieren. Layouts:
 # Container: /app/tests + /app/scripts (Mount) · CI/Host: backend/tests + ../scripts
 _CANDIDATES = [
-    parent / "scripts" / "check_no_confidential_in_prod.py"
-    for parent in Path(__file__).resolve().parents[1:3]
+    parent / "scripts" / "check_prod_ready.py" for parent in Path(__file__).resolve().parents[1:3]
 ]
 _SCRIPT = next(p for p in _CANDIDATES if p.exists())
 _SPEC = importlib.util.spec_from_file_location("check_gate", _SCRIPT)
@@ -27,6 +26,7 @@ PROD_SETTINGS = Settings(
     admin_api_key="x" * 32,
     mistral_api_key="sk-prod",
     cors_origins="https://wissen.example.com",
+    embed_provider="mistral",
 )
 
 
@@ -34,26 +34,27 @@ def _results(checks: list[tuple[str, bool, str]]) -> dict[str, bool]:
     return {name: ok for name, ok, _ in checks}
 
 
-def test_gate_green_with_public_only_db(db_session: Session) -> None:
-    db_session.add(
-        Document(source_type="pdf", title="P", content_hash="gate-pub", sensitivity="public")
-    )
+def test_gate_green_with_ready_environment(db_session: Session) -> None:
+    db_session.add(Document(source_type="pdf", title="P", content_hash="gate-doc"))
     db_session.commit()
     results = _results(gate.run_checks(settings=PROD_SETTINGS, session=db_session))
-    assert results["DB: keine non-public Dokumente"] is True
-    assert results["DB: keine non-public Chunks"] is True
+    assert results["DB: Korpus ist befüllt"] is True
     assert results["Env: APP_ENV=production"] is True
-    assert results["Env: MISTRAL_API_KEY gesetzt (public-Zone via EU-API)"] is True
+    assert results["Env: MISTRAL_API_KEY gesetzt (Antworten via EU-API)"] is True
     assert results["Env: CORS ohne localhost"] is True
+    assert results["Env: EMBED_PROVIDER kommt ohne lokales Modell aus"] is True
 
 
-def test_gate_red_with_confidential_doc(db_session: Session) -> None:
-    db_session.add(
-        Document(source_type="pdf", title="S", content_hash="gate-conf", sensitivity="confidential")
+def test_gate_red_with_local_embed_provider(db_session: Session) -> None:
+    local = Settings(
+        app_env="production",
+        admin_api_key="x" * 32,
+        mistral_api_key="sk-prod",
+        cors_origins="https://wissen.example.com",
+        embed_provider="ollama",
     )
-    db_session.commit()
-    results = _results(gate.run_checks(settings=PROD_SETTINGS, session=db_session))
-    assert results["DB: keine non-public Dokumente"] is False
+    results = _results(gate.run_checks(settings=local, session=db_session))
+    assert results["Env: EMBED_PROVIDER kommt ohne lokales Modell aus"] is False
 
 
 def test_gate_red_with_weak_env(db_session: Session) -> None:
@@ -65,9 +66,9 @@ def test_gate_red_with_weak_env(db_session: Session) -> None:
     )
     results = _results(gate.run_checks(settings=weak, session=db_session))
     assert results["Env: APP_ENV=production"] is False
+    assert results["Env: MISTRAL_API_KEY gesetzt (Antworten via EU-API)"] is False
+    assert results["Env: CORS ohne localhost"] is False
     assert any(
         name.startswith("Env: ADMIN_API_KEY") and not ok
         for name, ok, _ in gate.run_checks(settings=weak, session=db_session)
     )
-    assert results["Env: MISTRAL_API_KEY gesetzt (public-Zone via EU-API)"] is False
-    assert results["Env: CORS ohne localhost"] is False

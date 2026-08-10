@@ -10,14 +10,13 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
-from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.security import is_admin, rate_limit, require_admin
+from app.core.security import rate_limit, require_admin
 from app.db.models import Chunk, Document
 from app.db.session import get_db
 from app.ingestion.pipeline import (
@@ -31,7 +30,6 @@ router = APIRouter(tags=["documents"])
 
 UPLOAD_DIR = Path("data/uploads")
 MAX_MARKDOWN_BYTES = 2 * 1024 * 1024  # 2 MB
-Sensitivity = Literal["public", "internal", "confidential"]
 
 
 @router.get("/documents")
@@ -42,7 +40,6 @@ def list_documents(request: Request, db: Session = Depends(get_db)) -> list[dict
             Document.id,
             Document.title,
             Document.source_type,
-            Document.sensitivity,
             Document.lang,
             Document.uri,
             func.count(Chunk.id).label("chunks"),
@@ -51,14 +48,11 @@ def list_documents(request: Request, db: Session = Depends(get_db)) -> list[dict
         .group_by(Document.id)
         .order_by(Document.created_at.desc())
     )
-    if not is_admin(request):
-        stmt = stmt.where(Document.sensitivity == "public")
     return [
         {
             "id": str(row.id),
             "title": row.title,
             "source_type": row.source_type,
-            "sensitivity": row.sensitivity,
             "lang": row.lang,
             "uri": row.uri,
             "chunks": row.chunks,
@@ -67,10 +61,9 @@ def list_documents(request: Request, db: Session = Depends(get_db)) -> list[dict
     ]
 
 
-def _get_visible_document(request: Request, db: Session, doc_id: uuid.UUID) -> Document:
-    """404 for unknown ids AND for non-public docs without admin (no existence leak)."""
+def _get_document(db: Session, doc_id: uuid.UUID) -> Document:
     doc = db.get(Document, doc_id)
-    if doc is None or (doc.sensitivity != "public" and not is_admin(request)):
+    if doc is None:
         raise HTTPException(status_code=404, detail="document not found")
     return doc
 
@@ -94,9 +87,9 @@ def _reassembled_content(db: Session, doc_id: uuid.UUID) -> str:
 
 
 @router.get("/documents/{doc_id}")
-def get_document(request: Request, doc_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
+def get_document(doc_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
     """Document detail incl. full content for the reader/editor."""
-    doc = _get_visible_document(request, db, doc_id)
+    doc = _get_document(db, doc_id)
     n_chunks = db.execute(
         select(func.count(Chunk.id)).where(Chunk.document_id == doc.id)
     ).scalar_one()
@@ -108,7 +101,6 @@ def get_document(request: Request, doc_id: uuid.UUID, db: Session = Depends(get_
         "id": str(doc.id),
         "title": doc.title,
         "source_type": doc.source_type,
-        "sensitivity": doc.sensitivity,
         "lang": doc.lang,
         "uri": doc.uri,
         "meta": doc.meta,
@@ -124,10 +116,9 @@ def get_document(request: Request, doc_id: uuid.UUID, db: Session = Depends(get_
 async def ingest_upload(
     request: Request,
     filename: str = Query(min_length=1, max_length=200),
-    sensitivity: Sensitivity = "confidential",
     db: Session = Depends(get_db),
 ) -> dict:
-    """Admin-only: upload a PDF or Markdown file (raw bytes body) into the given zone."""
+    """Admin-only: upload a PDF or Markdown file (raw bytes body)."""
     require_admin(request)
     raw = await request.body()
     if not raw:
@@ -157,9 +148,9 @@ async def ingest_upload(
     target.write_bytes(raw)
 
     if is_markdown:
-        status, n_chunks = ingest_markdown(db, target, sensitivity)
+        status, n_chunks = ingest_markdown(db, target)
     else:
-        status, n_chunks = ingest_file(db, target, sensitivity)
+        status, n_chunks = ingest_file(db, target)
     return {"filename": safe_name, "status": status, "chunks": n_chunks}
 
 

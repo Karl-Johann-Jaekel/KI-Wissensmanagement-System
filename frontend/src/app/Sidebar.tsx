@@ -2,10 +2,9 @@ import { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   BookOpen,
-  BrainCircuit,
+  Brain,
   FolderKanban,
   Inbox,
-  Library,
   Lock,
   MessageSquare,
   Moon,
@@ -32,7 +31,6 @@ const NAV_ITEMS = [
   { to: '/inbox', label: 'Inbox', icon: Inbox },
   { to: '/wissen', label: 'Wissen', icon: BookOpen },
   { to: '/skills', label: 'Skills', icon: Sparkles },
-  { to: '/bibliothek', label: 'Bibliothek', icon: Library },
   { to: '/projekte', label: 'Projekte', icon: FolderKanban },
 ]
 
@@ -85,11 +83,24 @@ export default function Sidebar({
   return (
     <div className="flex h-full flex-col border-r border-edge bg-surface">
       {/* Brand */}
-      <div className={cn('flex items-center gap-2 px-4 pb-2 pt-4', collapsed && 'justify-center px-2')}>
-        <span className="rounded-lg bg-primary-600 p-1.5 text-white">
-          <BrainCircuit className="h-4 w-4" />
-        </span>
-        {!collapsed && <span className="truncate text-sm font-semibold">KI-Wissen</span>}
+      <div
+        className={cn('flex items-center gap-2 px-4 pb-2 pt-4', collapsed && 'justify-center px-2')}
+      >
+        <NavLink
+          to="/"
+          onClick={onNavigate}
+          title="Zur Startseite"
+          className={cn('flex min-w-0 items-center gap-2', collapsed && 'justify-center')}
+        >
+          <span className="shrink-0 rounded-lg bg-primary-600 p-1.5 text-white">
+            <Brain className="h-5 w-5" />
+          </span>
+          {!collapsed && (
+            <span className="min-w-0 break-words text-[13px] font-semibold leading-tight">
+              KI-Wissensmanagement-System
+            </span>
+          )}
+        </NavLink>
         <button
           onClick={onToggleCollapsed}
           aria-label={collapsed ? 'Sidebar ausklappen' : 'Sidebar einklappen'}
@@ -169,9 +180,6 @@ export default function Sidebar({
                           : 'text-muted hover:bg-sunken hover:text-ink',
                       )}
                     >
-                      {chat.zone === 'confidential' && (
-                        <Lock className="h-3 w-3 shrink-0 text-rose-400" aria-label="confidential" />
-                      )}
                       <span className="min-w-0 flex-1 truncate">{chat.title}</span>
                     </button>
                     <button

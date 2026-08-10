@@ -9,8 +9,20 @@ from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.db.session import engine
 from app.main import app
+
+
+@pytest.fixture(autouse=True)
+def _pin_embed_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests prüfen Verhalten, nicht die .env des Betreibers.
+
+    Ohne diese Festlegung kippen Embedding- und Ingest-Tests, sobald jemand
+    EMBED_PROVIDER=mistral setzt (ADR-0014). Tests, die den entfernten Anbieter
+    prüfen, setzen ihn selbst.
+    """
+    monkeypatch.setattr(get_settings(), "embed_provider", "ollama", raising=False)
 
 
 @pytest.fixture

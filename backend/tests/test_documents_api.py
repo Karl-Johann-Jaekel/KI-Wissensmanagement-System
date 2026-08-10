@@ -20,18 +20,8 @@ ADMIN_KEY = get_settings().admin_api_key
 def _seed_docs(session: Session) -> None:
     session.add_all(
         [
-            Document(
-                source_type="pdf",
-                title="Public Phase6 Doc",
-                content_hash="p6-pub",
-                sensitivity="public",
-            ),
-            Document(
-                source_type="pdf",
-                title="Secret Phase6 Doc",
-                content_hash="p6-conf",
-                sensitivity="confidential",
-            ),
+            Document(source_type="pdf", title="Public Phase6 Doc", content_hash="p6-pub"),
+            Document(source_type="pdf", title="Second Phase6 Doc", content_hash="p6-second"),
         ]
     )
     session.commit()
@@ -49,35 +39,12 @@ def _bind_db(session: Session) -> Iterator[None]:
         app.dependency_overrides.clear()
 
 
-def test_documents_public_hides_confidential(db_session: Session, client: TestClient) -> None:
+def test_documents_lists_corpus(db_session: Session, client: TestClient) -> None:
     _seed_docs(db_session)
-
-    def _override() -> Iterator[Session]:
-        yield db_session
-
-    app.dependency_overrides[get_db] = _override
-    try:
-        public_view = client.get("/documents").json()
-        admin_view = client.get("/documents", headers={"X-API-Key": ADMIN_KEY}).json()
-    finally:
-        app.dependency_overrides.clear()
-
-    public_titles = {d["title"] for d in public_view}
-    admin_titles = {d["title"] for d in admin_view}
-    assert "Public Phase6 Doc" in public_titles
-    assert "Secret Phase6 Doc" not in public_titles
-    assert not any(d["sensitivity"] == "confidential" for d in public_view)
-    assert "Secret Phase6 Doc" in admin_titles
-
-
-def test_search_confidential_requires_admin(client: TestClient) -> None:
-    resp = client.post("/search", json={"query": "x", "max_sensitivity": "confidential"})
-    assert resp.status_code == 403
-
-
-def test_chat_confidential_requires_admin(client: TestClient) -> None:
-    resp = client.post("/chat", json={"query": "x", "max_sensitivity": "confidential"})
-    assert resp.status_code == 403
+    with _bind_db(db_session):
+        listed = client.get("/documents").json()
+    titles = {d["title"] for d in listed}
+    assert {"Public Phase6 Doc", "Second Phase6 Doc"} <= titles
 
 
 def test_ingest_requires_admin_key(client: TestClient) -> None:
@@ -113,12 +80,11 @@ def test_ingest_markdown_rejects_oversize(client: TestClient) -> None:
 # --------------------------------------------------------------- detail (Phase 9)
 
 
-def _seed_md_doc(session: Session, *, sensitivity: str = "public") -> Document:
+def _seed_md_doc(session: Session) -> Document:
     doc = Document(
         source_type="markdown",
         title="MD Doc",
-        content_hash=f"md-{sensitivity}",
-        sensitivity=sensitivity,
+        content_hash="md-doc",
         content_md="# MD Doc\n\nInhalt.",
     )
     session.add(doc)
@@ -136,7 +102,7 @@ def test_document_detail_stored_content(db_session: Session, client: TestClient)
 
 
 def test_document_detail_reassembles_legacy_chunks(db_session: Session, client: TestClient) -> None:
-    doc = Document(source_type="pdf", title="Legacy", content_hash="legacy-1", sensitivity="public")
+    doc = Document(source_type="pdf", title="Legacy", content_hash="legacy-1")
     db_session.add(doc)
     db_session.flush()
     db_session.add_all(
@@ -164,15 +130,6 @@ def test_document_detail_reassembles_legacy_chunks(db_session: Session, client: 
     assert data["editable"] is False
     assert "## Intro" in data["content"]
     assert data["content"].index("Erster Teil.") < data["content"].index("Zweiter Teil.")
-
-
-def test_document_detail_hides_confidential_as_404(db_session: Session, client: TestClient) -> None:
-    doc = _seed_md_doc(db_session, sensitivity="confidential")
-    with _bind_db(db_session):
-        anon = client.get(f"/documents/{doc.id}")
-        admin = client.get(f"/documents/{doc.id}", headers={"X-API-Key": ADMIN_KEY})
-    assert anon.status_code == 404
-    assert admin.status_code == 200
 
 
 # ----------------------------------------------------------- edit + delete (Phase 9)
@@ -242,7 +199,6 @@ def test_update_content_conflicts_on_duplicate_hash(
             source_type="markdown",
             title="Other",
             content_hash=other_hash,
-            sensitivity="public",
             content_md=other_content,
         )
     )

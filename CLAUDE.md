@@ -5,24 +5,25 @@ Wissens-Graph (Papers ↔ Konzepte ↔ Modelle ↔ Datasets) + rekursiver Update
 Vollständiger Plan in [PLAN.md](PLAN.md) — vor jeder Aufgabe lesen, aktuelle Phase
 dort abhaken. GitHub-Portfolio-Track wurde entfernt (ADR-0004).
 
-**Stand:** Phasen 0–9 fertig (Korpus: 16 Papers/1801 Chunks; Hit@5 0,94; MCP + n8n;
-Living-Knowledge-Loop; UI/UX-Redesign: Sidebar-App mit Chat-Verläufen (localStorage,
-ADR-0006), Suche, Inbox, Wissen inkl. MD-Editor (ADR-0007), Skills, Bibliothek mit
-Ollama-Modellwahl (ADR-0008), Projekte; hell/dunkel, mobile-friendly). Phase 10:
-Deployment-Werkzeuge fertig (Caddy-Prod-Stack ADR-0009, Deploy-Gate, Smoke-Test,
-Backup + Restore-Drill) — offen ist nur der Go-Live auf dem EU-VPS.
+**Stand:** Phasen 0–9 fertig (56 Papers/6.950 Chunks; Hit@5 0,94; Graph mit 370
+Knoten inkl. Zitations-Hervorhebung; UI/UX-Redesign: Sidebar-App mit Chat-Verläufen,
+Suche, Inbox mit Sammelfreigabe, Wissen inkl. MD-Editor, Skills, Projekte, Landing-
+Page; hell/dunkel, mobile-friendly; Graph-Explorer mit 4 Layouts, ADR-0016).
+Phase 10: Deployment-Werkzeuge fertig
+(Caddy-Prod-Stack, Deploy-Gate, Smoke-Test, Backup + verifizierter Restore) —
+offen ist der Go-Live auf dem EU-VPS.
 
 ## Regeln
-- Zonen: `public` (Korpus, EU-API erlaubt) vs. `confidential` (nur lokal, Ollama).
-  Router: nicht-public ⇒ **nur** Ollama; `max_sensitivity != public` nur mit Admin-Key.
-- Öffentliches Deployment enthält NIE `confidential`-Daten
-  (Deploy-Gate: `scripts/check_no_confidential_in_prod.py`).
+- Korpus ist vollständig öffentlich; die Zwei-Zonen-Idee wanderte in ein eigenes
+  Projekt (ADR-0015). Admin-Key schützt Upload, Löschen, Review und pending-Fakten.
+- Vor jedem Rollout: `scripts/check_prod_ready.py` (Deploy-Gate).
 - Paper-PDFs nie committen (arXiv-Lizenz); nur `demo-data/corpus.yaml` ist im Repo.
 - Extrahierte Graph-Fakten starten als `pending`; Promotion nur regelbasiert/Review;
   Provenienz (`source_document_ids`) ist Pflicht; kein Silent-Overwrite
   (Upserts: `app/db/graph.py` — Konflikt lässt `status`/`first_seen` unangetastet).
-- Ein multilinguales Embedding-Modell für Index UND Query:
-  `qwen3-embedding:0.6b`, 1024-dim (ADR-0002); Wechsel nur per Reindex.
+- Ein Embedding-Modell für Index UND Query (ADR-0002). Aktuell `mistral-embed`
+  (1024-dim, ADR-0014); Wechsel nur per `scripts/reindex.py`. Ein gemischter Index
+  liefert still die falschen Treffer — `assert_index_matches_settings` bricht ab.
 - `data/` und `.env` sind tabu für Commits, Logs und Tests. Gitleaks muss grün sein.
 - Agent-Tools nur als feste, parametrisierte Funktionen — kein LLM-generiertes SQL.
 - Stack: FastAPI, Postgres+pgvector, Docling, Ollama, Mistral-API, fastmcp,
@@ -42,5 +43,5 @@ Backup + Restore-Drill) — offen ist nur der Go-Live auf dem EU-VPS.
   `docker compose exec backend sh -c "ruff check . && ruff format --check . && mypy app && pytest"`.
 - Frontend: `cd frontend && npm run dev` (http://localhost:5173) bzw. `npm run build`.
 - Eval: `docker compose exec backend python eval/run_eval.py`.
-- Korpus: `python scripts/fetch_corpus.py` + `python -m app.ingest data/corpus
-  --sensitivity public` (beides im Container; idempotent).
+- Korpus: `python scripts/fetch_corpus.py` + `python -m app.ingest data/corpus`
+  (beides im Container; idempotent).

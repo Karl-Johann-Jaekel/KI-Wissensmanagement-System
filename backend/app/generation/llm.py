@@ -1,14 +1,13 @@
 """Chat LLM clients — Ollama (local) and Mistral (EU API), streaming.
 
 Both expose ``chat_stream(messages) -> Iterator[str]`` yielding text deltas, and a
-``chat()`` convenience that joins them. Which one is used is decided by the zone
-router (PLAN §2, §7 Phase 5), never here.
+``chat()`` convenience that joins them. Which one is used is decided by
+``core.llm_router`` (PLAN §7 Phase 5), never here.
 """
 
 from __future__ import annotations
 
 import json
-import time
 from collections.abc import Iterator
 from typing import Protocol
 
@@ -27,7 +26,7 @@ class LLMClient(Protocol):
 
 
 class OllamaChatClient:
-    """Local, confidential-safe. Talks to Ollama /api/chat (NDJSON stream)."""
+    """Local fallback without an API key. Talks to Ollama /api/chat (NDJSON stream)."""
 
     name = "ollama"
 
@@ -54,46 +53,8 @@ class OllamaChatClient:
         return "".join(self.chat_stream(messages))
 
 
-_TAGS_CACHE: dict[str, tuple[float, list[dict]]] = {}
-_TAGS_TTL_SECONDS = 60.0
-
-
-def list_ollama_models(
-    base_url: str, *, client: httpx.Client | None = None, ttl: float = _TAGS_TTL_SECONDS
-) -> list[dict] | None:
-    """Installed Ollama models via /api/tags; None when Ollama is unreachable.
-
-    Cached in-process for ``ttl`` seconds — the endpoint is polled by the UI and
-    used to validate per-request model overrides.
-    """
-    now = time.monotonic()
-    cached = _TAGS_CACHE.get(base_url)
-    if cached and now - cached[0] < ttl:
-        return cached[1]
-    try:
-        if client is not None:
-            resp = client.get("/api/tags")
-        else:
-            resp = httpx.get(f"{base_url}/api/tags", timeout=5.0)
-        resp.raise_for_status()
-        raw = resp.json().get("models", [])
-    except (httpx.HTTPError, ValueError):
-        return None
-    models = [
-        {
-            "name": m.get("name", ""),
-            "parameter_size": (m.get("details") or {}).get("parameter_size"),
-            "size": m.get("size"),
-        }
-        for m in raw
-        if m.get("name")
-    ]
-    _TAGS_CACHE[base_url] = (now, models)
-    return models
-
-
 class MistralChatClient:
-    """Public zone only (EU API, AVV). Talks to /v1/chat/completions (SSE stream)."""
+    """Default client: Mistral EU API (AVV). Talks to /v1/chat/completions (SSE)."""
 
     name = "mistral"
 

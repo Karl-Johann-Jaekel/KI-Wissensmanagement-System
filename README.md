@@ -1,263 +1,192 @@
-<div align="center">
+# KI-Wissensmanagement-System
 
-# 🧠 KI-Wissensmanagement-System
+**Ein RAG-System über KI-Forschungsliteratur, das jede Antwort belegt — und einen
+Wissens-Graphen, der nur aufnimmt, was durch eine Prüfung gekommen ist.**
 
-**Ein DSGVO-konformes RAG-System über KI-Forschung — mit einem Wissens-Graphen,
-der sich selbst aktualisiert und verifiziert.**
+56 arXiv-Papers · 6.950 indexierte Chunks · 370 Graph-Knoten · Hit-Rate@5 **0,94**
+· 113 automatisierte Tests
 
-Frag in natürlicher Sprache (DE/EN) einen Korpus aus arXiv-Papers und erhalte
-**belegte Antworten mit Zitaten**. Ein rekursiver Loop holt neue Publikationen,
-extrahiert Fakten per LLM und übernimmt sie **erst nach Mehr-Quellen-Verifikation**
-in einen interaktiven Wissens-Graphen.
-
-![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi&logoColor=white)
-![Postgres](https://img.shields.io/badge/Postgres-16_+_pgvector-4169E1?logo=postgresql&logoColor=white)
-![React](https://img.shields.io/badge/React-TS_+_Vite-61DAFB?logo=react&logoColor=black)
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-54_green-success)
-![License](https://img.shields.io/badge/license-MIT-black)
-
-</div>
-
----
-
-## Warum dieses Projekt
-
-Die meisten RAG-Demos beantworten Fragen. Dieses System geht drei Schritte weiter und
-löst die Probleme, die im echten Betrieb wehtun:
-
-- **🔒 Privacy by Architecture** — zwei Datenzonen, im Code getrennt. Öffentliche
-  Forschung darf über die EU-API laufen; vertrauliche Dokumente werden **garantiert
-  nur lokal** (Ollama) verarbeitet. Ein Zonen-Router entscheidet pro Anfrage; ein Test
-  beweist, dass `confidential` nie einen externen Call auslöst.
-- **📚 Belegte Antworten statt Halluzination** — jede Aussage trägt ihre Quelle
-  (`[Titel, Abschnitt]`); ohne Treffer sagt das System „dazu liegt keine Quelle vor".
-- **🌱 Selbst-aktualisierender Wissens-Graph** — der Kern. Neue Fakten werden per LLM
-  extrahiert, starten als `pending` und werden **nur bei ≥ 2 unabhängigen Quellen**
-  automatisch verifiziert. Kein Silent-Overwrite, Provenienzpflicht, Review-Queue.
-
-Gebaut mit dem Anspruch von Produktionscode: getypt, getestet, migriert, in Docker,
-mit CI, Secret-Scanning und dokumentierten Architektur­entscheidungen (ADRs).
-
----
-
-## Auf einen Blick
-
-| | |
-|---|---|
-| **Korpus** | 16 arXiv-Papers · **1.801** Chunks · multilinguale Embeddings (1024-dim) |
-| **Retrieval** | Hybrid (Vektor + BM25) → Reciprocal Rank Fusion → optionaler Cross-Encoder |
-| **Qualität** | **Hit-Rate@5 = 0,94** · p95-Latenz **~220 ms** (Golden-Set, DE + EN) |
-| **Wissens-Graph** | LLM-Extraktion → `pending` → 2-Quellen-Promotion → `verified` |
-| **Zugriff** | Web-UI · REST-API (`/docs`) · **MCP-Server** für Claude Desktop |
-| **Qualitätssicherung** | 54 Tests · `ruff` · `mypy` · `gitleaks` · GitHub Actions |
-
----
-
-## Architektur
-
-```mermaid
-flowchart LR
-    subgraph Ingestion
-        A[arXiv PDF] --> B[Docling → Markdown]
-        B --> C[Heading-aware Chunking]
-        C --> D[Ollama Embeddings]
-    end
-    D --> DB[(Postgres 16<br/>pgvector + tsvector)]
-
-    subgraph "Retrieval und Antwort"
-        Q["Frage (DE/EN)"] --> H[Vektor + BM25]
-        H --> R[RRF-Fusion]
-        R --> RR[Cross-Encoder Rerank]
-        RR --> G[LLM · zitierte Antwort]
-    end
-    DB --> H
-
-    subgraph "Living Knowledge Loop"
-        DF[Delta-Fetch] --> EX[LLM-Extraktion]
-        EX --> P((pending))
-        P --> PR{"≥ 2 Quellen<br/>& Konfidenz?"}
-        PR -->|ja| V((verified))
-        PR -->|nein| RQ[Review-Queue]
-    end
-    DB --> DF
-    V --> DB
-
-    style V fill:#065f46,color:#fff
-    style P fill:#78350f,color:#fff
-    style DB fill:#1e3a8a,color:#fff
+```
+Frage ──▶ Hybrid-Retrieval ──▶ Kontext ──▶ LLM ──▶ Antwort mit Quellenangabe
+          (Vektor + Volltext,                       │
+           RRF-fusioniert)                          └─▶ Faktenextraktion ──▶ Graph
+                                                          (pending ──▶ verified)
 ```
 
-### Privacy by Architecture — der Zonen-Router
+---
 
-Die höchste Sensitivität der Treffer entscheidet, welches Modell antwortet. Das ist
-kein Prompt-Hinweis, sondern eine harte Weiche im Code (und per Test belegt):
+## Warum das mehr ist als ein RAG-Tutorial
 
-```mermaid
-flowchart TD
-    T[Retrieval-Treffer] --> Z{höchste Zone}
-    Z -->|public| M["Mistral EU-API (AVV)"]
-    Z -->|confidential / internal| O["Ollama — lokal, verlässt den Rechner nie"]
-    M --> ANS[Antwort]
-    O --> ANS
-```
+Die meisten RAG-Demos enden bei „Frage rein, Antwort raus". Die interessanten
+Probleme fangen danach an — und genau die behandelt dieses Projekt:
 
-Das öffentliche Deployment enthält **ausschließlich** public-Daten; vertrauliche
-Dokumente existieren nur im lokalen Betrieb. Ein Deploy-Gate verhindert Vermischung.
+**Antworten sind überprüfbar.** Jede Aussage nennt Paper und Abschnitt. Findet das
+Retrieval keine belastbare Stelle, sagt das System „Dazu liegt keine Quelle vor",
+statt zu raten. Der Systemprompt erzwingt das, ein Test hält es fest.
 
-### Living Knowledge — kein ungefilterter LLM-Output
+**Der Graph nimmt nichts ungeprüft auf.** Was das LLM aus einem Paper extrahiert,
+landet als `pending` — mit Pflicht-Provenienz auf jeder Kante. Verifiziert wird nur
+regelbasiert (mehrere unabhängige Quellen) oder durch menschliche Freigabe.
+Widersprüchliche Behauptungen werden als `disputed` markiert statt still
+überschrieben.
 
-Der Wissens-Graph darf nie rohe LLM-Ausgabe sein. Deshalb ein mehrstufiges Staging:
+**Qualität wird gemessen, nicht behauptet.** Ein Golden-Set aus 16 Fragen (deutsch
+und englisch) misst die Hit-Rate bei jedem Durchlauf. Als die Embeddings gewechselt
+wurden, lag die Zahl vorher und nachher auf dem Tisch: 0,88 → 0,94.
 
-1. **Extraktion** — pro Paper extrahiert ein LLM Konzepte, Modelle, Datasets und
-   Relationen; jede Kante trägt ihre **Provenienz** (`source_document_ids`).
-2. **Normalisierung** — Alias-Mapping führt „RAG" und „Retrieval-Augmented Generation"
-   zusammen, damit der Graph nicht zerfasert.
-3. **Promotion** — automatisch `verified` nur bei **≥ 2 unabhängigen Quellen** und
-   ausreichender Konfidenz. Widersprüche (reziprokes `IMPROVES_ON`) werden markiert,
-   nie überschrieben.
-4. **Review** — alles Übrige landet in einer Admin-Queue (verify/reject per Klick).
-   Neue Knoten leuchten im Graphen; ein Changelog-Feed zeigt „Neu (7 Tage)".
-
-> Beispiel-Lauf: 16 Papers → 66 extrahierte Fakten → 3 automatisch verifiziert
-> (2-Quellen-Regel) → 76 Fakten in der Review-Queue. Golden-Eval nach dem Lauf: 0,94.
+**Entscheidungen sind dokumentiert.** 15 Architecture Decision Records halten fest,
+was warum entschieden wurde — inklusive der Fälle, in denen sich eine Annahme als
+falsch herausstellte und der Weg korrigiert wurde.
 
 ---
 
-## Tech-Stack
-
-| Ebene | Technologie |
-|---|---|
-| Backend | FastAPI · SQLAlchemy 2 · Alembic · Pydantic |
-| Datenbank | PostgreSQL 16 · **pgvector** (HNSW) · `tsvector`/GIN (BM25) |
-| Parsing / Embeddings | Docling · Ollama (`qwen3-embedding`, multilingual) |
-| LLM | Mistral (EU-API, public) · Ollama (lokal, confidential) |
-| Retrieval | Hybrid + RRF + `bge-reranker-v2-m3` (Env-Flag) |
-| Frontend | React · TypeScript · Vite · Tailwind · react-force-graph · SSE-Streaming |
-| Integration | **MCP-Server** (fastmcp) · **n8n** (Cron- & Webhook-Workflows) |
-| Qualität | pytest · ruff · mypy · gitleaks · GitHub Actions · Docker Compose |
-
----
-
-## Quickstart
+## Live ausprobieren
 
 ```bash
-cp .env.example .env                # POSTGRES_PASSWORD, ADMIN_API_KEY setzen
-docker compose up -d                # Postgres + Backend  → http://localhost:8000/docs
+git clone https://github.com/Karl-Johann-Jaekel/KI-Wissensmanagement-System
+cd KI-Wissensmanagement-System
+cp .env.example .env          # MISTRAL_API_KEY eintragen
+docker compose up -d          # Postgres + Backend
 docker compose exec backend alembic upgrade head
 
-# Korpus holen + indexieren (Ollama mit Embedding-Modell muss laufen):
+# Korpus holen und indexieren
 docker compose exec backend python scripts/fetch_corpus.py
-docker compose exec backend python -m app.ingest data/corpus --sensitivity public
+docker compose exec backend python -m app.ingest data/corpus
 
-# Wissens-Graph aus dem Korpus aufbauen (Extraktion → Promotion → Eval):
-docker compose exec backend python -m app.update
-
-# Frontend:
 cd frontend && npm install && npm run dev     # http://localhost:5173
 ```
 
-Ausprobieren:
-
-```bash
-# Zitierte RAG-Antwort (Streaming):
-curl -N -X POST localhost:8000/chat -H 'Content-Type: application/json' \
-     -d '{"query":"Wie funktioniert Self-Attention?"}'
-
-# Retrieval-Qualität messen:
-docker compose exec backend python eval/run_eval.py
-```
-
-### Privater Betrieb (`confidential`)
-
-```bash
-# Eigene PDFs nach data/private/ legen, dann lokal indexieren:
-docker compose exec backend python -m app.ingest data/private --sensitivity confidential
-```
-
-Oder direkt im UI: Die **Bibliothek** ist der private Wissensspeicher — PDFs und
-Markdown-Notizen per Drag&Drop hochladen (Zone fest `confidential`), Markdown
-direkt im Browser bearbeiten (Speichern re-indexiert), und beim Chat das lokale
-**Ollama-Modell frei wählen** (`GET /models`). Fragen mit
-`max_sensitivity=confidential` (Admin-Key nötig) werden **garantiert nur vom
-lokalen Ollama-Modell** beantwortet — kein externer API-Call. Chats, Skills und
-Projekte liegen ausschließlich im Browser (localStorage, ADR-0006) — der Server
-speichert keine Konversationen.
-
-### Öffentliches Deployment (EU-VPS)
-
-```bash
-# 1. .env produktiv setzen: SITE_ADDRESS=wissen.example.com, APP_ENV=production,
-#    starker ADMIN_API_KEY, MISTRAL_API_KEY, CORS_ORIGINS=https://wissen.example.com
-# 2. Stack bauen & starten (Caddy: TLS + SPA + /api-Proxy, ADR-0009):
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile public up -d --build
-# 3. Deploy-Gate: öffentlicher Server darf NUR public-Daten enthalten
-docker compose exec -T backend python scripts/check_no_confidential_in_prod.py
-# 4. Smoke-Test (Health, Graph, Chat, Golden-Eval):
-BASE_URL=https://wissen.example.com/api ./scripts/smoke_prod.sh
-# 5. Nightly-Backup als Host-Cron (03:00) + Restore-Drill: docs/runbooks/restore.md
-#    0 3 * * * cd /opt/kwms && ./scripts/backup.sh >> backups/backup.log 2>&1
-# 6. Living-Knowledge-Loop wöchentlich (Caps inklusive):
-#    0 6 * * 1 cd /opt/kwms && docker compose exec -T backend \
-#      python -m app.update --since $(date -d '8 days ago' +\%F) --cap 5 --token-budget 200000
-```
-
-Uptime-Monitoring extern auf `https://<domain>/api/health` legen (z. B. UptimeRobot).
+Ohne API-Schlüssel läuft alles gegen ein lokales Ollama-Modell weiter — nur eben
+langsamer.
 
 ---
 
-## API
+## Die Oberfläche
 
-| Endpoint | Beschreibung |
+Eine React-SPA mit Sidebar-Navigation, hellem und dunklem Theme, mobiltauglich:
+
+| Bereich | Was es tut |
 |---|---|
-| `POST /chat` | Zitierte RAG-Antwort, SSE-Streaming, zonen-geroutet |
-| `POST /search` | Hybrid-Retrieval mit Debug-Scores |
-| `GET /graph` | Wissens-Graph (`verified`; Admin: `include_pending`) |
-| `GET /graph/changelog` | Neu hinzugekommene Fakten (N Tage) |
-| `GET /review` · `POST /review/node/{id}` | Review-Queue (Admin) |
-| `GET /documents` · `GET /documents/{id}` | Dokumentliste · Inhalt für Reader/Editor |
-| `POST /ingest` · `PUT /documents/{id}/content` · `DELETE /documents/{id}` | Upload (PDF/MD) · MD-Edit mit Re-Index · Löschen (Admin) |
-| `GET /models` | Installierte Ollama-Modelle für die Modellwahl (Admin) |
+| **Chat** | Streamende Antworten mit Quellenkarten. Verläufe bleiben im Browser (localStorage), nicht auf dem Server. |
+| **Suche** | Hybrid-Retrieval mit aufklappbaren Scores je Verfahren — sichtbar, warum ein Treffer oben steht. |
+| **Wissen** | Dokumente hochladen (PDF und Markdown), lesen, Markdown direkt im Browser bearbeiten (Speichern indexiert neu). Dazu der Graph-Explorer. |
+| **Inbox** | Review-Queue der unbestätigten Fakten mit Filtern und Sammelfreigabe. |
+| **Skills** | Wiederverwendbare Prompt-Vorlagen, per „/" in den Chat einsetzbar. |
+| **Projekte** | Arbeitsbereiche, die Chats und Dokumente bündeln. |
 
-Interaktive Doku unter `/docs` (OpenAPI/Swagger).
+Der Graph zeichnet vielzitierte Grundlagenarbeiten mit einem goldenen Ring aus
+(Zitationszahlen von Semantic Scholar). Die Knotengröße bleibt dem
+Vernetzungsgrad vorbehalten — zwei Signale, zwei visuelle Kanäle.
+
+**Der Graph-Explorer** (ADR-0016) zeigt denselben Bestand in vier Layouts:
+*Cloud* (Kräftesimulation mit getrennten Cluster-Zentren), *Globus* (rotierende
+Kugel mit Tiefenschärfe), *Ring* (Systemkern in der Mitte, außen Wissenswelten
+als Sektoren, dann Projekte und externe Dienste auf Orbits) und *Ebenen* (die
+Systemschichten vertikal gestapelt). Kanten bleiben unsichtbar, bis man einen
+Knoten überfährt; ein verschiebbares Menü trägt Suche, Regler (Knotengröße,
+Cluster-Abstand, Streuung, Detail-Tiefe) und das Kollabieren ganzer Cluster zu
+einem Hub. Ein Klick öffnet die Leseansicht mit dem Volltext des Quell-Dokuments
+direkt neben dem Graphen.
 
 ---
 
-## Qualität & Engineering
+## Wie es funktioniert
 
-- **54 automatisierte Tests** (Retrieval, Zonen-Router, Extraktion, Promotion, API) —
-  DB-Tests mit Transaktions-Rollback-Isolation, LLM/HTTP gemockt.
-- **Typisiert** (`mypy`), **gelintet & formatiert** (`ruff`), **Secret-Scanning**
-  (`gitleaks`) — lokal als pre-commit und in **GitHub Actions**.
-- **Alembic-Migrationen**, reproduzierbarer Docker-Compose-Stack, idempotente Ingestion
-  (Content-Hash) und Graph-Upserts (kein Duplikat, kein Silent-Overwrite).
-- **Architektur­entscheidungen** dokumentiert in [`docs/adr/`](docs/adr/) —
-  u. a. relationaler Graph statt Graph-DB, Embedding-Modell-Wahl, Zonen-Routing.
+**Aufnahme.** Docling parst PDFs zu Markdown, das Chunking folgt den Überschriften
+statt einer festen Zeichenzahl. Jedes Dokument trägt einen Content-Hash: ein
+zweiter Durchlauf fügt nichts hinzu.
+
+**Retrieval.** Zwei Verfahren laufen parallel — Vektorsuche über pgvector (HNSW)
+und Postgres-Volltextsuche — und werden per Reciprocal Rank Fusion verschmolzen.
+Ein Cross-Encoder-Reranker ist optional zuschaltbar. Ein multilinguales
+Embedding-Modell für Index **und** Query lässt deutsche Fragen auf englischen
+Papers funktionieren.
+
+**Generation.** Der Kontext geht mit Zitationspflicht an das Sprachmodell,
+gestreamt per Server-Sent Events. Antworten mit Quellenkarten, Tages-Token-Budget
+und Rate-Limit.
+
+**Wissens-Graph.** Ein wiederkehrender Lauf holt neue arXiv-Papers, extrahiert
+Fakten, hebt Neues hervor und schlägt Kandidaten zur Freigabe vor. Entitätsnamen
+werden kanonisiert, damit „Cross-Encoder", „cross encoder" und „Cross Encoders"
+ein Knoten bleiben und der Graph nicht zerfasert.
+
+---
+
+## Technisch
+
+**Backend** FastAPI · Postgres 16 + pgvector · SQLAlchemy · Alembic · Docling ·
+Mistral EU-API · Ollama (lokal)
+**Frontend** React 18 · TypeScript · Vite · Tailwind · react-force-graph
+**Betrieb** Docker Compose · Caddy (TLS, SPA, API-Proxy) · GitHub Actions
+**Weiteres** MCP-Server für Claude Desktop · n8n-Workflows · pg_dump-Backups
+
+**Qualitätssicherung**
+
+- 113 automatisierte Tests (Retrieval, Extraktion, Promotion, API, Deploy-Gate).
+  DB-Tests laufen in Transaktionen mit Rollback, LLM und HTTP sind gemockt.
+- `ruff`, `mypy` und `gitleaks` in GitHub Actions, dazu ein Frontend-Job mit
+  Typprüfung, Vitest und Produktionsbuild.
+- Ein Deploy-Gate prüft vor jedem Rollout, ob der Server tatsächlich ausliefern
+  kann — unter anderem, ob die Embeddings im Index zum konfigurierten Modell
+  passen. Ein solcher Fehler liefert sonst still die falschen Treffer.
+- Ein Restore-Drill wurde real durchgeführt und protokolliert
+  ([Runbook](docs/runbooks/restore.md)).
+
+---
+
+## Was dabei schiefging
+
+Für ein ehrliches Bild — diese Fälle sind in den ADRs dokumentiert:
+
+**Der Delta-Fetch holte die falschen Papers.** Die arXiv-Suche lautete
+`all:retrieval augmented generation` — unquotiert bindet nur das erste Wort ans
+Feld. Zusammen mit der Sortierung nach Datum kamen die neuesten Einreichungen
+*aller* Disziplinen zurück: 20 von 40 Papers hatten keinerlei Informatik-Kategorie.
+Behoben mit quotierter Phrase und Kategorie-Filter, abgesichert durch Tests.
+
+**Mehr Daten machten den Graphen nicht voller.** Nach 56 Papers hatten alle 316
+unbestätigten Fakten exakt eine Quelle — die Regel „zwei unabhängige Belege" konnte
+nie greifen. Die Ursache war nicht die Korpusgröße, sondern die Benennung: Jedes
+Paper prägte eigene Begriffe. Erst kanonische Namen plus ein Vokabular im
+Extraktions-Prompt haben das gelöst.
+
+**Ein Indexierungslauf wurde vom OOM-Killer beendet.** Docling lief mit
+eingeschalteter OCR über born-digital PDFs — die Stufe lieferte nichts und
+verbrauchte den ganzen Speicher. Ohne OCR: viermal schneller, kein Absturz.
+
+---
+
+## Deployment
+
+Der öffentliche Betrieb ist ein schlanker Leseserver — kein Docling, kein torch,
+kein lokales Modell. Der Korpus wird lokal gebaut und als Datenbank-Dump
+eingespielt.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile public up -d --build
+docker compose exec -T backend python scripts/check_prod_ready.py    # Deploy-Gate
+BASE_URL=https://<domain>/api ./scripts/smoke_prod.sh                # Smoke-Test
+```
+
+Caddy übernimmt TLS, liefert die SPA aus und proxied `/api` — ein Container für
+alles drei. Backups laufen nächtlich per `pg_dump`, das Restore-Verfahren ist
+erprobt.
+
+---
 
 ## Projektstruktur
 
 ```
-backend/app/   ingestion · retrieval · generation · corpus (living loop) · api · db
-frontend/      React-SPA: Chat · Suche · Inbox · Wissen (Docs+Graph) · Skills ·
-               Bibliothek · Projekte — hell/dunkel, mobile-friendly
-mcp_server/    MCP-Tools für Claude Desktop (search/ask/list/graph)
-automation/    n8n-Workflows (Webhook-Ingest, Wochen-Cron)
-eval/          Golden-Set + Hit-Rate-Messung + Parameter-Tuning
-scripts/       Korpus-Fetch · Deploy-Gate · Smoke-Test · Backup
-docs/adr/      Architecture Decision Records · docs/runbooks/ Restore-Drill
+backend/app/   ingestion · retrieval · generation · corpus (Update-Loop) · api · db
+frontend/      React-SPA: Chat · Suche · Inbox · Wissen · Skills · Projekte
+mcp_server/    MCP-Werkzeuge für Claude Desktop
+eval/          Golden-Set, Hit-Rate-Messung, Parameter-Tuning
+scripts/       Korpus-Fetch · Reindex · Deploy-Gate · Smoke-Test · Backup
+docs/adr/      15 Architecture Decision Records · docs/runbooks/
 ```
-
-## Roadmap
-
-Umgesetzt: Ingestion · Hybrid-Retrieval · zitierte Generation · Zonen-Router ·
-MCP · Living-Knowledge-Loop · **UI/UX-Redesign** (Sidebar-App mit Chat-Verläufen,
-Suche, Inbox, Wissen inkl. MD-Editor, Skills, Bibliothek mit Modellwahl, Projekte;
-hell/dunkel, mobile-friendly) · **Deployment-Werkzeuge** (Caddy-Prod-Stack,
-Deploy-Gate, Smoke-Test, Backups mit verifiziertem Restore). Als Nächstes:
-Go-Live auf dem EU-VPS (Domain, TLS, Monitoring, Prod-Cron).
 
 ## Lizenz
 
-MIT — siehe [LICENSE](LICENSE). Paper-PDFs und private Daten unter `data/` sind
-git-ignoriert und werden **nie** committet (arXiv-Lizenz · Datenschutz).
+MIT — siehe [LICENSE](LICENSE). Paper-PDFs unter `data/` sind git-ignoriert und
+werden nie committet (arXiv-Lizenz).

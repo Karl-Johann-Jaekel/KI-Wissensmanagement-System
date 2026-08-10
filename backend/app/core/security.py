@@ -89,11 +89,5 @@ def require_admin(request: Request) -> None:
         raise HTTPException(status_code=401, detail="admin API key required")
 
 
-def require_admin_for_nonpublic(request: Request, max_sensitivity: str) -> None:
-    """Non-public zones (confidential/internal) require the admin key."""
-    if max_sensitivity != "public" and not is_admin(request):
-        raise HTTPException(status_code=403, detail="confidential zone requires admin key")
-
-
 def estimate_tokens(text: str) -> int:
     return max(1, len(text) // 4)

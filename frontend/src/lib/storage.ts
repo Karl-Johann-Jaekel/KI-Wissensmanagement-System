@@ -13,24 +13,23 @@ const LEGACY_ADMIN_KEY = 'kwms-admin-key'
 
 export const MAX_CHATS = 100
 export const MAX_MESSAGES_PER_CHAT = 200
-
-export type Zone = 'public' | 'confidential'
+export const DEFAULT_TOP_K = 5
 
 export interface ChatMeta {
   id: string
   title: string
   createdAt: number
   updatedAt: number
-  zone: Zone
-  model: string | null
   projectId: string | null
+  /** Retrieval-Einstellungen; bei Chats aus früheren Versionen undefined. */
+  topK?: number
+  rerank?: boolean
 }
 
 export interface StoredMessage {
   role: 'user' | 'assistant'
   text: string
   sources?: ChatSource[]
-  zone?: string
   model?: string
   error?: string
 }
@@ -147,16 +146,20 @@ export function chatTitleFrom(text: string): string {
   return line.length > 60 ? `${line.slice(0, 60)}…` : line || 'Neuer Chat'
 }
 
-export function createChat(init: Partial<Pick<ChatMeta, 'title' | 'zone' | 'model' | 'projectId'>> = {}): ChatMeta {
+export function createChat(
+  init: Partial<
+    Pick<ChatMeta, 'title' | 'projectId' | 'topK' | 'rerank'>
+  > = {},
+): ChatMeta {
   const now = Date.now()
   const meta: ChatMeta = {
     id: newId(),
     title: init.title ?? 'Neuer Chat',
     createdAt: now,
     updatedAt: now,
-    zone: init.zone ?? 'public',
-    model: init.model ?? null,
     projectId: init.projectId ?? null,
+    topK: init.topK ?? DEFAULT_TOP_K,
+    rerank: init.rerank ?? false,
   }
   const index = chatIndex()
   index.push(meta)
@@ -246,7 +249,8 @@ export function seedSkillsOnce(): void {
     {
       id: newId(),
       name: 'Konzept-Vergleich',
-      content: 'Vergleiche die folgenden zwei Konzepte anhand des Korpus (Gemeinsamkeiten, Unterschiede, typische Anwendungsfälle): ',
+      content:
+        'Vergleiche die folgenden zwei Konzepte anhand des Neuralen Gedächtnisses (Gemeinsamkeiten, Unterschiede, typische Anwendungsfälle): ',
       createdAt: now,
       updatedAt: now,
     },
@@ -291,6 +295,17 @@ export function deleteProject(id: string): void {
     }
   }
   if (changed) writeChatIndex(index)
+}
+
+// ------------------------------------------------------------------ graph explorer
+
+/** Einstellungen des Graph-Explorers (Layout, Slider, Panel-Position). */
+export function getGraphPrefs<T>(fallback: T): T {
+  return read<T>('graph.prefs', fallback)
+}
+
+export function setGraphPrefs(value: unknown): boolean {
+  return write('graph.prefs', value)
 }
 
 // ------------------------------------------------------------------ react hooks

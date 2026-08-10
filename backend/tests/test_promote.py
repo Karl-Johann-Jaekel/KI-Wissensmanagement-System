@@ -51,7 +51,9 @@ def test_two_sources_promote_single_source_stays_pending(db_session: Session) ->
     )
     db_session.commit()
 
-    stats = promote_graph(db_session)
+    # Schwellen explizit: die Regel wird getestet, nicht die .env des Betreibers
+    # (seit ADR-0010 sind PROMOTE_MIN_SOURCES/-CONFIDENCE konfigurierbar).
+    stats = promote_graph(db_session, min_sources=2, confidence_threshold=0.7)
     assert stats.promoted_nodes == 1
     assert _status(db_session, "concept", "Popular Concept") == "verified"
     assert _status(db_session, "concept", "Lonely Concept") == "pending"
@@ -60,6 +62,26 @@ def test_two_sources_promote_single_source_stays_pending(db_session: Session) ->
         text("SELECT meta FROM graph_nodes WHERE name='Popular Concept'")
     ).scalar_one()
     assert len(promoted["source_document_ids"]) == 2  # provenance recorded
+
+
+def test_min_sources_one_promotes_single_source_facts(db_session: Session) -> None:
+    """Gelockerte Schwelle (ADR-0010): einquellige Fakten werden übernommen."""
+    _reset(db_session)
+    p1 = upsert_node(db_session, "paper", "Solo Paper", status="verified")
+    lonely = upsert_node(db_session, "concept", "Solo Concept", status="pending")
+    upsert_edge(
+        db_session,
+        p1,
+        lonely,
+        "INTRODUCES",
+        meta={"source_document_ids": ["d1"], "confidence": 0.9},
+        status="pending",
+    )
+    db_session.commit()
+
+    assert promote_graph(db_session, min_sources=2).promoted_nodes == 0
+    assert promote_graph(db_session, min_sources=1).promoted_nodes == 1
+    assert _status(db_session, "concept", "Solo Concept") == "verified"
 
 
 def test_low_confidence_stays_pending(db_session: Session) -> None:

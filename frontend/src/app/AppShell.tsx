@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
-import { Menu } from 'lucide-react'
+import { Brain, Menu } from 'lucide-react'
 import { fetchReview } from '../api'
 import { cn } from '../lib/cn'
 import { useTheme } from '../lib/theme'
@@ -103,7 +103,12 @@ export default function AppShell() {
           >
             <Menu className="h-5 w-5" />
           </button>
-          <span className="text-sm font-semibold">KI-Wissen</span>
+          <span className="shrink-0 rounded-md bg-primary-600 p-1 text-white">
+            <Brain className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 truncate text-sm font-semibold">
+            KI-Wissensmanagement-System
+          </span>
         </header>
 
         <main className="min-h-0 flex-1">

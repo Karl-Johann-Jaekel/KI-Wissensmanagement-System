@@ -5,19 +5,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Markenakzent: gedecktes Grün (Jobgether-inspiriert), Anker #3ca66a.
+        // Markenakzent: Blau passend zum App-Icon (Anker #3b82f6).
         primary: {
-          50: '#f2f9f5',
-          100: '#e0f1e8',
-          200: '#c3e3d2',
-          300: '#97ceb1',
-          400: '#66b28b',
-          500: '#3ca66a',
-          600: '#2f8a57',
-          700: '#276e47',
-          800: '#22583b',
-          900: '#1d4931',
-          950: '#0e281b',
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
+          950: '#172554',
         },
         // Semantische Flächen-Tokens als CSS-Variablen: Komponenten schreiben nie
         // `dark:` für Flächen — das Theme wechselt über :root/.dark in index.css.

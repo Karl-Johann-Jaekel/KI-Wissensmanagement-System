@@ -37,7 +37,6 @@ def test_store_facts_creates_pending_entities_with_provenance(db_session: Sessio
         title="Attention Is All You Need",
         uri="http://arxiv.org/abs/1706.03762",
         content_hash="hash-attn",
-        sensitivity="public",
         meta={"id": "1706.03762"},
     )
     db_session.add(doc)

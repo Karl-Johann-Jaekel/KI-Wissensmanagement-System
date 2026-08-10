@@ -30,9 +30,17 @@ class Settings(BaseSettings):
     postgres_port: int = 5432
     database_url: str | None = None
 
-    # Embeddings (fixed in Phase 3 — see docs/adr/0002; one model for index AND query)
+    # Embeddings (fixed in Phase 3 — see docs/adr/0002; one model for index AND query).
+    # provider: "ollama" (lokal, nichts verlässt den Rechner) | "mistral" (EU-API,
+    # mistral-embed, ebenfalls 1024 dim) — ADR-0014.
+    embed_provider: str = "ollama"
     embed_model: str = "qwen3-embedding:0.6b"
     embed_dim: int = 1024
+
+    # Docling-Parsing. OCR aus: arXiv-PDFs sind born-digital, die OCR-Stufe war der
+    # Speicher-Peak, der den Ingest-Prozess bei 40 Papers zerlegt hat (ADR-0011).
+    docling_ocr: bool = False
+    docling_table_structure: bool = True
 
     # Ollama (confidential zone)
     ollama_base_url: str = "http://ollama:11434"
@@ -45,6 +53,16 @@ class Settings(BaseSettings):
     # Mistral (public zone, Phase 5)
     mistral_api_key: str = ""
     mistral_model: str = "mistral-medium-latest"
+
+    # Promotion pending -> verified (Phase 8). Lockern erhöht die Ausbeute, senkt aber
+    # die Belegtiefe — Provenienz bleibt in jedem Fall Pflicht (PLAN §2.7, ADR-0010).
+    promote_min_sources: int = 2
+    promote_confidence: float = 0.7
+
+    # Zitationsmetriken (ADR-0013). Ohne Key gilt das freie Kontingent von
+    # Semantic Scholar; ab dieser Zitationszahl gilt ein Paper als Primärquelle.
+    semantic_scholar_api_key: str = ""
+    citation_landmark_min: int = 100
 
     # Hardening (Phase 5)
     admin_api_key: str = "change-me"

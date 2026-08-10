@@ -59,7 +59,6 @@ def _load_sidecar(pdf_path: Path) -> dict:
 def ingest_file(
     session: Session,
     pdf_path: Path,
-    sensitivity: str,
     lang: str | None = None,
     *,
     to_md: ToMarkdown = to_markdown,
@@ -85,7 +84,6 @@ def ingest_file(
         title=sidecar.get("title") or pdf_path.stem,
         uri=sidecar.get("uri") or str(pdf_path),
         content_hash=content_hash,
-        sensitivity=sensitivity,
         lang=doc_lang,
         content_md=md,
         meta={
@@ -104,7 +102,6 @@ def ingest_file(
 def ingest_markdown(
     session: Session,
     md_path: Path,
-    sensitivity: str,
     lang: str | None = None,
     *,
     embed_fn: EmbedFn = embed_texts,
@@ -132,7 +129,6 @@ def ingest_markdown(
         title=title,
         uri=str(md_path),
         content_hash=content_hash,
-        sensitivity=sensitivity,
         lang=doc_lang,
         content_md=text,
     )
@@ -207,7 +203,6 @@ def _add_chunks(
 def ingest_path(
     session: Session,
     root: Path,
-    sensitivity: str,
     lang: str | None = None,
     *,
     to_md: ToMarkdown = to_markdown,
@@ -218,7 +213,7 @@ def ingest_path(
     pdfs = [root] if root.is_file() else sorted(root.glob("**/*.pdf"))
     for pdf in pdfs:
         try:
-            status, n = ingest_file(session, pdf, sensitivity, lang, to_md=to_md, embed_fn=embed_fn)
+            status, n = ingest_file(session, pdf, lang, to_md=to_md, embed_fn=embed_fn)
         except Exception as exc:  # noqa: BLE001 — one bad PDF must not abort the run
             session.rollback()
             print(f"  ! {pdf.name}: {exc}")

@@ -1,0 +1,221 @@
+import { describe, expect, it } from 'vitest'
+import type { Project } from '../../lib/storage'
+import type { GraphData } from '../../types'
+import {
+  applyDetail,
+  buildScene,
+  collapseGroups,
+  connectedComponents,
+  endpoint,
+  searchMatches,
+  SERVICES,
+  SYSTEM_ID,
+  type SceneLink,
+  type SceneNode,
+} from './scene'
+
+const DATA: GraphData = {
+  nodes: [
+    {
+      id: 'p1',
+      kind: 'paper',
+      name: 'Attention Is All You Need',
+      status: 'verified',
+      first_seen: '2026-01-01T00:00:00Z',
+      val: 9,
+      meta: { source_document_ids: ['doc-1'] },
+    },
+    {
+      id: 'c1',
+      kind: 'concept',
+      name: 'Transformer',
+      status: 'verified',
+      first_seen: '2026-01-02T00:00:00Z',
+      val: 6,
+      meta: {},
+    },
+    {
+      id: 'c2',
+      kind: 'concept',
+      name: 'RAG',
+      status: 'verified',
+      first_seen: '2026-01-03T00:00:00Z',
+      val: 2,
+      meta: {},
+    },
+    {
+      id: 'm1',
+      kind: 'model',
+      name: 'BERT',
+      status: 'pending',
+      first_seen: '2026-01-04T00:00:00Z',
+      val: 1,
+      meta: {},
+    },
+  ],
+  links: [
+    { source: 'p1', target: 'c1', relation: 'mentions', weight: 2, status: 'verified' },
+    { source: 'p1', target: 'c2', relation: 'mentions', weight: 1, status: 'verified' },
+    { source: 'c1', target: 'm1', relation: 'uses', weight: 1, status: 'verified' },
+  ],
+}
+
+const PROJECT: Project = {
+  id: 'prj-1',
+  name: 'Literaturarbeit',
+  description: 'Vergleich RAG-Varianten',
+  chatIds: [],
+  documentIds: ['doc-1'],
+  createdAt: 1_700_000_000_000,
+  updatedAt: 1_700_000_000_000,
+}
+
+describe('buildScene', () => {
+  it('gruppiert nach Typ und ergänzt Kern, Dienste und Projekte', () => {
+    const scene = buildScene(DATA, {
+      theme: 'dark',
+      groupMode: 'kind',
+      showSystem: true,
+      projects: [PROJECT],
+    })
+    const ids = scene.nodes.map((n) => n.id)
+    expect(ids).toContain(SYSTEM_ID)
+    expect(ids).toContain('prj:prj-1')
+    for (const svc of SERVICES) expect(ids).toContain(svc.id)
+    expect(scene.groups.map((g) => g.id)).toEqual(
+      expect.arrayContaining(['system', 'concept', 'paper', 'project', 'service']),
+    )
+    // Systemschichten: Kern innen, Dienste außen.
+    expect(scene.nodes.find((n) => n.id === SYSTEM_ID)?.tier).toBe(0)
+    expect(scene.nodes.find((n) => n.id === 'svc:arxiv')?.tier).toBe(4)
+  })
+
+  it('hängt Projekte über die Quell-Dokumente an echte Knoten', () => {
+    const scene = buildScene(DATA, {
+      theme: 'light',
+      groupMode: 'kind',
+      showSystem: true,
+      projects: [PROJECT],
+    })
+    const link = scene.links.find(
+      (l) => endpoint(l.source) === 'prj:prj-1' && endpoint(l.target) === 'p1',
+    )
+    expect(link?.relation).toBe('referenziert')
+  })
+
+  it('lässt die Systemebenen weg, wenn sie abgeschaltet sind', () => {
+    const scene = buildScene(DATA, { theme: 'dark', groupMode: 'kind', showSystem: false })
+    expect(scene.nodes).toHaveLength(DATA.nodes.length)
+    expect(scene.nodes.some((n) => n.synthetic)).toBe(false)
+  })
+
+  it('bildet im Themenmodus zusammenhängende Cluster mit Konzeptnamen', () => {
+    const scene = buildScene(DATA, { theme: 'dark', groupMode: 'cluster', showSystem: false })
+    const groups = new Set(scene.nodes.map((n) => n.group))
+    // Alle vier Knoten hängen zusammen — ein Cluster, benannt nach dem Konzept.
+    expect(groups.size).toBe(1)
+    expect(scene.groups[0].label).toBe('Transformer')
+  })
+
+  it('führt vereinzelte Inseln als eigene Gruppe', () => {
+    const lonely = { ...DATA.nodes[3], id: 'x1', name: 'Einzelgänger' }
+    const scene = buildScene(
+      { nodes: [...DATA.nodes, lonely], links: DATA.links },
+      { theme: 'dark', groupMode: 'cluster', showSystem: false },
+    )
+    // Zwei Komponenten: der verbundene Kern und der Einzelgänger.
+    expect(scene.groups).toHaveLength(2)
+    const island = scene.groups.find((g) => g.count === 1)
+    expect(island?.label).toBe('Einzelgänger')
+    expect(scene.nodes.find((n) => n.id === 'x1')?.group).toBe(island?.id)
+  })
+})
+
+describe('connectedComponents', () => {
+  const node = (id: string, val: number): SceneNode => ({
+    id,
+    kind: 'concept',
+    name: id,
+    status: 'verified',
+    first_seen: '2026-01-01T00:00:00Z',
+    val,
+    meta: {},
+    group: 'concept',
+    tier: 1,
+  })
+  const link = (source: string, target: string): SceneLink => ({
+    source,
+    target,
+    relation: 'x',
+    weight: 1,
+    status: 'verified',
+  })
+
+  it('trennt Inseln und hält Verbundenes zusammen', () => {
+    const nodes = [node('a', 10), node('a2', 1), node('b', 9), node('b2', 1)]
+    const label = connectedComponents(nodes, [link('a', 'a2'), link('b', 'b2')])
+    expect(label.get('a')).toBe(label.get('a2'))
+    expect(label.get('b')).toBe(label.get('b2'))
+    expect(label.get('a')).not.toBe(label.get('b'))
+  })
+
+  it('ist deterministisch, auch für Einzelknoten', () => {
+    const nodes = [node('a', 10), node('lonely', 1)]
+    const first = connectedComponents(nodes, [])
+    const second = connectedComponents(nodes, [])
+    expect(first.get('lonely')).toBe('lonely')
+    expect([...first.entries()]).toEqual([...second.entries()])
+  })
+})
+
+describe('collapseGroups', () => {
+  it('fasst eine Gruppe zu einem Hub zusammen und legt Kanten um', () => {
+    const scene = buildScene(DATA, { theme: 'dark', groupMode: 'kind', showSystem: false })
+    const collapsed = collapseGroups(scene, new Set(['concept']))
+    const hub = collapsed.nodes.find((n) => n.id === 'hub:concept')
+    expect(hub?.members).toEqual(['c1', 'c2'])
+    expect(hub?.val).toBe(8)
+    expect(collapsed.nodes.some((n) => n.id === 'c1')).toBe(false)
+    // p1→c1 und p1→c2 werden zu einer Kante mit summiertem Gewicht.
+    const merged = collapsed.links.filter(
+      (l) => endpoint(l.source) === 'p1' || endpoint(l.target) === 'p1',
+    )
+    expect(merged).toHaveLength(1)
+    expect(merged[0].weight).toBe(3)
+  })
+
+  it('lässt die Szene unangetastet, wenn nichts kollabiert ist', () => {
+    const scene = buildScene(DATA, { theme: 'dark', groupMode: 'kind', showSystem: false })
+    expect(collapseGroups(scene, new Set())).toBe(scene)
+  })
+})
+
+describe('applyDetail', () => {
+  it('behält bei geringer Tiefe die Köpfe jeder Gruppe', () => {
+    const scene = buildScene(DATA, { theme: 'dark', groupMode: 'kind', showSystem: true })
+    const reduced = applyDetail(scene, 1)
+    const ids = reduced.nodes.map((n) => n.id)
+    expect(ids).toContain(SYSTEM_ID) // Systemknoten bleiben immer
+    expect(ids).toContain('p1')
+    expect(ids).toContain('c1') // stärkster Konzept-Knoten
+    expect(ids).not.toContain('c2')
+    // Kanten ohne beide Endpunkte fallen weg.
+    for (const l of reduced.links) {
+      expect(ids).toContain(endpoint(l.source))
+      expect(ids).toContain(endpoint(l.target))
+    }
+  })
+
+  it('gibt bei voller Tiefe dieselbe Szene zurück', () => {
+    const scene = buildScene(DATA, { theme: 'dark', groupMode: 'kind', showSystem: false })
+    expect(applyDetail(scene, 5)).toBe(scene)
+  })
+})
+
+describe('searchMatches', () => {
+  it('findet Namen unabhängig von Groß-/Kleinschreibung', () => {
+    const scene = buildScene(DATA, { theme: 'dark', groupMode: 'kind', showSystem: false })
+    expect(searchMatches(scene, 'transformer')).toEqual(new Set(['c1']))
+    expect(searchMatches(scene, '  ')).toBeNull()
+  })
+})

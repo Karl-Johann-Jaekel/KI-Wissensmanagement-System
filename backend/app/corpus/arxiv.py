@@ -25,6 +25,21 @@ NS = {"atom": "http://www.w3.org/2005/Atom"}
 USER_AGENT = "ki-wissensmanagement-system/0.1 (delta fetch; contact via repo)"
 POLITE_DELAY_S = 3.0
 
+# Fachgebiete des Korpus (PLAN §4). Ohne diese Klammer liefert
+# sortBy=submittedDate schlicht die neuesten arXiv-Einreichungen aller Disziplinen.
+CORPUS_CATEGORIES = ("cs.AI", "cs.CL", "cs.IR", "cs.LG")
+
+
+def build_search_query(query: str, categories: tuple[str, ...] = CORPUS_CATEGORIES) -> str:
+    """arXiv-Suchausdruck: Phrase in Anführungszeichen UND auf die Fachgebiete begrenzt.
+
+    ``all:retrieval augmented generation`` bindet nur das erste Wort an das Feld und
+    lässt den Rest als lose Terme stehen — zusammen mit der Datumssortierung kommen
+    dann fachfremde Neueinreichungen zurück. Die Phrase muss quotiert werden.
+    """
+    cats = " OR ".join(f"cat:{c}" for c in categories)
+    return f'all:"{query}" AND ({cats})'
+
 
 def _text(el: ET.Element | None) -> str:
     return (el.text or "").strip() if el is not None else ""
@@ -76,7 +91,7 @@ def delta_fetch(
             resp = http.get(
                 ARXIV_API,
                 params={
-                    "search_query": f"all:{query}",
+                    "search_query": build_search_query(query),
                     "sortBy": "submittedDate",
                     "sortOrder": "descending",
                     "max_results": per_query,

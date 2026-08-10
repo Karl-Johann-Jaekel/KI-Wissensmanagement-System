@@ -10,7 +10,6 @@ import {
   type DocumentDetail,
 } from '../api'
 import { useAdminKey } from '../app/AdminKeyContext'
-import SensitivityBadge from '../components/SensitivityBadge'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import Modal from '../components/ui/Modal'
@@ -114,8 +113,9 @@ export default function DocumentPage() {
           )}
         </div>
         <div className="mx-auto mt-1.5 flex max-w-4xl flex-wrap items-center gap-2 text-xs text-muted">
-          <Badge tone={doc.source_type === 'markdown' ? 'sky' : 'neutral'}>{doc.source_type}</Badge>
-          <SensitivityBadge value={doc.sensitivity} />
+          <Badge tone={doc.source_type === 'markdown' ? 'violet' : 'neutral'}>
+            {doc.source_type}
+          </Badge>
           <span>{doc.chunks} Chunks</span>
           {doc.content_source === 'reassembled' && (
             <span title="Alt-Dokument ohne gespeichertes Markdown — Ansicht aus Chunks zusammengesetzt">

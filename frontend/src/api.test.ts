@@ -22,13 +22,13 @@ describe('handleSseEvent', () => {
     expect(h.tokens.join('')).toBe('Hallo Welt')
   })
 
-  it('dispatches sources with zone and model', () => {
+  it('dispatches sources with the answering model', () => {
     const h = makeHandlers()
     handleSseEvent(
-      'data: {"type":"sources","zone":"public","model":"qwen3:8b","sources":[{"title":"RAG"}]}',
+      'data: {"type":"sources","model":"mistral-medium-latest","sources":[{"title":"RAG"}]}',
       h,
     )
-    expect(h.onSources).toHaveBeenCalledWith([{ title: 'RAG' }], 'public', 'qwen3:8b')
+    expect(h.onSources).toHaveBeenCalledWith([{ title: 'RAG' }], 'mistral-medium-latest')
   })
 
   it('signals DONE', () => {

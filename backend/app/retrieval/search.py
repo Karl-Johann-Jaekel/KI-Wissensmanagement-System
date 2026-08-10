@@ -27,7 +27,6 @@ class SearchHit:
     document_id: str
     title: str
     uri: str | None
-    sensitivity: str
     content: str
     heading: str | None = None
     scores: dict = field(default_factory=dict)
@@ -51,15 +50,14 @@ def hybrid_search(
     *,
     top_k: int = 5,
     candidate_k: int = 30,
-    max_sensitivity: str = "public",
     rerank: bool | None = None,
     embed_fn: EmbedQuery = embed_query,
 ) -> list[SearchHit]:
     settings = get_settings()
     q_emb = embed_fn(query)
 
-    vec = vector_search(session, q_emb, top_k=candidate_k, max_sensitivity=max_sensitivity)
-    kw = keyword_search(session, query, top_k=candidate_k, max_sensitivity=max_sensitivity)
+    vec = vector_search(session, q_emb, top_k=candidate_k)
+    kw = keyword_search(session, query, top_k=candidate_k)
     vec_scores, kw_scores = dict(vec), dict(kw)
 
     fused = reciprocal_rank_fusion([[i for i, _ in vec], [i for i, _ in kw]])
@@ -86,7 +84,6 @@ def hybrid_search(
                 document_id=str(doc.id),
                 title=doc.title,
                 uri=doc.uri,
-                sensitivity=doc.sensitivity,
                 content=chunk.content,
                 heading=(chunk.meta or {}).get("heading"),
                 scores={

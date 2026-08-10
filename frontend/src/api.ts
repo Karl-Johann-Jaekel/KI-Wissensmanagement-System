@@ -21,7 +21,6 @@ export interface ChatSource {
   uri?: string | null
   section?: string | null
   chunk_id?: string
-  sensitivity?: string
   preview?: string
   repo?: string
   url?: string
@@ -29,7 +28,7 @@ export interface ChatSource {
 
 export interface StreamHandlers {
   onToken: (text: string) => void
-  onSources: (sources: ChatSource[], zone?: string, model?: string) => void
+  onSources: (sources: ChatSource[], model?: string) => void
   onDone: () => void
   onError: (message: string) => void
 }
@@ -48,12 +47,11 @@ export function handleSseEvent(event: string, handlers: StreamHandlers): boolean
       type?: string
       text?: string
       sources?: ChatSource[]
-      zone?: string
       model?: string
     }
     if (obj.type === 'token' && obj.text) handlers.onToken(obj.text)
     else if (obj.type === 'sources' && obj.sources)
-      handlers.onSources(obj.sources, obj.zone, obj.model)
+      handlers.onSources(obj.sources, obj.model)
   } catch {
     // ignore malformed event
   }
@@ -110,7 +108,6 @@ export interface DocumentRow {
   id: string
   title: string
   source_type: string
-  sensitivity: string
   lang: string
   uri: string | null
   chunks: number
@@ -128,7 +125,6 @@ export interface DocumentDetail {
   id: string
   title: string
   source_type: string
-  sensitivity: string
   lang: string
   uri: string | null
   meta: Record<string, unknown>
@@ -150,11 +146,10 @@ export async function fetchDocument(id: string, apiKey?: string | null): Promise
 /** Upload a PDF or Markdown file (raw bytes, admin-only). */
 export async function uploadDocument(
   file: File,
-  sensitivity: string,
   apiKey: string,
 ): Promise<{ filename: string; status: string; chunks: number }> {
   const isMarkdown = file.name.toLowerCase().endsWith('.md')
-  const params = new URLSearchParams({ filename: file.name, sensitivity })
+  const params = new URLSearchParams({ filename: file.name })
   const res = await fetch(`${BASE}/ingest?${params}`, {
     method: 'POST',
     headers: {
@@ -195,20 +190,6 @@ export async function deleteDocument(id: string, apiKey: string): Promise<void> 
   if (!res.ok) throw new Error(`Löschen fehlgeschlagen (HTTP ${res.status})`)
 }
 
-// ---------------------------------------------------------------- models
-
-export interface ModelsInfo {
-  available: boolean
-  default: string
-  models: { name: string; parameter_size?: string | null; size?: number | null }[]
-}
-
-export async function fetchModels(apiKey: string): Promise<ModelsInfo> {
-  const res = await fetch(`${BASE}/models`, { headers: { 'X-API-Key': apiKey } })
-  if (!res.ok) throw new Error(`models: HTTP ${res.status}`)
-  return (await res.json()) as ModelsInfo
-}
-
 // ---------------------------------------------------------------- search
 
 export interface SearchHitRow {
@@ -216,14 +197,13 @@ export interface SearchHitRow {
   document_id: string
   title: string
   uri: string | null
-  sensitivity: string
   content: string
   scores: Record<string, number | null>
 }
 
 export async function postSearch(
   query: string,
-  options: { topK?: number; maxSensitivity?: string; rerank?: boolean | null } = {},
+  options: { topK?: number; rerank?: boolean | null } = {},
   apiKey?: string | null,
 ): Promise<SearchHitRow[]> {
   const res = await fetch(`${BASE}/search`, {
@@ -235,7 +215,6 @@ export async function postSearch(
     body: JSON.stringify({
       query,
       top_k: options.topK ?? 5,
-      max_sensitivity: options.maxSensitivity ?? 'public',
       rerank: options.rerank ?? null,
     }),
   })
@@ -283,4 +262,26 @@ export async function reviewNode(
     headers: { 'X-API-Key': apiKey },
   })
   if (!res.ok) throw new Error(`review ${action}: HTTP ${res.status}`)
+}
+
+export interface BulkReviewResult {
+  action: 'verify' | 'reject'
+  processed: number
+  edges_verified: number
+  not_found: string[]
+}
+
+/** Sammelfreigabe: mehrere pending-Fakten in einem Aufruf. */
+export async function reviewBulk(
+  ids: string[],
+  action: 'verify' | 'reject',
+  apiKey: string,
+): Promise<BulkReviewResult> {
+  const res = await fetch(`${BASE}/review/bulk`, {
+    method: 'POST',
+    headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids, action }),
+  })
+  if (!res.ok) throw new Error(`review bulk ${action}: HTTP ${res.status}`)
+  return (await res.json()) as BulkReviewResult
 }

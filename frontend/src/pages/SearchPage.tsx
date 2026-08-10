@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronDown, ChevronUp, MessageSquarePlus, Search as SearchIcon } from 'lucide-react'
 import { postSearch, type SearchHitRow } from '../api'
 import { useAdminKey } from '../app/AdminKeyContext'
-import SensitivityBadge from '../components/SensitivityBadge'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
@@ -54,7 +53,6 @@ function ResultCard({ hit }: { hit: SearchHitRow }) {
         ) : (
           <span className="font-medium text-ink">{hit.title}</span>
         )}
-        <SensitivityBadge value={hit.sensitivity} />
       </div>
       <p className="mt-1.5 line-clamp-3 text-sm text-muted">{hit.content}</p>
       <div className="mt-2 flex items-center gap-3">
@@ -82,7 +80,6 @@ export default function SearchPage() {
   const { adminKey } = useAdminKey()
   const [query, setQuery] = useState('')
   const [topK, setTopK] = useState(5)
-  const [confidential, setConfidential] = useState(false)
   const [rerank, setRerank] = useState(false)
   const [hits, setHits] = useState<SearchHitRow[] | null>(null)
   const [busy, setBusy] = useState(false)
@@ -96,11 +93,7 @@ export default function SearchPage() {
     try {
       const result = await postSearch(
         q,
-        {
-          topK,
-          maxSensitivity: confidential && adminKey ? 'confidential' : 'public',
-          rerank: rerank || null,
-        },
+        { topK, rerank: rerank || null },
         adminKey,
       )
       setHits(result)
@@ -122,7 +115,7 @@ export default function SearchPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && search()}
-            placeholder="Hybrid-Suche im Korpus … (DE/EN)"
+            placeholder="Hybrid-Suche im Neuralen Gedächtnis … (DE/EN)"
             className="text-base sm:text-sm"
             autoFocus
           />
@@ -148,16 +141,6 @@ export default function SearchPage() {
             <input type="checkbox" checked={rerank} onChange={(e) => setRerank(e.target.checked)} />
             Reranker
           </label>
-          {adminKey && (
-            <label className="flex items-center gap-1.5">
-              <input
-                type="checkbox"
-                checked={confidential}
-                onChange={(e) => setConfidential(e.target.checked)}
-              />
-              confidential einbeziehen
-            </label>
-          )}
         </div>
 
         {error && <p className="text-sm text-rose-500">{error}</p>}

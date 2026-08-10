@@ -45,12 +45,7 @@ export default function MessageList({ messages, busy, emptyHint }: MessageListPr
                   <div className="mt-3 border-t border-edge pt-2">
                     <div className="mb-1.5 text-xs font-semibold text-muted">
                       Quellen{' '}
-                      {msg.zone && (
-                        <span className="font-normal">
-                          (Zone: {msg.zone}
-                          {msg.model ? ` · Modell: ${msg.model}` : ''})
-                        </span>
-                      )}
+                      {msg.model && <span className="font-normal">(Modell: {msg.model})</span>}
                     </div>
                     <ul className="flex flex-col gap-1.5">
                       {msg.sources.map((s, j) => (

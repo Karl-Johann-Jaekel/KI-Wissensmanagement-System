@@ -20,15 +20,22 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, attributes
 
 from app.core.security import estimate_tokens
-from app.corpus.aliases import normalize_entity
+from app.corpus.aliases import (
+    canonical_key,
+    is_plausible_entity,
+    normalize_entity,
+    split_entities,
+)
 from app.db.graph import upsert_edge, upsert_node
-from app.db.models import Chunk, Document
+from app.db.models import Chunk, Document, GraphNode
 
 Chat = Callable[[list[dict]], str]
 
 DEFAULT_CONFIDENCE = 0.8
 ENTITY_KINDS = {"concept", "model", "dataset"}
 RELATIONS = {"INTRODUCES", "EVALUATES_ON", "IMPROVES_ON", "RELATED_TO"}
+# So viele bekannte Begriffe bekommt das Modell als Vorschlagsliste zu sehen.
+VOCABULARY_LIMIT = 40
 
 SYSTEM_PROMPT = (
     "You extract structured facts for an AI-research knowledge graph. "
@@ -37,7 +44,7 @@ SYSTEM_PROMPT = (
 
 USER_TEMPLATE = """Paper title: {title}
 Abstract: {abstract}
-
+{vocabulary}
 Extract the paper's key entities and relations. Return JSON with exactly these keys:
 {{
   "concepts": ["short canonical method/idea names"],
@@ -49,7 +56,48 @@ Extract the paper's key entities and relations. Return JSON with exactly these k
       "relation": "INTRODUCES|EVALUATES_ON|IMPROVES_ON|RELATED_TO", "confidence": 0.0-1.0}}
   ]
 }}
-Only include entities actually discussed. Keep names concise. Output JSON only."""
+
+Naming rules — these decide whether the graph connects or fragments:
+- Prefer an established term from the vocabulary above whenever it fits, even if the
+  paper words it differently. Only coin a new name for something genuinely new.
+- Use the field's general terminology ("dense retrieval", "reranking"), not the
+  paper's private label for its own component.
+- One entity per list item. Never pack several into one string.
+- 1-4 words, no sentence fragments, no parenthetical abbreviations, no trailing
+  explanations. Write "knowledge graph", not "knowledge graph (KG)".
+
+Only include entities actually discussed. Output JSON only."""
+
+
+def load_vocabulary(session: Session, limit: int = VOCABULARY_LIMIT) -> dict[tuple[str, str], str]:
+    """Bekannte Entitäten als ``(kind, canonical_key) -> Anzeigename``.
+
+    Dient doppelt: als Vorschlagsliste im Prompt und als Nachschlagewerk beim
+    Speichern, damit eine Schreibvariante auf den bestehenden Knoten zeigt.
+    """
+    rows = session.execute(
+        select(GraphNode.kind, GraphNode.name, GraphNode.status).where(
+            GraphNode.kind.in_(tuple(ENTITY_KINDS)), GraphNode.status != "rejected"
+        )
+    ).all()
+    # Verifizierte zuerst: deren Schreibweise gewinnt bei Kollisionen.
+    rows = sorted(rows, key=lambda r: r.status != "verified")
+    vocab: dict[tuple[str, str], str] = {}
+    for kind, name, _status in rows:
+        key = canonical_key(name)
+        if key:
+            vocab.setdefault((kind, key), name)
+    return dict(list(vocab.items())[: limit * 4])
+
+
+def _vocabulary_block(vocab: dict[tuple[str, str], str], limit: int = VOCABULARY_LIMIT) -> str:
+    names = sorted({name for (kind, _k), name in vocab.items() if kind == "concept"})[:limit]
+    if not names:
+        return ""
+    return "\nEstablished vocabulary (reuse these exact names when they apply):\n" + ", ".join(
+        names
+    )
+
 
 _JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 
@@ -94,16 +142,31 @@ def parse_extraction(text: str) -> ExtractedFacts:
     )
 
 
-def build_messages(title: str, abstract: str) -> list[dict]:
+def build_messages(
+    title: str, abstract: str, vocab: dict[tuple[str, str], str] | None = None
+) -> list[dict]:
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": USER_TEMPLATE.format(title=title, abstract=abstract[:4000])},
+        {
+            "role": "user",
+            "content": USER_TEMPLATE.format(
+                title=title,
+                abstract=abstract[:4000],
+                vocabulary=_vocabulary_block(vocab or {}),
+            ),
+        },
     ]
 
 
-def store_facts(session: Session, doc: Document, facts: ExtractedFacts) -> tuple[int, int]:
+def store_facts(
+    session: Session,
+    doc: Document,
+    facts: ExtractedFacts,
+    vocab: dict[tuple[str, str], str] | None = None,
+) -> tuple[int, int]:
     """Persist extracted facts as pending nodes/edges with provenance. Returns (nodes, edges)."""
     doc_id = str(doc.id)
+    vocab = vocab if vocab is not None else {}
     paper_id = upsert_node(
         session,
         "paper",
@@ -115,13 +178,22 @@ def store_facts(session: Session, doc: Document, facts: ExtractedFacts) -> tuple
     n_nodes = n_edges = 0
 
     def ensure(kind: str, raw: str) -> str | None:
-        name = normalize_entity(raw)
+        """Einen Begriff auf einen Knoten abbilden — vorhandene Schreibweise gewinnt."""
+        if not is_plausible_entity(raw):
+            return None
+        key = canonical_key(raw)
+        if not key:
+            return None
+        # Bekannter Begriff? Dann dessen Anzeigenamen übernehmen statt einen zweiten
+        # Knoten für dieselbe Sache anzulegen.
+        name = vocab.get((kind, key)) or normalize_entity(raw)
         if not name:
             return None
-        key = (kind, name)
-        if key not in node_ids:
-            node_ids[key] = upsert_node(session, kind, name, status="pending")
-        return node_ids[key]
+        vocab.setdefault((kind, key), name)
+        cache_key = (kind, key)
+        if cache_key not in node_ids:
+            node_ids[cache_key] = upsert_node(session, kind, name, status="pending")
+        return node_ids[cache_key]
 
     def link(src: str, tgt: str, relation: str, confidence: float) -> None:
         nonlocal n_edges
@@ -142,11 +214,13 @@ def store_facts(session: Session, doc: Document, facts: ExtractedFacts) -> tuple
         ("model", facts.models, "INTRODUCES"),
         ("dataset", facts.datasets, "EVALUATES_ON"),
     ):
-        for raw in names:
-            nid = ensure(kind, raw)
-            if nid:
-                n_nodes += 1
-                link(paper_id, nid, relation, DEFAULT_CONFIDENCE)
+        for entry in names:
+            # Aufzählungen in einem Feld auftrennen, bevor sie zu einem Knoten werden.
+            for raw in split_entities(entry):
+                nid = ensure(kind, raw)
+                if nid:
+                    n_nodes += 1
+                    link(paper_id, nid, relation, DEFAULT_CONFIDENCE)
 
     # Explicit entity-to-entity relations from the LLM.
     for rel in facts.relations:
@@ -195,6 +269,8 @@ def extract_corpus(
     docs = session.execute(stmt).scalars().all()
     stats = ExtractStats()
     used_tokens = 0
+    # Wächst über den Lauf mit: was Paper 1 benennt, steht Paper 2 zur Verfügung.
+    vocab = load_vocabulary(session)
 
     for doc in docs:
         if not force and (doc.meta or {}).get("facts_extracted"):
@@ -206,7 +282,7 @@ def extract_corpus(
         if not abstract:
             stats.skipped += 1
             continue
-        messages = build_messages(doc.title, abstract)
+        messages = build_messages(doc.title, abstract, vocab)
         used_tokens += estimate_tokens(messages[-1]["content"])
         if used_tokens > token_budget:
             print(f"  token budget {token_budget} reached — stopping")
@@ -217,7 +293,7 @@ def extract_corpus(
             print(f"  ! {doc.title[:50]}: {exc}")
             stats.failed += 1
             continue
-        n_nodes, n_edges = store_facts(session, doc, facts)
+        n_nodes, n_edges = store_facts(session, doc, facts, vocab)
         doc.meta = {**(doc.meta or {}), "facts_extracted": True}
         attributes.flag_modified(doc, "meta")
         session.commit()
