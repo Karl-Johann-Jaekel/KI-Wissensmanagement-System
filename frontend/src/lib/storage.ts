@@ -297,6 +297,17 @@ export function deleteProject(id: string): void {
   if (changed) writeChatIndex(index)
 }
 
+// ------------------------------------------------------------------ graph explorer
+
+/** Einstellungen des Graph-Explorers (Layout, Slider, Panel-Position). */
+export function getGraphPrefs<T>(fallback: T): T {
+  return read<T>('graph.prefs', fallback)
+}
+
+export function setGraphPrefs(value: unknown): boolean {
+  return write('graph.prefs', value)
+}
+
 // ------------------------------------------------------------------ react hooks
 
 function subscribe(cb: () => void): () => void {

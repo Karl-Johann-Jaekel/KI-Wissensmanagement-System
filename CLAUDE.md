@@ -8,7 +8,8 @@ dort abhaken. GitHub-Portfolio-Track wurde entfernt (ADR-0004).
 **Stand:** Phasen 0–9 fertig (56 Papers/6.950 Chunks; Hit@5 0,94; Graph mit 370
 Knoten inkl. Zitations-Hervorhebung; UI/UX-Redesign: Sidebar-App mit Chat-Verläufen,
 Suche, Inbox mit Sammelfreigabe, Wissen inkl. MD-Editor, Skills, Projekte, Landing-
-Page; hell/dunkel, mobile-friendly). Phase 10: Deployment-Werkzeuge fertig
+Page; hell/dunkel, mobile-friendly; Graph-Explorer mit 4 Layouts, ADR-0016).
+Phase 10: Deployment-Werkzeuge fertig
 (Caddy-Prod-Stack, Deploy-Gate, Smoke-Test, Backup + verifizierter Restore) —
 offen ist der Go-Live auf dem EU-VPS.
 

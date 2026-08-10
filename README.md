@@ -69,7 +69,7 @@ Eine React-SPA mit Sidebar-Navigation, hellem und dunklem Theme, mobiltauglich:
 |---|---|
 | **Chat** | Streamende Antworten mit Quellenkarten. Verläufe bleiben im Browser (localStorage), nicht auf dem Server. |
 | **Suche** | Hybrid-Retrieval mit aufklappbaren Scores je Verfahren — sichtbar, warum ein Treffer oben steht. |
-| **Wissen** | Dokumente hochladen (PDF und Markdown), lesen, Markdown direkt im Browser bearbeiten (Speichern indexiert neu). Dazu der Graph. |
+| **Wissen** | Dokumente hochladen (PDF und Markdown), lesen, Markdown direkt im Browser bearbeiten (Speichern indexiert neu). Dazu der Graph-Explorer. |
 | **Inbox** | Review-Queue der unbestätigten Fakten mit Filtern und Sammelfreigabe. |
 | **Skills** | Wiederverwendbare Prompt-Vorlagen, per „/" in den Chat einsetzbar. |
 | **Projekte** | Arbeitsbereiche, die Chats und Dokumente bündeln. |
@@ -77,6 +77,16 @@ Eine React-SPA mit Sidebar-Navigation, hellem und dunklem Theme, mobiltauglich:
 Der Graph zeichnet vielzitierte Grundlagenarbeiten mit einem goldenen Ring aus
 (Zitationszahlen von Semantic Scholar). Die Knotengröße bleibt dem
 Vernetzungsgrad vorbehalten — zwei Signale, zwei visuelle Kanäle.
+
+**Der Graph-Explorer** (ADR-0016) zeigt denselben Bestand in vier Layouts:
+*Cloud* (Kräftesimulation mit getrennten Cluster-Zentren), *Globus* (rotierende
+Kugel mit Tiefenschärfe), *Ring* (Systemkern in der Mitte, außen Wissenswelten
+als Sektoren, dann Projekte und externe Dienste auf Orbits) und *Ebenen* (die
+Systemschichten vertikal gestapelt). Kanten bleiben unsichtbar, bis man einen
+Knoten überfährt; ein verschiebbares Menü trägt Suche, Regler (Knotengröße,
+Cluster-Abstand, Streuung, Detail-Tiefe) und das Kollabieren ganzer Cluster zu
+einem Hub. Ein Klick öffnet die Leseansicht mit dem Volltext des Quell-Dokuments
+direkt neben dem Graphen.
 
 ---
 

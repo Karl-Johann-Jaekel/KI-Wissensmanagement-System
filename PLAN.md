@@ -454,6 +454,11 @@ für den öffentlichen Server ist keine GPU nötig.
 
 Abweichungen vom ursprünglichen Plan, jeweils als ADR begründet:
 
+- **Graph-Explorer** (ADR-0016): vier Layouts (Cloud, Globus, Ring, Ebenen),
+  räumlich getrennte Wissenswelten mit Farbcodierung, Kanten erst bei Hover,
+  verschiebbares Menü mit Suche/Reglern/Kollabieren, Minimap und Leseansicht
+  neben dem Graphen. Themen-Cluster = Zusammenhangskomponenten (der Korpus
+  zerfällt real in ~48 Inseln).
 - **Zwei-Zonen-Architektur entfernt** (ADR-0015). Der Korpus ist vollständig
   öffentlich; die Idee der vertraulichen Zone mit lokalem Modellzwang wird als
   eigenständiges Projekt umgesetzt. Damit entfallen `documents.sensitivity`,
