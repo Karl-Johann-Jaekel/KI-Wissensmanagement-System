@@ -172,37 +172,71 @@ function ringTargets(nodes: SceneNode[], opts: LayoutOptions): Map<string, Targe
   return out
 }
 
-/** Ebenen: die Systemschichten vertikal gestapelt, Fundament unten. */
+/** Maße der Ebenenansicht — der Canvas beschriftet damit Spalten und Reihen. */
+export function layerGeometry(opts: LayoutOptions) {
+  const cell = 8.5 * (0.6 + opts.clusterGap / 26)
+  return {
+    /** Rasterabstand innerhalb einer Spalte. */
+    cell,
+    /** Fußlinie: Spalten stehen darauf, Systemreihen liegen darunter. */
+    baseline: BASE * 0.2,
+    columnGap: cell * 2.6,
+    rowStep: cell * 3.2,
+    /** Abstand der ersten Systemreihe zur Fußlinie. */
+    rowOffset: cell * 7,
+  }
+}
+
+/** Systemreihen von unten nach oben: Fundament, Projekte, Dienste. */
+const LAYER_ROWS = [4, 3, 0] as const
+
+/**
+ * Ebenen: Wissensbereiche als Rasterspalten, unten bündig auf einer Fußlinie —
+ * die Spaltenhöhe zeigt so direkt, wie viel in einem Bereich steckt. Darunter
+ * liegen die Systemschichten als einzelne Reihen (Dienste ▸ Projekte ▸ Kern).
+ */
 function layerTargets(nodes: SceneNode[], opts: LayoutOptions): Map<string, Target> {
   const out = new Map<string, Target>()
-  const height = BASE * 1.4 * (0.6 + opts.clusterGap / 25)
-  const step = height / (TIER_COUNT - 1)
-  const width = BASE * 2.1
-  for (let tier = 0; tier < TIER_COUNT; tier += 1) {
-    const inTier = ordered(nodes.filter((n) => n.tier === tier))
-    if (inTier.length === 0) continue
-    const y = height / 2 - tier * step
-    const groups = byGroup(inTier)
-    const total = inTier.length
-    // Flache Schichten bleiben einreihig; große Schichten wachsen in die Tiefe.
-    const rows = Math.max(1, Math.min(9, Math.ceil(total / 26)))
-    let cursor = -width / 2
-    for (const [, list] of groups) {
-      const bandWidth = (width * list.length) / total
-      const cols = Math.max(1, Math.ceil(list.length / rows))
-      list.forEach((node, i) => {
-        const row = i % rows
-        const col = Math.floor(i / rows)
-        const depth = rows === 1 ? 1 : 1 - (0.45 * row) / (rows - 1)
-        out.set(node.id, {
-          x: cursor + (bandWidth * (col + 0.5)) / cols + jitter(node, i) * 2 * opts.spread,
-          y: y - row * 6 * opts.spread,
-          depth,
-        })
+  const geo = layerGeometry(opts)
+
+  const knowledge = ordered(nodes.filter((n) => n.tier === 1 || n.tier === 2))
+  const columns = [...byGroup(knowledge).entries()].sort(
+    (a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]),
+  )
+  const widthOf = (count: number) => Math.min(9, Math.max(3, Math.ceil(Math.sqrt(count * 0.8))))
+  const totalWidth = columns.reduce(
+    (sum, [, list]) => sum + widthOf(list.length) * geo.cell + geo.columnGap,
+    -geo.columnGap,
+  )
+
+  let cursor = -totalWidth / 2
+  for (const [, list] of columns) {
+    const cols = Math.min(widthOf(list.length), list.length)
+    const columnWidth = cols * geo.cell
+    list.forEach((node, i) => {
+      const col = i % cols
+      const row = Math.floor(i / cols)
+      out.set(node.id, {
+        x: cursor + (col + 0.5) * geo.cell,
+        // Zeile 0 unten: die Spalte wächst nach oben.
+        y: geo.baseline - row * geo.cell,
+        depth: 1,
       })
-      cursor += bandWidth
-    }
+    })
+    cursor += columnWidth + geo.columnGap
   }
+
+  LAYER_ROWS.forEach((tier, index) => {
+    const list = ordered(nodes.filter((n) => n.tier === tier))
+    if (list.length === 0) return
+    const y = geo.baseline + geo.rowOffset + index * geo.rowStep
+    const step = geo.cell * 2.4
+    const width = (list.length - 1) * step
+    list.forEach((node, i) => {
+      out.set(node.id, { x: -width / 2 + i * step, y, depth: 1 })
+    })
+  })
+
   return out
 }
 
@@ -238,12 +272,13 @@ export function tierLabelPositions(
     return geo.orbits.map((radius, i) => ({ tier: 3 + i, x: 0, y: -radius - 12 }))
   }
   if (layout === 'layers') {
-    const height = BASE * 1.4 * (0.6 + opts.clusterGap / 25)
-    const step = height / (TIER_COUNT - 1)
-    return Array.from({ length: TIER_COUNT }, (_, tier) => ({
+    // Nur die Systemreihen tragen links ihren Namen; die Spalten beschriftet
+    // der Canvas an ihrer Fußlinie.
+    const geo = layerGeometry(opts)
+    return LAYER_ROWS.map((tier, index) => ({
       tier,
-      x: -BASE * 1.25,
-      y: height / 2 - tier * step,
+      x: -BASE * 1.3,
+      y: geo.baseline + geo.rowOffset + index * geo.rowStep,
     }))
   }
   return []

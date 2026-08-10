@@ -329,6 +329,11 @@ export default function ControlPanel({
               onChange={(v) => onChange({ motion: v })}
               label="Bewegung"
             />
+            <Toggle
+              checked={settings.glow}
+              onChange={(v) => onChange({ glow: v })}
+              label="Leuchten (dunkles Theme)"
+            />
           </Section>
 
           <Section title="Regler">

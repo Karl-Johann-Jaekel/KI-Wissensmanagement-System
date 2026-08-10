@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { clusterCenters, layoutTargets, ringGeometry, tierLabelPositions } from './layouts'
+import {
+  clusterCenters,
+  layerGeometry,
+  layoutTargets,
+  ringGeometry,
+  tierLabelPositions,
+} from './layouts'
 import { KIND_TIER, type SceneGroup, type SceneKind, type SceneNode } from './scene'
 
 function node(id: string, kind: SceneKind, group: string, val = 1): SceneNode {
@@ -84,17 +90,35 @@ describe('layoutTargets: ring', () => {
 
 describe('layoutTargets: layers', () => {
   const targets = layoutTargets('layers', NODES, OPTS)
+  const geo = layerGeometry(OPTS)
+  const y = (id: string) => targets.get(id)!.y
 
-  it('stapelt die Schichten von unten (Fundament) nach oben (Dienste)', () => {
-    const y = (id: string) => targets.get(id)!.y
-    expect(y('kern')).toBeGreaterThan(y('c1'))
-    expect(y('c1')).toBeGreaterThan(y('p1'))
-    expect(y('p1')).toBeGreaterThan(y('prj'))
-    expect(y('prj')).toBeGreaterThan(y('svc1'))
+  it('stellt die Wissensspalten auf die Fußlinie und lässt sie nach oben wachsen', () => {
+    // Konzepte: zwei Knoten, Spaltenbreite ≥ 3 ⇒ beide in der untersten Reihe.
+    expect(y('c1')).toBeCloseTo(geo.baseline, 5)
+    expect(y('c2')).toBeCloseTo(geo.baseline, 5)
+    const many = Array.from({ length: 12 }, (_, i) => node(`c${i + 10}`, 'concept', 'concept'))
+    const tall = layoutTargets('layers', [...NODES, ...many], OPTS)
+    const top = Math.min(...many.map((n) => tall.get(n.id)!.y))
+    expect(top).toBeLessThan(geo.baseline) // wächst nach oben
   })
 
-  it('beschriftet jede Ebene', () => {
-    expect(tierLabelPositions('layers', OPTS)).toHaveLength(5)
+  it('legt die Systemreihen unter die Fußlinie: Dienste, Projekte, Kern', () => {
+    expect(y('svc1')).toBeGreaterThan(geo.baseline)
+    expect(y('prj')).toBeGreaterThan(y('svc1'))
+    expect(y('kern')).toBeGreaterThan(y('prj'))
+    // Eine Reihe liegt auf einer Höhe.
+    expect(y('svc2')).toBeCloseTo(y('svc1'), 5)
+  })
+
+  it('trennt die Spalten horizontal', () => {
+    const x = (id: string) => targets.get(id)!.x
+    expect(Math.abs(x('c1') - x('p1'))).toBeGreaterThan(geo.cell)
+  })
+
+  it('beschriftet die drei Systemreihen', () => {
+    const labels = tierLabelPositions('layers', OPTS)
+    expect(labels.map((l) => l.tier)).toEqual([4, 3, 0])
   })
 })
 

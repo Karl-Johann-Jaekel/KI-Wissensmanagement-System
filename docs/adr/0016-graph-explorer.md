@@ -40,6 +40,18 @@ Semantic Scholar, Postgres+pgvector, n8n, MCP). Projekte hängen über
 `source_document_ids` an echten Papers, sind also keine Deko. Abschaltbar über
 „Systemebenen".
 
+**Ebenen als Spalten.** Die Ebenenansicht stellt die Wissensbereiche als
+Rasterspalten auf eine gemeinsame Fußlinie — die Spaltenhöhe ist damit selbst die
+Aussage („so viel steckt in diesem Bereich"), ohne dass eine Zahl danebenstehen
+muss. Unter der Fußlinie liegen die Systemschichten als einzelne Reihen
+(Dienste ▸ Projekte ▸ Kern), links beschriftet in der Farbe ihrer Knoten.
+
+**Leuchten.** Auf dunklem Grund bekommen Knoten einen additiven Halo
+(`globalCompositeOperation = 'lighter'`): große Knoten und Hubs einen
+Radialverlauf, das Punktraster nur einen einfachen Kreis mit niedriger Deckkraft
+— ein Gradient je Knoten und Frame wäre bei mehreren hundert Knoten zu teuer. Im
+hellen Theme bleibt es flach, dort trübt Bloom nur. Abschaltbar über „Leuchten".
+
 **Ruhe im Bild.** Kanten sind standardmäßig unsichtbar und erscheinen erst beim
 Überfahren eines Knotens. Zusätzlich verdichten „Detail-Tiefe" (behält die
 bestvernetzten Knoten, Gruppenköpfe immer) und „Kollabieren" (eine Gruppe wird

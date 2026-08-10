@@ -116,7 +116,8 @@ Vernetzungsgrad vorbehalten — zwei Signale, zwei visuelle Kanäle.
 - **Globus** — rotierende Kugel, Tiefe steuert Größe und Deckkraft
 - **Ring** — Systemkern mittig, außen Wissenswelten als Sektoren, dann Projekte
   und externe Dienste auf Orbits
-- **Ebenen** — die Systemschichten vertikal gestapelt
+- **Ebenen** — Wissensbereiche als Rasterspalten auf einer Fußlinie, darunter die
+  Systemschichten als Reihen
 
 Kanten erscheinen erst beim Überfahren eines Knotens; ein verschiebbares Menü
 trägt Suche, Regler (Knotengröße, Cluster-Abstand, Streuung, Detail-Tiefe) und das
