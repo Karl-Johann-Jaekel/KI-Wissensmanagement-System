@@ -419,9 +419,15 @@ Lizenz- und DSGVO-Leitplanken für alle Schritte:
       passt auf die `to_md`-Naht der Ingest-Pipeline — ADR-0019.
       **Live geprüft:** RAG-Paper 41 Sektionen / 69 Referenzen (69 mit Titel,
       68 mit Jahr, 21 mit DOI), ~40 s je Paper auf CPU
-- [ ] **11.5 Provenienz-Schema:** Migration für `document_sources` und
-      `entities_extracted`, Autor:innen-Entitäten ohne E-Mail-Felder,
-      Konflikt-Flags
+- [x] **11.5 Provenienz-Schema:** Migration `0005` — `document_sources`,
+      `authors` (+ `document_authors`), `entities_extracted`; eine Zeile **je
+      Beleg** statt eines JSONB-Felds je Aussage. Kontaktdaten per CHECK verboten,
+      Autor:innen-Identität je Quellsystem (keine Personenprofile über Quellen
+      hinweg), Konflikt-Flags bleiben gesetzt. Schreibwege: PwC-Import,
+      LLM-Extraktion, Harvester-`DbSink`; `scripts/backfill_provenance.py` trägt
+      den Bestand nach — ADR-0020.
+      **Live:** 37.197 Belege nachgetragen, Knoten ohne Beleg 12.461 → 141;
+      13 Knoten von beiden Extraktoren getragen (vorher still überschrieben)
 - [ ] **11.6 Multilingual-Embeddings:** BGE-M3 vs. mBERT vs. LaBSE gegen deutsche
       Fragen auf englischem Korpus; Eval-Report
 - **DoD:** Fremdquellen sind importierbar, im Graphen als solche erkennbar und

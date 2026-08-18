@@ -38,10 +38,13 @@ from sqlalchemy.orm import Session
 from app.corpus.aliases import canonical_key, is_plausible_entity, normalize_entity
 from app.db.graph import upsert_edge, upsert_node
 from app.db.models import GraphNode
+from app.db.provenance import Claim, record_authors, record_extraction, record_source
 
 PWC_SOURCE = "paperswithcode"
 PWC_LICENSE = "CC-BY-SA-4.0"
 PWC_ARCHIVE = "https://github.com/paperswithcode/paperswithcode-data"
+#: Kennung dieses Schreibwegs in ``entities_extracted`` — regelbasiert, kein LLM.
+EXTRACTOR = "rule:paperswithcode"
 
 DUMP_STEMS = {
     "papers": "papers-with-abstracts",
@@ -465,10 +468,26 @@ def load_vocabulary(session: Session) -> dict[tuple[str, str], str]:
 
 
 def write_graph(session: Session, graph: PwcGraph, *, status: str = "verified") -> PwcStats:
-    """Knoten/Kanten idempotent schreiben (``app.db.graph``-Upserts, kein Overwrite)."""
+    """Knoten/Kanten idempotent schreiben (``app.db.graph``-Upserts, kein Overwrite).
+
+    Zusätzlich zum Graphen entsteht je Aussage eine Zeile in ``entities_extracted``
+    (ADR-0020). Das behebt die in ADR-0017 notierte Grenze: Trifft der Import auf
+    einen Knoten, den schon die eigene Extraktion angelegt hat, steht danach
+    **beides** als Beleg da statt einer die andere zu überschreiben.
+    """
     vocab = load_vocabulary(session)
     ids: dict[NodeKey, str] = {}
     stats = PwcStats(papers=len(graph.papers))
+
+    source_row = record_source(
+        session,
+        source_system=PWC_SOURCE,
+        source_id="dump",
+        fetched_by=EXTRACTOR,
+        source_url=PWC_ARCHIVE,
+        license=PWC_LICENSE,
+        title="Papers-with-Code-Dump",
+    )
 
     for (kind, name), meta in graph.nodes.items():
         display = name
@@ -477,7 +496,15 @@ def write_graph(session: Session, graph: PwcGraph, *, status: str = "verified") 
             display = vocab.get((kind, key), name)
             if key:
                 vocab.setdefault((kind, key), display)
-        ids[(kind, name)] = upsert_node(session, kind, display, meta, status=status)
+        node_id = upsert_node(session, kind, display, meta, status=status)
+        ids[(kind, name)] = node_id
+        record_extraction(
+            session,
+            Claim(node_id=node_id),
+            extractor=EXTRACTOR,
+            source_id=source_row,
+            meta={"kind": kind, "dump_name": name},
+        )
         stats.nodes += 1
 
     for (source, target, relation), payload in graph.edges.items():
@@ -493,7 +520,21 @@ def write_graph(session: Session, graph: PwcGraph, *, status: str = "verified") 
             meta=payload["meta"],
             status=status,
         )
+        record_extraction(
+            session,
+            Claim(edge=(src, dst, relation)),
+            extractor=EXTRACTOR,
+            source_id=source_row,
+        )
         stats.edges += 1
+
+    # Autor:innen als eigene Zeilen — ohne Kontaktfelder, Identität je Quellsystem.
+    for entry in graph.papers:
+        record_authors(
+            session,
+            [_clean(a) for a in (entry.get("authors") or [])][:20],
+            source_system=PWC_SOURCE,
+        )
 
     session.commit()
     return stats

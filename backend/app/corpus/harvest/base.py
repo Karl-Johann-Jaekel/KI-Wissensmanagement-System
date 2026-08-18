@@ -344,6 +344,7 @@ class JsonlSink:
 
 
 __all__ = [
+    "DbSink",
     "Deduper",
     "HarvestError",
     "HarvestRecord",
@@ -361,3 +362,55 @@ __all__ = [
     "title_key",
     "utc_now",
 ]
+
+
+class DbSink:
+    """Geerntete Datensätze nach ``document_sources`` schreiben (ADR-0020).
+
+    Die in ADR-0018 angekündigte Naht: Der Harvester weiß weiterhin nichts von der
+    Datenbank, er ruft eine Senke. Ein Dokument gibt es zu diesem Zeitpunkt noch
+    nicht — ``document_id`` bleibt NULL, bis das PDF geholt und ingestiert ist.
+    """
+
+    def __init__(self, session: Any, *, commit_every: int = 200) -> None:
+        self.session = session
+        self.commit_every = commit_every
+        self.written = 0
+
+    def __call__(self, record: HarvestRecord) -> None:
+        from app.db.provenance import record_authors, record_source
+
+        source_id = record_source(
+            self.session,
+            source_system=record.source,
+            source_id=record.source_id,
+            fetched_by=record.fetched_by,
+            source_url=record.source_url,
+            license=(record.extra or {}).get("license"),
+            doi=record.doi,
+            title=record.title,
+            title_key=record.title_key,
+            fetched_at=record.fetched_at,
+            meta={
+                "published": record.published,
+                "updated": record.updated,
+                "categories": record.categories,
+                # Abstract bleibt invertiert — der Rohtext existiert hier nirgends.
+                "abstract_index": record.abstract_index,
+                **{k: v for k, v in (record.extra or {}).items() if k != "license"},
+            },
+        )
+        record_authors(self.session, record.authors, source_system=record.source)
+        self.written += 1
+        if self.written % self.commit_every == 0:
+            self.session.commit()
+        _ = source_id
+
+    def close(self) -> None:
+        self.session.commit()
+
+    def __enter__(self) -> DbSink:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()

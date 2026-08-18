@@ -17,6 +17,7 @@ from sqlalchemy import (
     CheckConstraint,
     Computed,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     PrimaryKeyConstraint,
@@ -164,12 +165,147 @@ class GraphEdge(Base):
     )
 
 
+# ------------------------------------------------------------------ Provenienz
+# Vier Tabellen, die Herkunft aus JSONB in Zeilen holen (Migration 0005, ADR-0020).
+# Warum überhaupt: In JSONB trägt eine Aussage genau eine Quelle — belegen zwei
+# Quellen dieselbe Aussage, überschreibt der Upsert die eine mit der anderen.
+
+
+class DocumentSource(Base):
+    """Woher ein Dokument stammt. Mehrere Quellen je Dokument sind der Normalfall.
+
+    ``document_id`` darf NULL sein: Der Harvester kennt einen Datensatz, lange bevor
+    ein PDF geholt und ein Dokument angelegt ist (ADR-0018).
+    """
+
+    __tablename__ = "document_sources"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    document_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE")
+    )
+    source_system: Mapped[str] = mapped_column(Text, nullable=False)
+    source_id: Mapped[str] = mapped_column(Text, nullable=False)
+    source_url: Mapped[str | None] = mapped_column(Text)
+    license: Mapped[str | None] = mapped_column(Text)
+    doi: Mapped[str | None] = mapped_column(Text)
+    title: Mapped[str | None] = mapped_column(Text)
+    title_key: Mapped[str | None] = mapped_column(Text)
+    fetched_at: Mapped[dt.datetime] = mapped_column(nullable=False, server_default=text("now()"))
+    fetched_by: Mapped[str] = mapped_column(Text, nullable=False)
+    meta: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'"))
+
+    __table_args__ = (
+        UniqueConstraint("source_system", "source_id", name="uq_document_sources_system_id"),
+        Index("idx_document_sources_doi", "doi"),
+        Index("idx_document_sources_title_key", "title_key"),
+    )
+
+
+class Author(Base):
+    """Autor:in als eigene Zeile — ohne jedes Kontaktfeld.
+
+    Identität gilt **je Quellsystem**, nicht global: „P. Lewis" aus arXiv mit
+    „Patrick Lewis" aus OpenReview zu verschmelzen wäre genau die
+    Cross-Source-Anreicherung auf Personenebene, die dieses Projekt nicht betreibt.
+    Die DB erzwingt das Verbot per CHECK, nicht die Anwendung.
+    """
+
+    __tablename__ = "authors"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    source_system: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    name_key: Mapped[str] = mapped_column(Text, nullable=False)
+    first_seen: Mapped[dt.datetime] = mapped_column(nullable=False, server_default=text("now()"))
+    meta: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'"))
+
+    __table_args__ = (
+        UniqueConstraint("source_system", "name_key", name="uq_authors_system_key"),
+        CheckConstraint("position('@' in name) = 0", name="ck_authors_no_email_in_name"),
+        CheckConstraint(
+            "NOT (meta ?| ARRAY['email','emails','e_mail','mail','contact','phone'])",
+            name="ck_authors_no_contact_meta",
+        ),
+    )
+
+
+class DocumentAuthor(Base):
+    __tablename__ = "document_authors"
+
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE")
+    )
+    author_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("authors.id", ondelete="CASCADE")
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+
+    __table_args__ = (PrimaryKeyConstraint("document_id", "author_id"),)
+
+
+class EntityExtraction(Base):
+    """Ein Beleg: Diese Aussage stammt aus dieser Quelle, von diesem Extraktor.
+
+    Eine Zeile je Beleg — dieselbe Aussage aus zwei Quellen ergibt zwei Zeilen.
+    Zeigt entweder auf einen Knoten oder auf eine Kante (CHECK erzwingt das).
+    """
+
+    __tablename__ = "entities_extracted"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    node_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("graph_nodes.id", ondelete="CASCADE")
+    )
+    edge_source: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    edge_target: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    edge_relation: Mapped[str | None] = mapped_column(Text)
+    document_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE")
+    )
+    source_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("document_sources.id", ondelete="SET NULL")
+    )
+    extractor: Mapped[str] = mapped_column(Text, nullable=False)
+    confidence: Mapped[float | None] = mapped_column()
+    conflict: Mapped[bool] = mapped_column(nullable=False, server_default=text("FALSE"))
+    conflict_reason: Mapped[str | None] = mapped_column(Text)
+    extracted_at: Mapped[dt.datetime] = mapped_column(nullable=False, server_default=text("now()"))
+    meta: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'"))
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["edge_source", "edge_target", "edge_relation"],
+            ["graph_edges.source", "graph_edges.target", "graph_edges.relation"],
+            ondelete="CASCADE",
+            name="fk_entities_extracted_edge",
+        ),
+        CheckConstraint(
+            "node_id IS NOT NULL OR (edge_source IS NOT NULL AND edge_target IS NOT NULL "
+            "AND edge_relation IS NOT NULL)",
+            name="ck_entities_extracted_target",
+        ),
+        Index("idx_entities_extracted_node", "node_id"),
+        Index("idx_entities_extracted_edge", "edge_source", "edge_target", "edge_relation"),
+    )
+
+
 __all__ = [
     "Base",
     "Document",
     "Chunk",
     "GraphNode",
     "GraphEdge",
+    "DocumentSource",
+    "Author",
+    "DocumentAuthor",
+    "EntityExtraction",
     "NODE_KINDS",
     "EDGE_RELATIONS",
     "STATUSES",
