@@ -413,8 +413,12 @@ Lizenz- und DSGVO-Leitplanken für alle Schritte:
       **Live geprüft:** arXiv 25 Datensätze/6 s, zweiter Lauf 25 Dubletten erkannt.
       OpenReview braucht seit 2026 ein Konto (Browser-Challenge), Pfad daher nur
       gegen Mocks geprüft
-- [ ] **11.4 GROBID:** Docker-Service + Pipeline PDF → TEI-XML → Struktur
-      (Titel, Autoren, Sektionen, Referenzen)
+- [x] **11.4 GROBID:** Compose-Profil `grobid` (CRF-Image, 0,5 GB statt 14,8 GB)
+      + `app/ingestion/grobid.py`: PDF → TEI-XML → Titel, Autor:innen, Sektionen,
+      Referenzen (Titel/Jahr/DOI/Autor:innen als Felder); `markdown_from_pdf`
+      passt auf die `to_md`-Naht der Ingest-Pipeline — ADR-0019.
+      **Live geprüft:** RAG-Paper 41 Sektionen / 69 Referenzen (69 mit Titel,
+      68 mit Jahr, 21 mit DOI), ~40 s je Paper auf CPU
 - [ ] **11.5 Provenienz-Schema:** Migration für `document_sources` und
       `entities_extracted`, Autor:innen-Entitäten ohne E-Mail-Felder,
       Konflikt-Flags

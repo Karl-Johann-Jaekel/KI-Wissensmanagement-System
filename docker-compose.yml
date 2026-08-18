@@ -62,6 +62,23 @@ services:
     volumes:
       - ollama_data:/root/.ollama
 
+  # --- profile: grobid (Referenz-Parsing, Phase 11.4 — ADR-0019) ---
+  # Bewusst das CRF-Image (0,5 GB): die Deep-Learning-Variante wiegt 14,8 GB und
+  # braucht eine GPU, um schneller zu sein als die CRF-Modelle. Opt-in, weil der
+  # Dienst rund 3 GB RAM belegt und der Ingest ihn nicht zwingend braucht.
+  grobid:
+    image: grobid/grobid:0.9.1-crf
+    profiles: ["grobid"]
+    restart: unless-stopped
+    ports:
+      - "${GROBID_HOST_PORT:-8070}:8070"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8070/api/isalive || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
   # --- profile: full (frontend available from Phase 2, n8n from Phase 7) ---
   frontend:
     build:
