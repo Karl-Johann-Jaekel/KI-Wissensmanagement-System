@@ -99,6 +99,48 @@ def ingest_file(
     return "added", len(specs)
 
 
+def ingest_text(
+    session: Session,
+    *,
+    title: str,
+    text: str,
+    uri: str | None = None,
+    source_type: str = "markdown",
+    lang: str = "english",
+    meta: dict | None = None,
+    embed_fn: EmbedFn = embed_texts,
+) -> tuple[str, int]:
+    """Ingest Markdown that already sits in memory. Returns (status, n_chunks).
+
+    Same contract as ``ingest_file`` — idempotent over the content hash — for callers
+    whose text never was a file (abstracts from a dump, harvested records).
+    """
+    content_hash = content_hash_bytes(text.encode("utf-8"))
+    if document_exists(session, content_hash):
+        return "skipped", 0
+
+    specs = chunk_markdown(text)
+    if not specs:
+        return "empty", 0
+
+    settings = get_settings()
+    vectors = _embed_checked(specs, embed_fn)
+    doc = Document(
+        source_type=source_type,
+        title=title,
+        uri=uri,
+        content_hash=content_hash,
+        lang=lang,
+        content_md=text,
+        meta=meta or {},
+    )
+    session.add(doc)
+    session.flush()
+    _add_chunks(session, doc, specs, vectors, lang, settings.embed_model)
+    session.commit()
+    return "added", len(specs)
+
+
 def ingest_markdown(
     session: Session,
     md_path: Path,
@@ -107,36 +149,20 @@ def ingest_markdown(
     embed_fn: EmbedFn = embed_texts,
 ) -> tuple[str, int]:
     """Ingest one Markdown file (no Docling). Returns (status, n_chunks)."""
-    raw = md_path.read_bytes()
-    content_hash = content_hash_bytes(raw)
-    if document_exists(session, content_hash):
-        return "skipped", 0
-
-    text = raw.decode("utf-8")
-    specs = chunk_markdown(text)
-    if not specs:
-        return "empty", 0
-
-    settings = get_settings()
-    vectors = _embed_checked(specs, embed_fn)
-    doc_lang = lang or "english"
+    text = md_path.read_bytes().decode("utf-8")
     title = next(
         (line.lstrip("# ").strip() for line in text.splitlines() if line.startswith("# ")),
         md_path.stem,
     )
-    doc = Document(
-        source_type="markdown",
+    return ingest_text(
+        session,
         title=title,
+        text=text,
         uri=str(md_path),
-        content_hash=content_hash,
-        lang=doc_lang,
-        content_md=text,
+        source_type="markdown",
+        lang=lang or "english",
+        embed_fn=embed_fn,
     )
-    session.add(doc)
-    session.flush()
-    _add_chunks(session, doc, specs, vectors, doc_lang, settings.embed_model)
-    session.commit()
-    return "added", len(specs)
 
 
 def reingest_document(

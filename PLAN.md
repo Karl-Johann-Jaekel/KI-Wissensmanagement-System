@@ -371,6 +371,50 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
 - **DoD:** Wissens-Graph und Chat live unter eigener Domain;
   Deploy-Gate grün; Backup-Restore verifiziert.
 
+### Phase 11 — Fremdquellen & Provenienz  *(v6: Ausbau zur Wissensdatenbank)*
+
+Ausgangslage: Es gibt keine etablierte globale Wissensdatenbank zur KI-Forschung,
+die Souveränität **und** Provenienz **und** rekursive Updates abdeckt. Vier
+Teillandschaften existieren — bibliografische Substrate (OpenAlex, Semantic
+Scholar, Crossref), semantische aber schmale Systeme (ORKG, AI-KG), fragmentierte
+KI-Werkzeuge (Epoch AI, AI Index) und eingestellte Vorgänger (Microsoft Academic
+Graph, Papers with Code). Differenzierung dieses Systems ist **nicht Abdeckung**
+(dagegen verliert man gegen OpenAlex), sondern Souveränität, DSGVO-Konformität,
+Konfliktmarkierung im Update-Loop, deutschsprachiger Zugriff auf englischen
+Korpus und Tiefe in ausgewählten Teilgebieten.
+
+Lizenz- und DSGVO-Leitplanken für alle Schritte:
+- Volltext-Chunks nur aus CC-lizenzierten Quellen (ACL Anthology, CC-arXiv).
+- Abstracts aus arXiv/OpenReview/Semantic Scholar nur als invertierter Index,
+  nicht als Rohtext. (Papers with Code ist CC-BY-SA — dort sind Abstracts erlaubt.)
+- Keine E-Mail-Adressen harvesten, keine Cross-Source-Anreicherung auf
+  Autor:innen-Ebene.
+- `fetched_at`, `fetched_by`, `source_url` an jedem Datensatz — Grundlage für
+  spätere Löschanfragen.
+- Repo öffentlich: Code, Konfiguration, ID-Manifeste. Volltexte und Chunk-Tabellen
+  bleiben lokal.
+
+- [x] **11.1 Papers-with-Code-Adapter:** Dump (JSON/JSON.gz) → Papers, Code-Repos,
+      Datensätze, Tasks, Modelle; Kanten `IMPLEMENTS`, `USES_DATASET`,
+      `ACHIEVES_SOTA` (+ `RELATED_TO`, `USES`, `INTRODUCES`). Migration `0004`
+      erweitert die CHECKs; `--limit`/`--match` schneiden die Teilmenge zu;
+      `--ingest-abstracts` schreibt nach pgvector — ADR-0017
+- [ ] **11.2 Graph-Visualisierung der Fremdquelle:** neue Knotenarten und
+      Quellenfilter im bestehenden Force-Graph-Explorer
+- [ ] **11.3 Harvester-Grundgerüst:** arXiv (OAI-PMH, Delta über `updated_date`)
+      und OpenReview API v2 — Rate-Limiting, Backoff, Dedupe (DOI + Titel-Hash),
+      Fehlerbehandlung, inkrementeller Zustand
+- [ ] **11.4 GROBID:** Docker-Service + Pipeline PDF → TEI-XML → Struktur
+      (Titel, Autoren, Sektionen, Referenzen)
+- [ ] **11.5 Provenienz-Schema:** Migration für `document_sources` und
+      `entities_extracted`, Autor:innen-Entitäten ohne E-Mail-Felder,
+      Konflikt-Flags
+- [ ] **11.6 Multilingual-Embeddings:** BGE-M3 vs. mBERT vs. LaBSE gegen deutsche
+      Fragen auf englischem Korpus; Eval-Report
+- **DoD:** Fremdquellen sind importierbar, im Graphen als solche erkennbar und
+  vollständig mit Provenienz belegt; Harvester laufen inkrementell; Eval-Report
+  liegt vor.
+
 ---
 
 ## 8. Änderungsprotokoll

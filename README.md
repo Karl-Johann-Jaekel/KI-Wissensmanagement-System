@@ -91,6 +91,30 @@ Ohne API-Schlüssel läuft alles gegen ein lokales Ollama-Modell weiter — lang
 und die Wahl muss **vor** dem Indexieren fallen: Index und Query brauchen dasselbe
 Embedding-Modell (ADR-0002), ein Wechsel erzwingt `scripts/reindex.py`.
 
+### Kaltstart des Graphen: Papers-with-Code-Dump
+
+Der Graph wächst sonst Paper für Paper aus der LLM-Extraktion. Wer ihn sofort
+gefüllt sehen will, importiert das CC-BY-SA-Archiv von
+[Papers with Code](https://github.com/paperswithcode/paperswithcode-data)
+(Dienst Mitte 2025 abgeschaltet, Dump bleibt verfügbar). Die vier Dateien
+`papers-with-abstracts`, `links-between-papers-and-code`, `evaluation-tables`
+und `datasets` (`.json` oder `.json.gz`) nach `data/pwc/` legen, dann:
+
+```bash
+# Teilmenge zum Thema des Korpus, nur Graph (kein Embedding-Aufwand)
+docker compose exec backend python -m app.corpus.pwc \
+    --dump data/pwc --limit 5000 --match "retrieval|rag|agent|reranking"
+
+docker compose exec backend python -m app.corpus.pwc --dump data/pwc --dry-run  # nur zählen
+```
+
+Der Import ist idempotent und regelbasiert, die Fakten sind deshalb direkt
+`verified`; jeder Knoten trägt `meta.provenance` mit Quelle, URL, Zeitpunkt und
+Lizenz (ADR-0017). `--ingest-abstracts` legt zusätzlich die Abstracts als
+Dokumente in pgvector ab — erlaubt, weil der Dump CC-BY-SA steht. Im Graphen
+trennt `GET /graph?source=paperswithcode|native` die Fremdquelle vom eigenen
+Bestand.
+
 ---
 
 ## Die Oberfläche

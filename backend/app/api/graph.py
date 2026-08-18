@@ -21,13 +21,23 @@ from app.db.session import get_db
 
 router = APIRouter(tags=["graph"])
 
-KNOWLEDGE_KINDS = ("paper", "concept", "model", "dataset")
+# ``repo``/``task`` kommen aus dem Papers-with-Code-Import (ADR-0017).
+KNOWLEDGE_KINDS = ("paper", "concept", "model", "dataset", "task", "repo")
+
+#: Obergrenze der ausgelieferten Knoten. Der PwC-Dump kann den Graphen auf
+#: Zehntausende Knoten heben; ungebremst friert das die Force-Simulation ein.
+DEFAULT_NODE_LIMIT = 2000
 
 
 @router.get("/graph")
 def get_graph(
     request: Request,
     include_pending: bool = Query(default=False, description="also return pending facts"),
+    source: str | None = Query(
+        default=None,
+        description="filter by meta.provenance.source, e.g. paperswithcode; 'native' = ohne",
+    ),
+    limit: int = Query(default=DEFAULT_NODE_LIMIT, ge=1, le=20000),
     db: Session = Depends(get_db),
 ) -> dict[str, list[dict]]:
     if include_pending:
@@ -36,6 +46,9 @@ def get_graph(
     node_q = select(GraphNode).where(GraphNode.kind.in_(KNOWLEDGE_KINDS))
     if not include_pending:
         node_q = node_q.where(GraphNode.status == "verified")
+    if source:
+        provenance = GraphNode.meta["provenance"]["source"].astext
+        node_q = node_q.where(provenance.is_(None) if source == "native" else provenance == source)
     nodes = db.execute(node_q).scalars().all()
     node_ids = {n.id for n in nodes}
 
@@ -48,6 +61,12 @@ def get_graph(
     for e in edges:
         val[str(e.source)] += e.weight
         val[str(e.target)] += e.weight
+
+    if len(nodes) > limit:
+        # Die bestvernetzten Knoten tragen die Struktur; der Rest fällt weg.
+        nodes = sorted(nodes, key=lambda n: (-val.get(str(n.id), 0.0), n.name))[:limit]
+        node_ids = {n.id for n in nodes}
+        edges = [e for e in edges if e.source in node_ids and e.target in node_ids]
 
     landmark_min = get_settings().citation_landmark_min
 

@@ -33,7 +33,18 @@ from app.db.base import Base
 EMBED_DIM = get_settings().embed_dim
 
 # Allowed enum-like values (kept in Python to validate before insert; DB enforces too).
-NODE_KINDS = ("repo", "technology", "domain", "paper", "concept", "model", "dataset")
+# "repo" und "task" tragen die Fremdquellen-Entitäten (Papers with Code, ADR-0017);
+# "repo" stammt aus Phase 1 und wurde bewusst nicht gelöscht (ADR-0004).
+NODE_KINDS = (
+    "repo",
+    "technology",
+    "domain",
+    "paper",
+    "concept",
+    "model",
+    "dataset",
+    "task",
+)
 EDGE_RELATIONS = (
     "USES",
     "BUILT_WITH",
@@ -41,6 +52,9 @@ EDGE_RELATIONS = (
     "INTRODUCES",
     "EVALUATES_ON",
     "IMPROVES_ON",
+    "IMPLEMENTS",
+    "USES_DATASET",
+    "ACHIEVES_SOTA",
 )
 STATUSES = ("pending", "verified", "rejected")
 
@@ -111,7 +125,7 @@ class GraphNode(Base):
     __table_args__ = (
         UniqueConstraint("kind", "name", name="uq_graph_nodes_kind_name"),
         CheckConstraint(
-            "kind IN ('repo','technology','domain','paper','concept','model','dataset')",
+            "kind IN ('repo','technology','domain','paper','concept','model','dataset','task')",
             name="ck_graph_nodes_kind",
         ),
         CheckConstraint(
@@ -139,7 +153,8 @@ class GraphEdge(Base):
         PrimaryKeyConstraint("source", "target", "relation", name="pk_graph_edges"),
         CheckConstraint(
             "relation IN ('USES','BUILT_WITH','RELATED_TO',"
-            "'INTRODUCES','EVALUATES_ON','IMPROVES_ON')",
+            "'INTRODUCES','EVALUATES_ON','IMPROVES_ON',"
+            "'IMPLEMENTS','USES_DATASET','ACHIEVES_SOTA')",
             name="ck_graph_edges_relation",
         ),
         CheckConstraint(
