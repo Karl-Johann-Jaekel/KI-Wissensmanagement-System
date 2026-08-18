@@ -33,9 +33,7 @@ class KWMSClient:
     def _headers(self) -> dict[str, str]:
         return {"X-API-Key": self.admin_key} if self.admin_key else {}
 
-    def search_knowledge(
-        self, query: str, top_k: int = 5
-    ) -> list[dict[str, Any]]:
+    def search_knowledge(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:
         """Hybrid search over the corpus; returns compact passages with sources."""
         resp = self._client.post(
             "/search",
@@ -54,9 +52,7 @@ class KWMSClient:
             for h in hits
         ]
 
-    def ask_knowledge(
-        self, question: str, top_k: int = 5
-    ) -> dict[str, Any]:
+    def ask_knowledge(self, question: str, top_k: int = 5) -> dict[str, Any]:
         """RAG answer with citations (consumes the /chat SSE stream)."""
         answer: list[str] = []
         sources: list[dict] = []

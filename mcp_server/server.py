@@ -3,6 +3,11 @@
 Run (from the repo root):
     KWMS_API_BASE=http://localhost:8000 python -m mcp_server.server
 
+Der Korpus ist vollständig öffentlich (ADR-0015). KWMS_ADMIN_KEY braucht nur, wer
+über ``query_graph(include_pending=True)`` die ungeprüften Fakten sehen will — das
+Backend erzwingt das, ohne Schlüssel kommt nichts Unbestätigtes heraus.
+"""
+
 from __future__ import annotations
 
 from typing import Any
@@ -16,9 +21,7 @@ _client = KWMSClient()
 
 
 @mcp.tool()
-def search_knowledge(
-    query: str, top_k: int = 5
-) -> list[dict[str, Any]]:
+def search_knowledge(query: str, top_k: int = 5) -> list[dict[str, Any]]:
     """Hybrid (vector + keyword) search over the AI-research corpus.
 
     Returns the top passages with their source paper, section and a text preview.
