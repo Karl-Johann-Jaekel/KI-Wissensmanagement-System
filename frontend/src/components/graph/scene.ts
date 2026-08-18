@@ -55,6 +55,16 @@ export const SCENE_COLORS: Record<Theme, Record<SceneKind, string>> = {
 /** Sammelsektor „Weitere Inseln" — gedämpftes Türkis, klar neben den Diensten. */
 const REST_COLOR: Record<Theme, string> = { light: '#0f766e', dark: '#5eead4' }
 
+/**
+ * Ab so vielen Knoten wird der Sammelsektor nach Knotenart aufgefächert.
+ *
+ * Der lange Schwanz kleiner Themen war nach dem Fremdquellen-Import kein Schwanz
+ * mehr, sondern die Hälfte des Graphen (gemessen: 1.018 von 2.000 Knoten) — als
+ * ein Klumpen in einer Farbe. Nach Art getrennt bleibt er lesbar, und die Farbe
+ * sagt wenigstens noch, *was* dort liegt.
+ */
+const REST_SPLIT_MIN = 120
+
 /** Farbkreis für Themen-Cluster (Gruppenmodus „Themen"). */
 const CLUSTER_PALETTE: Record<Theme, string[]> = {
   light: [
@@ -358,7 +368,29 @@ export function buildScene(data: GraphData, opts: BuildOptions): Scene {
         count: list.length,
       })
     })
-    if (rest.length > 0) {
+    if (rest.length >= REST_SPLIT_MIN) {
+      const byKind = new Map<SceneKind, SceneNode[]>()
+      for (const n of rest) {
+        const list = byKind.get(n.kind)
+        if (list) list.push(n)
+        else byKind.set(n.kind, [n])
+      }
+      const ordered = [...byKind.entries()].sort(
+        (a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]),
+      )
+      for (const [kind, list] of ordered) {
+        const id = `${REST_GROUP}:${kind}`
+        for (const n of list) n.group = id
+        addGroup({
+          id,
+          label: `Weitere · ${KIND_LABELS[kind]}`,
+          // Ohne Thema bleibt die Art die einzige ehrliche Aussage — also ihre Farbe.
+          color: kindColors[kind] ?? REST_COLOR[theme],
+          tier: 1,
+          count: list.length,
+        })
+      }
+    } else if (rest.length > 0) {
       for (const n of rest) n.group = REST_GROUP
       addGroup({
         id: REST_GROUP,

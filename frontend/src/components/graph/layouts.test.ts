@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   clusterCenters,
+  columnWidth,
+  globeSectors,
   layerGeometry,
   layoutTargets,
   ringGeometry,
@@ -153,5 +155,64 @@ describe('cloud', () => {
     // Keine zwei Cluster teilen sich einen Ort.
     const unique = new Set(others.map((c) => `${c.x.toFixed(3)}|${c.y.toFixed(3)}`))
     expect(unique.size).toBe(others.length)
+  })
+})
+
+/**
+ * Der Globus verteilte die Kugel früher gleichmäßig auf die Gruppen, unabhängig
+ * von ihrer Größe. Bei 1.018 Knoten in der einen und 32 in der anderen Gruppe war
+ * die eine 28-mal dichter belegt als die andere — sichtbar als verklumpte Sichel.
+ */
+describe('globeSectors', () => {
+  it('gibt großen Gruppen entsprechend mehr Bogen', () => {
+    const [big, small] = globeSectors([100, 10])
+    expect(big / small).toBeGreaterThan(5)
+  })
+
+  it('hält die Belegungsdichte über die Gruppen hinweg annähernd gleich', () => {
+    const sizes = [1018, 260, 194, 129, 101, 69, 59, 51, 47, 40, 32]
+    const widths = globeSectors(sizes)
+    const density = sizes.map((n, i) => n / widths[i])
+    expect(Math.max(...density) / Math.min(...density)).toBeLessThan(1.5)
+  })
+
+  it('summiert sich auf den vollen Kreis', () => {
+    const sum = globeSectors([5, 3, 2, 1]).reduce((a, b) => a + b, 0)
+    expect(sum).toBeCloseTo(2 * Math.PI, 6)
+  })
+
+  it('lässt eine winzige Gruppe nicht auf null zusammenfallen', () => {
+    const [, tiny] = globeSectors([5000, 1])
+    // Ohne Boden wären das 0,07° — zwischen den Nachbarn unsichtbar.
+    expect((tiny * 180) / Math.PI).toBeGreaterThan(1)
+  })
+
+  it('kommt mit einer einzigen Gruppe klar', () => {
+    expect(globeSectors([7])).toHaveLength(1)
+    expect(globeSectors([7])[0]).toBeCloseTo(2 * Math.PI, 6)
+  })
+})
+
+/**
+ * Die Spaltenbreite war bei 9 gedeckelt: 1.018 Knoten wurden 9 breit und 114 hoch.
+ * Der Turm sprengte die Ansicht und schrumpfte alles andere auf Streichholzgröße.
+ */
+describe('columnWidth', () => {
+  it('hält das Seitenverhältnis auch bei großen Gruppen im Rahmen', () => {
+    for (const count of [40, 100, 250, 500, 1018]) {
+      const width = columnWidth(count)
+      const height = Math.ceil(count / width)
+      expect(height / width).toBeLessThan(2.5)
+    }
+  })
+
+  it('lässt kleine Gruppen nicht zu Fäden werden', () => {
+    expect(columnWidth(1)).toBeGreaterThanOrEqual(3)
+    expect(columnWidth(4)).toBeGreaterThanOrEqual(3)
+  })
+
+  it('wächst monoton mit der Knotenzahl', () => {
+    const widths = [10, 50, 200, 800].map(columnWidth)
+    expect(widths).toEqual([...widths].sort((a, b) => a - b))
   })
 })

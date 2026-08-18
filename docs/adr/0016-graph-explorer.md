@@ -99,3 +99,32 @@ Offen bleibt der Sammelsektor „Weitere Inseln": Er fasst alles jenseits der ze
 größten Cluster zusammen und liegt bei rund der Hälfte der Knoten — vor wie nach
 dieser Änderung. Mehr Cluster brächten wenig (14 statt 10 Cluster decken 53,7 %
 statt 49,0 % ab) und kosten unterscheidbare Farben.
+
+## Nachtrag 2 (18.08.2026): Verteilung folgt der Knotenzahl
+
+Nach dem Import kippten zwei Layouts, weil beide die **Gruppenzahl** verteilten
+statt der **Knotenzahl**:
+
+* **Globus** gab jeder Gruppe denselben Längengrad-Sektor. 1.018 Knoten auf 9,1 %
+  der Fläche gegen 32 Knoten auf ebenfalls 9,1 % — Faktor 28 im Gedränge, sichtbar
+  als verklumpte Sichel. Die Sektorbreite folgt jetzt der Knotenzahl (auf einer
+  Kugel ist die Fläche eines Sektors proportional zu seiner Breite), mit einem
+  Boden, damit Ein-Knoten-Gruppen nicht auf Bruchteile eines Grades zusammenfallen.
+  Die Aufteilung ist als `globeSectors()` herausgezogen — aus fertigen
+  Kugelkoordinaten zurückgerechnet ist sie nahe den Polen numerisch wertlos, als
+  eigene Funktion dagegen prüfbar.
+* **Ebenen** deckelte die Spaltenbreite bei 9 Rasterzellen. Die größte Gruppe wurde
+  damit 9 breit und 114 hoch — ein Turm, der die Ansicht sprengte und alles andere
+  auf Streichholzgröße schrumpfte. Ohne Deckel wächst die Breite mit der Wurzel der
+  Knotenzahl: aus 9 × 114 werden 29 × 17, alle Spalten liegen unter 2,5 : 1.
+  Die Systemreihen spannen sich jetzt über dieselbe Breite wie der Spaltenblock —
+  auf festem Rasterabstand drängten sich sechs Dienste auf einem Fünftel der Fläche
+  und ihre Namen überlagerten sich zu einer unlesbaren Zeile. Die Reihenbeschriftung
+  steht am tatsächlichen linken Rand statt an einer festen Koordinate.
+
+Dazu wird der Sammelsektor **nach Knotenart aufgefächert**, sobald er 120 Knoten
+überschreitet. Er war kein Schwanz kleiner Inseln mehr, sondern die Hälfte des
+Graphen in einer Farbe. Aus einem Block von 1.018 werden sechs Gruppen (Code 466,
+Papers 203, Aufgaben 181, Konzepte 76, Modelle 42, Datasets 41); die größte Gruppe
+der Ansicht sinkt von 50,9 % auf 23,3 %, und die Farbe sagt wenigstens noch, *was*
+dort liegt. Insgesamt 18 statt 11 Gruppen.

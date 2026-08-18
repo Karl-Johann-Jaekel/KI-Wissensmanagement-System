@@ -411,3 +411,73 @@ describe('buildScene im Themen-Modus', () => {
     expect(scene.groups.length).toBeGreaterThan(1)
   })
 })
+
+/**
+ * Der Sammelsektor war nach dem Fremdquellen-Import kein Schwanz kleiner Inseln
+ * mehr, sondern die Hälfte des Graphen — 1.018 von 2.000 Knoten in einer Farbe.
+ */
+describe('Sammelsektor', () => {
+  function manyTinyIslands(count: number): GraphData {
+    const nodes: GraphData['nodes'] = []
+    const links: GraphData['links'] = []
+    // Zehn Themen, die die Cluster-Plätze belegen …
+    for (let t = 0; t < 10; t += 1) {
+      nodes.push({
+        id: `t${t}`, kind: 'task', name: `Thema ${t}`, status: 'verified',
+        first_seen: '2026-08-18T00:00:00Z', val: 5, meta: {},
+      })
+      for (let p = 0; p < 8; p += 1) {
+        nodes.push({
+          id: `t${t}p${p}`, kind: 'paper', name: `Paper ${t}-${p}`, status: 'verified',
+          first_seen: '2026-08-18T00:00:00Z', val: 1, meta: {},
+        })
+        links.push({ source: `t${t}p${p}`, target: `t${t}`, relation: 'RELATED_TO', weight: 1, status: 'verified' })
+      }
+    }
+    // … und danach der lange Schwanz: Paare aus je einem Konzept und einem Repo.
+    for (let i = 0; i < count; i += 1) {
+      nodes.push({
+        id: `c${i}`, kind: 'concept', name: `Konzept ${i}`, status: 'verified',
+        first_seen: '2026-08-18T00:00:00Z', val: 1, meta: {},
+      })
+      nodes.push({
+        id: `r${i}`, kind: 'repo', name: `repo/${i}`, status: 'verified',
+        first_seen: '2026-08-18T00:00:00Z', val: 1, meta: {},
+      })
+      links.push({ source: `r${i}`, target: `c${i}`, relation: 'IMPLEMENTS', weight: 1, status: 'verified' })
+    }
+    return { nodes, links }
+  }
+
+  it('fächert einen großen Rest nach Knotenart auf', () => {
+    const scene = buildScene(manyTinyIslands(120), {
+      theme: 'dark', groupMode: 'cluster', showSystem: false,
+    })
+    const labels = scene.groups.map((g) => g.label)
+    expect(labels).toContain('Weitere · Konzepte')
+    expect(labels).toContain('Weitere · Code')
+    expect(labels).not.toContain('Weitere Inseln')
+    // Jeder Knoten landet in genau einer Gruppe.
+    const ids = new Set(scene.groups.map((g) => g.id))
+    for (const n of scene.nodes) expect(ids.has(n.group)).toBe(true)
+  })
+
+  it('lässt einen kleinen Rest als eine Gruppe stehen', () => {
+    const scene = buildScene(manyTinyIslands(4), {
+      theme: 'dark', groupMode: 'cluster', showSystem: false,
+    })
+    // Unter der Schwelle wäre die Aufteilung nur Zersplitterung.
+    expect(scene.groups.map((g) => g.label)).not.toContain('Weitere · Code')
+  })
+
+  it('zählt die aufgefächerten Gruppen vollständig', () => {
+    const scene = buildScene(manyTinyIslands(120), {
+      theme: 'dark', groupMode: 'cluster', showSystem: false,
+    })
+    const rest = scene.groups.filter((g) => g.label.startsWith('Weitere · '))
+    const counted = rest.reduce((sum, g) => sum + g.count, 0)
+    const actual = scene.nodes.filter((n) => n.group.startsWith('cluster:rest:')).length
+    expect(counted).toBe(actual)
+    expect(counted).toBe(240) // 120 Konzepte + 120 Repos
+  })
+})
