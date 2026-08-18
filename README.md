@@ -4,7 +4,7 @@
 Wissens-Graphen, der nur aufnimmt, was durch eine Prüfung gekommen ist.**
 
 56 arXiv-Papers · 6.950 indexierte Chunks · 12.746 Graph-Knoten · Hit-Rate@5 **0,94**
-· 170 automatisierte Tests · 17 Architecture Decision Records
+· 195 automatisierte Tests · 18 Architecture Decision Records
 
 ```
 Frage ──▶ Hybrid-Retrieval ──▶ Kontext ──▶ LLM ──▶ Antwort mit Quellenangabe
@@ -36,7 +36,7 @@ Frage ──▶ Hybrid-Retrieval ──▶ Kontext ──▶ LLM ──▶ Antwo
 | **Datenmodellierung** | Chunks, Vektoren (HNSW), Graph-Tabellen, versionierte Migrationen — [`backend/app/db/`](backend/app/db/) |
 | **Frontend-Handwerk** | Canvas-Graph-Explorer mit vier Layouts, hell/dunkel, mobiltauglich — [`frontend/src/components/graph/`](frontend/src/components/graph/) |
 | **Betrieb** | Caddy-Prod-Stack, Deploy-Gate, Smoke-Test, erprobtes Restore — [`scripts/`](scripts/), [`docs/runbooks/`](docs/runbooks/) |
-| **Entscheidungen begründen** | 17 ADRs, inklusive der revidierten — [`docs/adr/`](docs/adr/) |
+| **Entscheidungen begründen** | 18 ADRs, inklusive der revidierten — [`docs/adr/`](docs/adr/) |
 
 **Drei Dateien, wenn die Zeit knapp ist:**
 [`retrieval/rrf.py`](backend/app/retrieval/rrf.py) (wie zwei Suchverfahren fusioniert werden),
@@ -65,7 +65,7 @@ Widersprüchliche Behauptungen werden als `disputed` markiert statt still
 und englisch) misst die Hit-Rate bei jedem Durchlauf. Als die Embeddings gewechselt
 wurden, lag die Zahl vorher und nachher auf dem Tisch: 0,88 → 0,94.
 
-**Entscheidungen sind dokumentiert.** 17 Architecture Decision Records halten fest,
+**Entscheidungen sind dokumentiert.** 18 Architecture Decision Records halten fest,
 was warum entschieden wurde — inklusive der Fälle, in denen sich eine Annahme als
 falsch herausstellte und der Weg korrigiert wurde.
 
@@ -116,6 +116,33 @@ Lizenz (ADR-0017). `--ingest-abstracts` legt zusätzlich die Abstracts als
 Dokumente in pgvector ab — erlaubt, weil der Dump CC-BY-SA steht. Im Graphen
 trennt `GET /graph?source=paperswithcode|native` die Fremdquelle vom eigenen
 Bestand.
+
+### Laufende Ernte: arXiv und OpenReview
+
+Der Seed-Korpus kam über die arXiv-Query-API. Die kennt kein Änderungsdatum — für
+laufende Aktualität harvestet `app.corpus.harvest` per **OAI-PMH** über
+`from`/`until` auf dem Änderungszeitstempel und findet damit auch überarbeitete
+Fassungen bereits bekannter Papers:
+
+```bash
+docker compose exec backend python -m app.corpus.harvest --source arxiv --since 2026-08-01
+docker compose exec backend python -m app.corpus.harvest --source arxiv   # ab letztem Lauf
+```
+
+Läufe sind wiederaufnehmbar (Zeitmarke und Blätter-Zeiger in
+`data/harvest/state.json`), höflich (`Retry-After` schlägt die eigene Wartekurve)
+und erkennen Dubletten über DOI **und** Titelschlüssel — quellenübergreifend, weil
+dieselbe Arbeit auf arXiv und OpenReview steht.
+
+**Abstracts werden nie als Rohtext gespeichert**, sondern nur als invertierter
+Index (`{Token: [Positionen]}`, wie bei OpenAlex). Der Datentyp hat schlicht kein
+Feld dafür. Volltexte kommen ausschließlich aus CC-lizenzierten Quellen.
+Autorenfelder werden von Kontaktdaten bereinigt (ADR-0018).
+
+OpenReview (`--source openreview --venue ICLR.cc/2025/Conference`) verlangt seit
+2026 ein kostenloses Konto — anonyme Zugriffe beantwortet der Dienst mit einer
+Browser-Challenge, die dieses Projekt bewusst nicht umgeht.
+`OPENREVIEW_USERNAME`/`OPENREVIEW_PASSWORD` setzen.
 
 ---
 
@@ -251,7 +278,7 @@ frontend/      React-SPA: Chat · Suche · Inbox · Wissen · Skills · Projekte
 mcp_server/    MCP-Werkzeuge für Claude Desktop
 eval/          Golden-Set, Hit-Rate-Messung, Parameter-Tuning
 scripts/       Korpus-Fetch · Reindex · Deploy-Gate · Smoke-Test · Backup
-docs/adr/      17 Architecture Decision Records · docs/runbooks/
+docs/adr/      18 Architecture Decision Records · docs/runbooks/
 ```
 
 ## Lizenz

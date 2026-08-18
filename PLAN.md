@@ -405,9 +405,14 @@ Lizenz- und DSGVO-Leitplanken für alle Schritte:
       mit eigenen Farben, Ebenen und Cluster-Namen im Force-Graph-Explorer;
       Quellenfilter (alle / eigener Korpus / Papers with Code) im Menü;
       Herkunftszeile (Quelle, Lizenz, Abrufdatum) in der Leseansicht
-- [ ] **11.3 Harvester-Grundgerüst:** arXiv (OAI-PMH, Delta über `updated_date`)
-      und OpenReview API v2 — Rate-Limiting, Backoff, Dedupe (DOI + Titel-Hash),
-      Fehlerbehandlung, inkrementeller Zustand
+- [x] **11.3 Harvester-Grundgerüst:** `app/corpus/harvest/` — OAI-PMH-Client
+      (Blättern per `resumptionToken`), arXiv-Delta über das Änderungsdatum,
+      OpenReview API v2; Rate-Limiting mit `Retry-After`-Vorrang, exponentieller
+      Backoff, Dedupe (DOI + Titelschlüssel, quellenübergreifend), wiederaufnehmbarer
+      Zustand, Abstracts nur als invertierter Index — ADR-0018.
+      **Live geprüft:** arXiv 25 Datensätze/6 s, zweiter Lauf 25 Dubletten erkannt.
+      OpenReview braucht seit 2026 ein Konto (Browser-Challenge), Pfad daher nur
+      gegen Mocks geprüft
 - [ ] **11.4 GROBID:** Docker-Service + Pipeline PDF → TEI-XML → Struktur
       (Titel, Autoren, Sektionen, Referenzen)
 - [ ] **11.5 Provenienz-Schema:** Migration für `document_sources` und
