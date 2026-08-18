@@ -38,7 +38,7 @@ erfunden (ADR-0004 hat das Schema absichtlich stehen lassen). Neue Kanten:
 |---|---|---|
 | `repo IMPLEMENTS paper` | Implementierung eines Papers | `links-between-papers-and-code` |
 | `paper USES_DATASET dataset` | Paper wertet auf dem Datensatz aus | `evaluation-tables` |
-| `model ACHIEVES_SOTA dataset` | SOTA-Zeile inkl. Metriken in `meta` | `evaluation-tables` |
+| `model ACHIEVES_SOTA dataset` | SOTA-Zeile; Metriknamen in `meta` | `evaluation-tables` |
 | `paper RELATED_TO task` | Aufgabengebiet | `papers-with-abstracts.tasks` |
 | `paper USES concept` | verwendete Methode | `papers-with-abstracts.methods` |
 | `paper INTRODUCES model` | Paper führt das Modell ein | `evaluation-tables` |
@@ -59,6 +59,31 @@ Wege sind belegt, keiner ist optional. Ein Index auf
 `meta->'provenance'->>'source'` macht den Löschpfad und den Quellenfilter
 bezahlbar.
 
+**Bezugsquelle und Format.** Der ursprüngliche Host
+(`production-media.paperswithcode.com`) ist mit der Abschaltung verschwunden. Das
+Archiv liegt seither unter der Organisation `pwc-archive` auf Hugging Face — und
+zwar als **Parquet-Shards**, nicht mehr als `.json.gz`. Daraus folgt:
+
+* `scripts/fetch_pwc_dump.py` lädt die Shards (rund 750 MB, idempotent).
+* `pyarrow` kommt als Backend-Abhängigkeit dazu; ohne Reader kein Import.
+* Der Adapter liest **beide** Formate. Die historischen JSON-Dateien bleiben
+  unterstützt, weil sie ältere Kopien lesbar halten und die Tests ohne Parquet
+  auskommen; liegt beides vor, gewinnt die JSON-Kopie als ausdrückliche Wahl.
+* Die Parquet-Konvertierung hat die SOTA-Metriken zu einem Struct mit **einer
+  Spalte je Metrikname im gesamten Datensatz** ausgerollt. Jede Zeile trägt damit
+  tausende leere Felder; der Import wirft sie beim Lesen weg (`_prune_nulls`),
+  sonst landen sie wortwörtlich in `meta.metrics` jeder Kante.
+* Papers werden **gestreamt** ausgewählt (`iter_dump`): der Dump hat rund eine
+  halbe Million Zeilen, die Teilmenge bricht früh ab. Auch Links, Evaluation und
+  Datasets laufen als Generator durch `build_graph` — die Evaluation-Tabellen auf
+  einmal zu laden hat den Container per OOM abgeräumt.
+* **Metrik-Werte werden nicht importiert.** Der Cast wirft `rows[].metrics` weg,
+  bevor ein Python-Objekt entsteht; erhalten bleiben die Metrik*namen* des
+  Datensatzes (`sota.metrics`, eine schlichte String-Liste) auf der
+  `ACHIEVES_SOTA`-Kante. Der Graph braucht die Aussage „dieses Modell führt auf
+  diesem Datensatz" — die Bestenliste selbst gehört zur Quelle, nicht hierher.
+  Aus einer JSON-Kopie gelesen, kämen die Werte weiterhin mit.
+
 **Teilmenge statt Vollimport.** `--limit` (Default 5.000) und `--match` (Regex auf
 Titel, Abstract, Tasks) schneiden den Dump auf die Themen des Korpus zu. Nur
 Repos, Datensätze und SOTA-Zeilen, die an einem Paper der Teilmenge hängen,
@@ -66,8 +91,12 @@ kommen mit — sonst treibt der Import Zehntausende unverbundener Inseln in den
 Graphen.
 
 **`GET /graph` bekommt `source` und `limit`.** Der Quellenfilter trennt
-`paperswithcode` von `native` (eigener Korpus); das Knotenlimit (Default 2.000,
-nach Vernetzungsgrad) hält die Force-Simulation im Frontend flüssig.
+`paperswithcode` von `native` (eigener Korpus); das Knotenlimit (Default 2.000)
+hält die Force-Simulation im Frontend flüssig. Gekappt wird **je Knotenart nach
+Bestandsanteil**, nicht global nach Vernetzungsgrad: Beim ersten echten Import
+überlebten von 4.600 Code-Repos genau zwei, weil ein Repo per Definition an
+genau einem Paper hängt. Eine Grad-Rangliste löscht damit systematisch die
+Blattarten — sichtbar bleiben nur die Naben, die man ohnehin kennt.
 
 **Abstracts nach pgvector nur auf Ansage.** `--ingest-abstracts` legt die
 Abstracts als Dokumente an und bettet sie ein. Der Dump ist CC-BY-SA, der Text

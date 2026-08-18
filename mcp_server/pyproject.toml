@@ -13,3 +13,10 @@ dev = ["pytest>=8.0"]
 
 [tool.ruff]
 line-length = 100
+
+# Gleiche Regelauswahl wie das Backend. Ohne explizite Auswahl erbt dieses
+# Unterprojekt die wechselnden ruff-Defaults — mit 0.16 kam darüber EXE002 dazu
+# und schlug an, weil der Windows-Bind-Mount alle Dateien als ausführbar zeigt
+# (die Git-Modi sind 100644).
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "C4", "SIM"]

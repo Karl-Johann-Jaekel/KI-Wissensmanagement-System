@@ -398,7 +398,9 @@ Lizenz- und DSGVO-Leitplanken für alle Schritte:
       Datensätze, Tasks, Modelle; Kanten `IMPLEMENTS`, `USES_DATASET`,
       `ACHIEVES_SOTA` (+ `RELATED_TO`, `USES`, `INTRODUCES`). Migration `0004`
       erweitert die CHECKs; `--limit`/`--match` schneiden die Teilmenge zu;
-      `--ingest-abstracts` schreibt nach pgvector — ADR-0017
+      `--ingest-abstracts` schreibt nach pgvector — ADR-0017.
+      **Live importiert (18.08.2026):** 5.000 Papers → 12.288 Knoten / 23.037
+      Kanten; Dump via `scripts/fetch_pwc_dump.py` von Hugging Face (Parquet)
 - [x] **11.2 Graph-Visualisierung der Fremdquelle:** Knotenarten `task`/`repo`
       mit eigenen Farben, Ebenen und Cluster-Namen im Force-Graph-Explorer;
       Quellenfilter (alle / eigener Korpus / Papers with Code) im Menü;

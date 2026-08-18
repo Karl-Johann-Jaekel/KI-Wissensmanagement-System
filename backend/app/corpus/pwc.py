@@ -11,12 +11,13 @@ der Manifest-Import aus Phase 1 (PLAN §7). Das ist kein Widerspruch zu PLAN §2
 Knoten und jede Kante trägt ``meta.provenance`` (Quelle, URL, Zeitpunkt, Lizenz) —
 Pflicht, damit eine spätere Löschanfrage die betroffenen Zeilen findet.
 
+    python scripts/fetch_pwc_dump.py --out data/pwc
     python -m app.corpus.pwc --dump data/pwc --limit 5000
     python -m app.corpus.pwc --dump data/pwc --limit 500 --match "retrieval|agent"
 
-Dump-Dateien (``.json`` oder ``.json.gz``, Bezug s. README):
-``papers-with-abstracts``, ``links-between-papers-and-code``,
-``evaluation-tables``, ``datasets``.
+Dump-Bestandteile: ``papers-with-abstracts``, ``links-between-papers-and-code``,
+``evaluation-tables``, ``datasets`` — als Parquet-Shards (Hugging-Face-Archiv,
+Stand nach der Abschaltung) oder als historische ``.json``/``.json.gz``.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ import json
 import re
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -121,23 +122,108 @@ class PwcStats:
 # ------------------------------------------------------------------ Dump lesen
 
 
+def dump_files(dump_dir: Path, name: str) -> list[Path]:
+    """Alle Dateien eines Dump-Bestandteils, in stabiler Reihenfolge.
+
+    Das Archiv liegt seit der Abschaltung als **Parquet-Shards** auf Hugging Face
+    (``<stem>.00.parquet``, …); die historischen ``.json``/``.json.gz`` werden
+    weiter gelesen, damit ältere Kopien und die Tests ohne Parquet auskommen.
+    """
+    stem = DUMP_STEMS[name]
+    for suffix in (".json", ".json.gz"):
+        single = dump_dir / f"{stem}{suffix}"
+        if single.exists():
+            return [single]
+    shards = sorted(dump_dir.glob(f"{stem}.parquet")) or sorted(
+        dump_dir.glob(f"{stem}.[0-9][0-9].parquet")
+    )
+    return shards
+
+
+def _prune_nulls(value: Any) -> Any:
+    """Leere Felder aus verschachtelten Strukturen entfernen, Zeitstempel zu Datum."""
+    if isinstance(value, dict):
+        return {k: _prune_nulls(v) for k, v in value.items() if v is not None}
+    if isinstance(value, list):
+        return [_prune_nulls(v) for v in value]
+    if isinstance(value, datetime | date):
+        # Der Dump führt `date` als Zeitstempel; im Graphen steht ein Datum.
+        return value.isoformat()[:10]
+    return value
+
+
+#: Struct-Felder, die beim Parquet-Lesen wegfallen (Name -> nur wenn Struct).
+DROPPED_STRUCT_FIELDS = ("metrics",)
+
+
+def iter_dump(dump_dir: Path, name: str) -> Iterator[dict] | None:
+    """Zeilen eines Dump-Bestandteils streamen; ``None`` wenn er fehlt.
+
+    Streamen statt Laden, weil allein ``papers-with-abstracts`` rund eine halbe
+    Million Zeilen trägt — die Teilmengen-Auswahl bricht früh ab und soll dafür
+    nicht erst den ganzen Dump im Speicher aufbauen.
+    """
+    files = dump_files(dump_dir, name)
+    if not files:
+        return None
+    return _iter_files(files)
+
+
+def _iter_files(files: list[Path]) -> Iterator[dict]:
+    for path in files:
+        if path.suffix == ".parquet":
+            yield from _iter_parquet(path)
+        elif path.suffixes[-2:] == [".json", ".gz"]:
+            with gzip.open(path, "rt", encoding="utf-8") as fh:
+                yield from json.load(fh)
+        else:
+            yield from json.loads(path.read_text(encoding="utf-8"))
+
+
+def _lean_type(dtype: Any) -> Any:
+    """Arrow-Typ ohne die Felder aus :data:`DROPPED_STRUCT_FIELDS` (rekursiv)."""
+    import pyarrow as pa
+
+    if pa.types.is_list(dtype) or pa.types.is_large_list(dtype):
+        return pa.list_(_lean_type(dtype.value_type))
+    if pa.types.is_struct(dtype):
+        keep = [
+            pa.field(f.name, _lean_type(f.type))
+            for f in dtype
+            if not (f.name in DROPPED_STRUCT_FIELDS and pa.types.is_struct(f.type))
+        ]
+        return pa.struct(keep)
+    return dtype
+
+
+def _iter_parquet(path: Path, batch_size: int = 256) -> Iterator[dict]:
+    """Parquet-Shard zeilenweise als Dicts.
+
+    Vor der Umwandlung nach Python wird der Typ **in Arrow** verschlankt: Die
+    Konvertierung des Archivs hat die SOTA-Metriken zu einem Struct mit einer
+    Spalte je Metrikname im gesamten Datensatz ausgerollt — 3.468 Felder, davon
+    typisch eines belegt. ``to_pylist`` würde daraus je SOTA-Zeile ein Dict mit
+    3.468 Schlüsseln bauen und den Prozess aus dem Speicher tragen (gemessen:
+    OOM-Kill). Der Cast wirft das Feld weg, bevor ein Python-Objekt entsteht.
+    """
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    handle = pq.ParquetFile(path)
+    lean = pa.schema([pa.field(f.name, _lean_type(f.type)) for f in handle.schema_arrow])
+    for batch in handle.iter_batches(batch_size=batch_size):
+        for row in pa.Table.from_batches([batch]).cast(lean).to_pylist():
+            yield _prune_nulls(row)
+
+
 def load_dump(dump_dir: Path, name: str) -> list[dict] | None:
-    """Eine Dump-Datei laden (``.json`` oder ``.json.gz``); ``None`` wenn sie fehlt.
+    """Einen Dump-Bestandteil vollständig laden; ``None`` wenn er fehlt.
 
     Nur ``papers`` ist Pflicht — mit einer Teilmenge der Dateien entsteht ein
     kleinerer, aber konsistenter Graph.
     """
-    stem = DUMP_STEMS[name]
-    plain = dump_dir / f"{stem}.json"
-    packed = dump_dir / f"{stem}.json.gz"
-    if plain.exists():
-        data = json.loads(plain.read_text(encoding="utf-8"))
-    elif packed.exists():
-        with gzip.open(packed, "rt", encoding="utf-8") as fh:
-            data = json.load(fh)
-    else:
-        return None
-    return data if isinstance(data, list) else []
+    rows = iter_dump(dump_dir, name)
+    return None if rows is None else list(rows)
 
 
 def _clean(value: Any) -> str:
@@ -209,25 +295,36 @@ def _provenance(source_url: str, fetched_at: str) -> dict[str, Any]:
 
 
 def _iter_eval_tasks(tables: Iterable[dict]) -> Iterator[dict]:
-    """Evaluation-Tables sind rekursiv (``subtasks``) — flach durchlaufen."""
-    stack = list(tables)
-    while stack:
-        node = stack.pop()
-        if not isinstance(node, dict):
-            continue
-        stack.extend(node.get("subtasks") or [])
-        yield node
+    """Evaluation-Tables sind rekursiv (``subtasks``) — flach durchlaufen.
+
+    Die oberste Ebene wird gestreamt (eine Tabelle nach der anderen), nur deren
+    Unterbaum liegt kurzzeitig im Speicher. Der gesamte Bestand auf einmal wäre
+    ein Vielfaches des Arbeitsspeichers.
+    """
+    for table in tables:
+        stack = [table]
+        while stack:
+            node = stack.pop()
+            if not isinstance(node, dict):
+                continue
+            stack.extend(node.get("subtasks") or [])
+            yield node
 
 
 def build_graph(
     papers: list[dict],
     *,
-    links: list[dict] | None = None,
-    evaluation: list[dict] | None = None,
-    datasets: list[dict] | None = None,
+    links: Iterable[dict] | None = None,
+    evaluation: Iterable[dict] | None = None,
+    datasets: Iterable[dict] | None = None,
     fetched_at: str | None = None,
 ) -> PwcGraph:
-    """Dump-Einträge → Knoten/Kanten. Reine Funktion, keine DB, kein Netz."""
+    """Dump-Einträge → Knoten/Kanten. Reine Funktion, keine DB, kein Netz.
+
+    ``links``, ``evaluation`` und ``datasets`` werden **einmal** durchlaufen und
+    dürfen deshalb Generatoren sein — der Dump passt sonst nicht in den Speicher.
+    Nur die ausgewählten ``papers`` liegen als Liste vor.
+    """
     stamp = fetched_at or datetime.now(UTC).isoformat(timespec="seconds")
     graph = PwcGraph(papers=list(papers))
 
@@ -294,8 +391,11 @@ def build_graph(
         for dataset_entry in task_table.get("datasets") or []:
             if not isinstance(dataset_entry, dict):
                 continue
-            sota_rows = (dataset_entry.get("sota") or {}).get("rows") or []
-            rows = [r for r in sota_rows if isinstance(r, dict)]
+            sota = dataset_entry.get("sota") or {}
+            rows = [r for r in (sota.get("rows") or []) if isinstance(r, dict)]
+            # Die Metriknamen des Datensatzes (`sota.metrics`) überleben den
+            # Parquet-Import, die Messwerte je Zeile nicht — s. `_iter_parquet`.
+            metric_names = [_clean(m) for m in (sota.get("metrics") or []) if _clean(m)]
             # Nur Zeilen, deren Paper in der Teilmenge liegt — sonst hängt der halbe
             # Dump als Insel im Graphen.
             relevant = [
@@ -322,7 +422,10 @@ def build_graph(
                     "ACHIEVES_SOTA",
                     meta={
                         "task": task_name or None,
+                        # Werte, falls die Quelle sie liefert (JSON-Kopie); sonst
+                        # wenigstens, worauf gemessen wurde.
                         "metrics": row.get("metrics") or {},
+                        "metric_names": metric_names,
                         **prov_eval,
                     },
                 )
@@ -464,21 +567,25 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     dump_dir = Path(args.dump)
-    papers_raw = load_dump(dump_dir, "papers")
-    if papers_raw is None:
+    rows = iter_dump(dump_dir, "papers")
+    if rows is None:
         parser.error(
-            f"{DUMP_STEMS['papers']}.json[.gz] fehlt in {dump_dir} — Dump laden: {PWC_ARCHIVE}"
+            f"{DUMP_STEMS['papers']}.parquet/.json[.gz] fehlt in {dump_dir} — "
+            f"Dump laden: scripts/fetch_pwc_dump.py ({PWC_ARCHIVE})"
         )
         return 2
 
-    papers = select_papers(papers_raw, limit=args.limit, match=args.match)
+    # Gestreamt: die Auswahl bricht bei --limit ab, ohne den ganzen Dump zu laden.
+    papers = select_papers(rows, limit=args.limit, match=args.match)
+    print(f"Papers ausgewählt: {len(papers)}")
+    # Alles außer der Paper-Teilmenge wird gestreamt — der Dump ist deutlich
+    # größer als der Arbeitsspeicher des Containers.
     graph = build_graph(
         papers,
-        links=load_dump(dump_dir, "links"),
-        evaluation=load_dump(dump_dir, "evaluation"),
-        datasets=load_dump(dump_dir, "datasets"),
+        links=iter_dump(dump_dir, "links"),
+        evaluation=iter_dump(dump_dir, "evaluation"),
+        datasets=iter_dump(dump_dir, "datasets"),
     )
-    print(f"Papers ausgewählt: {len(papers)} von {len(papers_raw)}")
     print(f"Graph: {graph.counts()}")
 
     if args.dry_run:

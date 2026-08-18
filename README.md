@@ -3,8 +3,8 @@
 **Ein RAG-System über KI-Forschungsliteratur, das jede Antwort belegt — und einen
 Wissens-Graphen, der nur aufnimmt, was durch eine Prüfung gekommen ist.**
 
-56 arXiv-Papers · 6.950 indexierte Chunks · 370 Graph-Knoten · Hit-Rate@5 **0,94**
-· 162 automatisierte Tests · 17 Architecture Decision Records
+56 arXiv-Papers · 6.950 indexierte Chunks · 12.746 Graph-Knoten · Hit-Rate@5 **0,94**
+· 170 automatisierte Tests · 17 Architecture Decision Records
 
 ```
 Frage ──▶ Hybrid-Retrieval ──▶ Kontext ──▶ LLM ──▶ Antwort mit Quellenangabe
@@ -94,13 +94,15 @@ Embedding-Modell (ADR-0002), ein Wechsel erzwingt `scripts/reindex.py`.
 ### Kaltstart des Graphen: Papers-with-Code-Dump
 
 Der Graph wächst sonst Paper für Paper aus der LLM-Extraktion. Wer ihn sofort
-gefüllt sehen will, importiert das CC-BY-SA-Archiv von
-[Papers with Code](https://github.com/paperswithcode/paperswithcode-data)
-(Dienst Mitte 2025 abgeschaltet, Dump bleibt verfügbar). Die vier Dateien
-`papers-with-abstracts`, `links-between-papers-and-code`, `evaluation-tables`
-und `datasets` (`.json` oder `.json.gz`) nach `data/pwc/` legen, dann:
+gefüllt sehen will, importiert das CC-BY-SA-Archiv von Papers with Code (Dienst
+Mitte 2025 abgeschaltet). Der ursprüngliche Host ging mit unter; das Archiv liegt
+heute als Parquet unter der Organisation
+[`pwc-archive`](https://huggingface.co/pwc-archive) auf Hugging Face:
 
 ```bash
+# Dump holen (~750 MB nach data/pwc/, idempotent, überspringt Vorhandenes)
+docker compose exec backend python scripts/fetch_pwc_dump.py --out data/pwc
+
 # Teilmenge zum Thema des Korpus, nur Graph (kein Embedding-Aufwand)
 docker compose exec backend python -m app.corpus.pwc \
     --dump data/pwc --limit 5000 --match "retrieval|rag|agent|reranking"

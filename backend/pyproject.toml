@@ -14,6 +14,9 @@ dependencies = [
     "pgvector>=0.3",
     "pyyaml>=6.0",
     "docling>=2.0",
+    # Fremdquellen-Dumps liegen als Parquet vor (Papers with Code auf
+    # Hugging Face, ADR-0017) — ohne Reader kein Import.
+    "pyarrow>=17.0",
 ]
 
 [project.optional-dependencies]
