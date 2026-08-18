@@ -5,12 +5,14 @@ import {
   applyDetail,
   buildScene,
   collapseGroups,
+  clusterAssignment,
   connectedComponents,
   endpoint,
   KIND_TIER,
   searchMatches,
   SERVICES,
   SYSTEM_ID,
+  type SceneKind,
   type SceneLink,
   type SceneNode,
 } from './scene'
@@ -287,5 +289,125 @@ describe('Fremdquellen-Knotenarten', () => {
     const hub = collapseGroups(scene, new Set(['repo'])).nodes.find((n) => n.members)
     expect(hub?.name).toBe('Code')
     expect(hub?.members).toEqual(['r1'])
+  })
+})
+
+/**
+ * Cluster-Bildung richtet sich nach der Form der Daten (ADR-0016, ergänzt): Für den
+ * dünnen Eigen-Korpus bleibt die Zusammenhangskomponente die ehrliche Gruppierung,
+ * für den dichten Graphen nach dem Fremdquellen-Import wäre sie nur noch ein
+ * Riesenklumpen — dort zählt das Thema.
+ */
+function sceneNode(id: string, kind: SceneKind): SceneNode {
+  return {
+    id,
+    kind,
+    name: id,
+    status: 'verified',
+    first_seen: '2026-08-18T00:00:00Z',
+    val: 1,
+    meta: {},
+    group: kind,
+    tier: 1,
+  }
+}
+
+function edge(source: string, target: string): SceneLink {
+  return { source, target, relation: 'RELATED_TO', weight: 1, status: 'verified' }
+}
+
+/** Ein Klumpen über der Aufteil-Schwelle: zwei Themen, per Brücke verbunden. */
+function twoTopicBlob(papersPerTopic = 30): { nodes: SceneNode[]; links: SceneLink[] } {
+  const nodes: SceneNode[] = []
+  const links: SceneLink[] = []
+  for (const topic of ['t-retrieval', 't-vision']) {
+    nodes.push(sceneNode(topic, 'task'))
+    for (let i = 0; i < papersPerTopic; i += 1) {
+      const id = `${topic}-p${i}`
+      nodes.push(sceneNode(id, 'paper'))
+      links.push(edge(id, topic))
+    }
+  }
+  links.push(edge('t-retrieval-p1', 't-vision-p1'))
+  return { nodes, links }
+}
+
+describe('clusterAssignment', () => {
+  it('bleibt bei Komponenten, solange der Graph ein Archipel ist', () => {
+    // Vier getrennte Paare: keine Komponente erreicht die Schwelle.
+    const nodes = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((id) => sceneNode(id, 'paper'))
+    const links = [edge('a', 'b'), edge('c', 'd'), edge('e', 'f'), edge('g', 'h')]
+    const { assignment, labels } = clusterAssignment(nodes, links)
+    expect(labels.size).toBe(0) // Komponenten tragen keinen eigenen Namen
+    expect(assignment.get('a')).toBe(assignment.get('b'))
+    expect(assignment.get('a')).not.toBe(assignment.get('c'))
+    expect(new Set(assignment.values()).size).toBe(4)
+  })
+
+  it('teilt einen dominanten Klumpen nach Themen auf und benennt sie', () => {
+    // Zwei Aufgaben mit je 30 Papers, über eine Brücke verbunden: eine einzige
+    // Komponente, groß genug und dominant — genau der Fall nach dem Import.
+    const { nodes, links } = twoTopicBlob()
+    const { assignment, labels } = clusterAssignment(nodes, links)
+    expect(assignment.get('t-retrieval-p0')).toBe(assignment.get('t-retrieval'))
+    expect(assignment.get('t-vision-p0')).toBe(assignment.get('t-vision'))
+    expect(assignment.get('t-retrieval-p0')).not.toBe(assignment.get('t-vision-p0'))
+    expect([...labels.values()].sort()).toEqual(['t-retrieval', 't-vision'])
+  })
+
+  it('lässt kleine zusammenhängende Graphen in Ruhe', () => {
+    // Unter der absoluten Untergrenze bleibt es bei einer Komponente — ein Graph
+    // aus einer Handvoll Knoten zerfasert beim Aufteilen nur.
+    const nodes = [sceneNode('t1', 'task'), sceneNode('p1', 'paper'), sceneNode('p2', 'paper')]
+    const links = [edge('p1', 't1'), edge('p2', 't1')]
+    const { assignment, labels } = clusterAssignment(nodes, links)
+    expect(labels.size).toBe(0)
+    expect(new Set(assignment.values()).size).toBe(1)
+  })
+
+  it('vererbt das Thema an Knoten ohne eigenen Themen-Nachbarn', () => {
+    // Ein Code-Repo hängt nur an seinem Paper — ohne Zwischenschritt bliebe es themenlos.
+    const { nodes, links } = twoTopicBlob()
+    nodes.push(sceneNode('r1', 'repo'))
+    links.push(edge('r1', 't-retrieval-p0'))
+    const { assignment } = clusterAssignment(nodes, links)
+    expect(assignment.get('r1')).toBe(assignment.get('t-retrieval'))
+  })
+
+  it('ist deterministisch', () => {
+    const { nodes, links } = twoTopicBlob()
+    const first = clusterAssignment(nodes, links).assignment
+    const second = clusterAssignment(nodes, links).assignment
+    expect([...first.entries()]).toEqual([...second.entries()])
+  })
+})
+
+describe('buildScene im Themen-Modus', () => {
+  it('nennt Cluster nach ihrem Thema statt nach dem größten Knoten', () => {
+    // Papers tragen hier den höheren `val` — ohne Themennamen würde ein Papertitel
+    // zum Clusternamen und die Legende unlesbar.
+    const { nodes, links } = twoTopicBlob()
+    for (const n of nodes) n.val = n.kind === 'paper' ? 9 : 1
+    const data: GraphData = {
+      nodes: nodes.map((n) => ({
+        id: n.id,
+        kind: n.kind as GraphData['nodes'][number]['kind'],
+        name: n.id === 't-retrieval' ? 'Question Answering' : n.name,
+        status: n.status,
+        first_seen: n.first_seen,
+        val: n.val,
+        meta: {},
+      })),
+      links: links.map((l) => ({
+        source: endpoint(l.source),
+        target: endpoint(l.target),
+        relation: l.relation,
+        weight: l.weight,
+        status: l.status,
+      })),
+    }
+    const scene = buildScene(data, { theme: 'dark', groupMode: 'cluster', showSystem: false })
+    expect(scene.groups.map((g) => g.label)).toContain('Question Answering')
+    expect(scene.groups.length).toBeGreaterThan(1)
   })
 })

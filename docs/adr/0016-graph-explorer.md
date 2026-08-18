@@ -72,3 +72,30 @@ ein Hub-Knoten, Kanten wandern mit und werden aufaddiert).
 - Grenze: Die Themen-Cluster sind nur so gut wie die Kanten. Wächst der Korpus
   und verschmelzen Konzepte, werden die Inseln größer — der Sammelsektor ist
   ein Maß dafür, wie zerfasert der Graph gerade ist.
+
+## Nachtrag (18.08.2026): Cluster-Bildung folgt der Datenform
+
+Der Themen-Modus gruppierte nach Zusammenhangskomponenten. Das passte zum Archipel
+des Eigen-Korpus (365 Knoten, 49 Komponenten, größte 15,9 %). Nach dem
+Papers-with-Code-Import (ADR-0017) lagen **78,8 % aller Knoten in einer einzigen
+Komponente** — vier Fünftel des Bildes in einer Farbe, benannt nach einem
+zufälligen Knoten darin. Der Graph wirkte dadurch ärmer, nicht reicher.
+
+Gemessen wurden drei Verfahren auf der echten Nutzlast:
+
+| Verfahren | größte Gruppe (dicht) | größte Gruppe (nativ) |
+|---|---|---|
+| Zusammenhangskomponente | 78,8 % | 15,9 % |
+| Label-Propagation | 66,8 % | zerfasert |
+| Themenzuordnung (`task`/`concept`) | 12,9 % | zerfasert (199 Cluster) |
+
+Keines taugt für beide Formen — deshalb entscheidet jetzt die Datenform:
+Dominiert eine Komponente (≥ 35 % der Knoten **und** ≥ 50 Knoten), wird nach
+Themen gruppiert, sonst bleibt es bei Komponenten. Themen-Cluster tragen den
+Namen ihres Themenknotens („Retrieval", „Question Answering") statt der
+Notlösung, den bestvernetzten Knoten zum Namensgeber zu machen.
+
+Offen bleibt der Sammelsektor „Weitere Inseln": Er fasst alles jenseits der zehn
+größten Cluster zusammen und liegt bei rund der Hälfte der Knoten — vor wie nach
+dieser Änderung. Mehr Cluster brächten wenig (14 statt 10 Cluster decken 53,7 %
+statt 49,0 % ab) und kosten unterscheidbare Farben.
