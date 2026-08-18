@@ -4,7 +4,7 @@
 Wissens-Graphen, der nur aufnimmt, was durch eine Prüfung gekommen ist.**
 
 56 arXiv-Papers · 6.950 indexierte Chunks · 370 Graph-Knoten · Hit-Rate@5 **0,94**
-· 140 automatisierte Tests · 16 Architecture Decision Records
+· 162 automatisierte Tests · 17 Architecture Decision Records
 
 ```
 Frage ──▶ Hybrid-Retrieval ──▶ Kontext ──▶ LLM ──▶ Antwort mit Quellenangabe
@@ -36,7 +36,7 @@ Frage ──▶ Hybrid-Retrieval ──▶ Kontext ──▶ LLM ──▶ Antwo
 | **Datenmodellierung** | Chunks, Vektoren (HNSW), Graph-Tabellen, versionierte Migrationen — [`backend/app/db/`](backend/app/db/) |
 | **Frontend-Handwerk** | Canvas-Graph-Explorer mit vier Layouts, hell/dunkel, mobiltauglich — [`frontend/src/components/graph/`](frontend/src/components/graph/) |
 | **Betrieb** | Caddy-Prod-Stack, Deploy-Gate, Smoke-Test, erprobtes Restore — [`scripts/`](scripts/), [`docs/runbooks/`](docs/runbooks/) |
-| **Entscheidungen begründen** | 16 ADRs, inklusive der revidierten — [`docs/adr/`](docs/adr/) |
+| **Entscheidungen begründen** | 17 ADRs, inklusive der revidierten — [`docs/adr/`](docs/adr/) |
 
 **Drei Dateien, wenn die Zeit knapp ist:**
 [`retrieval/rrf.py`](backend/app/retrieval/rrf.py) (wie zwei Suchverfahren fusioniert werden),
@@ -65,7 +65,7 @@ Widersprüchliche Behauptungen werden als `disputed` markiert statt still
 und englisch) misst die Hit-Rate bei jedem Durchlauf. Als die Embeddings gewechselt
 wurden, lag die Zahl vorher und nachher auf dem Tisch: 0,88 → 0,94.
 
-**Entscheidungen sind dokumentiert.** 16 Architecture Decision Records halten fest,
+**Entscheidungen sind dokumentiert.** 17 Architecture Decision Records halten fest,
 was warum entschieden wurde — inklusive der Fälle, in denen sich eine Annahme als
 falsch herausstellte und der Weg korrigiert wurde.
 
@@ -147,6 +147,11 @@ Kanten erscheinen erst beim Überfahren eines Knotens; ein verschiebbares Menü
 trägt Suche, Regler (Knotengröße, Cluster-Abstand, Streuung, Detail-Tiefe) und das
 Kollabieren ganzer Cluster zu einem Hub. Ein Klick öffnet den Volltext des
 Quell-Dokuments direkt neben dem Graphen.
+
+Importierte Fremdquellen bleiben unterscheidbar: Ein Quellenfilter im Menü trennt
+den eigenen Korpus von Papers with Code, die Arten `Aufgaben` und `Code` tragen
+eigene Farben, und die Leseansicht nennt zu jedem importierten Knoten Herkunft,
+Lizenz und Abrufdatum (ADR-0017).
 
 ---
 
@@ -244,7 +249,7 @@ frontend/      React-SPA: Chat · Suche · Inbox · Wissen · Skills · Projekte
 mcp_server/    MCP-Werkzeuge für Claude Desktop
 eval/          Golden-Set, Hit-Rate-Messung, Parameter-Tuning
 scripts/       Korpus-Fetch · Reindex · Deploy-Gate · Smoke-Test · Backup
-docs/adr/      16 Architecture Decision Records · docs/runbooks/
+docs/adr/      17 Architecture Decision Records · docs/runbooks/
 ```
 
 ## Lizenz

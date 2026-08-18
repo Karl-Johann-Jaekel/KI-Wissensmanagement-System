@@ -22,7 +22,10 @@ export const KIND_TIER: Record<SceneKind, number> = {
   concept: 1,
   model: 1,
   dataset: 1,
+  // Aufgabengebiete gliedern das Wissen, Code-Repos belegen eine Quelle.
+  task: 1,
   paper: 2,
+  repo: 2,
   project: 3,
   service: 4,
 }
@@ -32,7 +35,9 @@ const KIND_LABELS: Record<SceneKind, string> = {
   concept: 'Konzepte',
   model: 'Modelle',
   dataset: 'Datasets',
+  task: 'Aufgaben',
   paper: 'Papers',
+  repo: 'Code',
   project: 'Projekte',
   service: 'Dienste',
 }
@@ -137,10 +142,12 @@ const LABEL_CHARS = 30
 
 /**
  * Namensgeber eines Clusters: das bestvernetzte Konzept — Konzeptnamen lesen sich
- * als Themen ("Retrieval-Augmented Generation"), Papertitel nicht.
+ * als Themen ("Retrieval-Augmented Generation"), Papertitel nicht. Aufgaben
+ * ("Question Answering") taugen ebenfalls als Themenname, Modelle nur notfalls.
  */
 function clusterLabel(list: SceneNode[]): string {
-  const rank = (n: SceneNode) => (n.kind === 'concept' ? 2 : n.kind === 'model' ? 1 : 0)
+  const RANK: Partial<Record<SceneKind, number>> = { concept: 3, task: 2, model: 1 }
+  const rank = (n: SceneNode) => RANK[n.kind] ?? 0
   const lead = [...list].sort(
     (a, b) => rank(b) - rank(a) || b.val - a.val || a.name.localeCompare(b.name),
   )[0]

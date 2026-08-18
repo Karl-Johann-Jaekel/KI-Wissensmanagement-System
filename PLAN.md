@@ -399,8 +399,10 @@ Lizenz- und DSGVO-Leitplanken für alle Schritte:
       `ACHIEVES_SOTA` (+ `RELATED_TO`, `USES`, `INTRODUCES`). Migration `0004`
       erweitert die CHECKs; `--limit`/`--match` schneiden die Teilmenge zu;
       `--ingest-abstracts` schreibt nach pgvector — ADR-0017
-- [ ] **11.2 Graph-Visualisierung der Fremdquelle:** neue Knotenarten und
-      Quellenfilter im bestehenden Force-Graph-Explorer
+- [x] **11.2 Graph-Visualisierung der Fremdquelle:** Knotenarten `task`/`repo`
+      mit eigenen Farben, Ebenen und Cluster-Namen im Force-Graph-Explorer;
+      Quellenfilter (alle / eigener Korpus / Papers with Code) im Menü;
+      Herkunftszeile (Quelle, Lizenz, Abrufdatum) in der Leseansicht
 - [ ] **11.3 Harvester-Grundgerüst:** arXiv (OAI-PMH, Delta über `updated_date`)
       und OpenReview API v2 — Rate-Limiting, Backoff, Dedupe (DOI + Titel-Hash),
       Fehlerbehandlung, inkrementeller Zustand

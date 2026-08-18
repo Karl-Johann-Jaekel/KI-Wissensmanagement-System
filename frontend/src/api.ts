@@ -1,13 +1,21 @@
-import type { GraphData } from './types'
+import type { GraphData, GraphSource } from './types'
 
 const BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? 'http://localhost:8000'
+
+/** Query string für `GET /graph` — `source: 'all'` bleibt weg, das ist der Default. */
+export function graphQuery(includePending: boolean, source: GraphSource = 'all'): string {
+  const params = new URLSearchParams({ include_pending: String(includePending) })
+  if (source !== 'all') params.set('source', source)
+  return params.toString()
+}
 
 /** Fetch the knowledge graph (pending nodes only visible with an admin key). */
 export async function fetchGraph(
   includePending = false,
   apiKey?: string | null,
+  source: GraphSource = 'all',
 ): Promise<GraphData> {
-  const res = await fetch(`${BASE}/graph?include_pending=${includePending}`, {
+  const res = await fetch(`${BASE}/graph?${graphQuery(includePending, source)}`, {
     headers: apiKey ? { 'X-API-Key': apiKey } : {},
   })
   if (!res.ok) throw new Error(`graph: HTTP ${res.status}`)

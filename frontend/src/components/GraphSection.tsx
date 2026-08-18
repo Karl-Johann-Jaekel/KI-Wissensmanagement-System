@@ -8,7 +8,7 @@ import { fetchChangelog, fetchGraph, type ChangelogItem } from '../api'
 import { useAdminKey } from '../app/AdminKeyContext'
 import { useProjects } from '../lib/storage'
 import { useTheme } from '../lib/theme'
-import { endpointId, type GraphData } from '../types'
+import { endpointId, type GraphData, type GraphSource } from '../types'
 import { useElementSize } from '../useElementSize'
 import ControlPanel from './graph/ControlPanel'
 import GraphCanvas from './graph/GraphCanvas'
@@ -40,6 +40,7 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
   const [selected, setSelected] = useState<SceneNode | null>(null)
   const [includePending, setIncludePending] = useState(false)
   const [filterDays, setFilterDays] = useState<number | null>(null)
+  const [source, setSource] = useState<GraphSource>('all')
   const [changelog, setChangelog] = useState<ChangelogItem[]>([])
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [query, setQuery] = useState('')
@@ -52,7 +53,7 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
     let cancelled = false
     setStatus('loading')
     setSelected(null)
-    fetchGraph(includePending, adminKey)
+    fetchGraph(includePending, adminKey, source)
       .then((d) => {
         if (cancelled) return
         setData(d)
@@ -69,7 +70,7 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
     return () => {
       cancelled = true
     }
-  }, [includePending, refreshKey, adminKey])
+  }, [includePending, refreshKey, adminKey, source])
 
   const prefsRef = useRef(prefs)
   const persist = useCallback((patch: Partial<GraphPrefs>) => {
@@ -178,8 +179,17 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
         )}
         {status === 'ready' && scene.nodes.length === 0 && (
           <div className="absolute inset-0 grid place-items-center p-6 text-center text-muted">
-            Keine Knoten in dieser Ansicht. Der Graph füllt sich über den
-            Living-Knowledge-Loop (<code>python -m app.update</code>).
+            {source === 'paperswithcode' ? (
+              <span>
+                Keine Fremdquellen-Knoten. Der Papers-with-Code-Dump wird über{' '}
+                <code>python -m app.corpus.pwc</code> importiert.
+              </span>
+            ) : (
+              <span>
+                Keine Knoten in dieser Ansicht. Der Graph füllt sich über den
+                Living-Knowledge-Loop (<code>python -m app.update</code>).
+              </span>
+            )}
           </div>
         )}
         {status === 'ready' && scene.nodes.length > 0 && width > 0 && (
@@ -215,6 +225,8 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
             onCollapseAll={() => setCollapsed(new Set(base.groups.map((g) => g.id)))}
             filterDays={filterDays}
             onFilterDays={setFilterDays}
+            source={source}
+            onSource={setSource}
             canSeePending={!!adminKey}
             includePending={includePending}
             onIncludePending={setIncludePending}

@@ -7,6 +7,7 @@ import {
   collapseGroups,
   connectedComponents,
   endpoint,
+  KIND_TIER,
   searchMatches,
   SERVICES,
   SYSTEM_ID,
@@ -217,5 +218,74 @@ describe('searchMatches', () => {
     const scene = buildScene(DATA, { theme: 'dark', groupMode: 'kind', showSystem: false })
     expect(searchMatches(scene, 'transformer')).toEqual(new Set(['c1']))
     expect(searchMatches(scene, '  ')).toBeNull()
+  })
+})
+
+/**
+ * Fremdquellen-Arten (Papers with Code, ADR-0017): `task` gliedert wie ein Konzept,
+ * `repo` belegt wie ein Paper — sie müssen in Ebenen, Farben und Cluster-Namen
+ * ankommen, sonst fallen importierte Knoten aus der Erzählung des Explorers.
+ */
+const PWC: GraphData = {
+  nodes: [
+    {
+      id: 't1',
+      kind: 'task',
+      name: 'Question Answering',
+      status: 'verified',
+      first_seen: '2026-08-18T00:00:00Z',
+      val: 8,
+      meta: { provenance: { source: 'paperswithcode' } },
+    },
+    {
+      id: 'r1',
+      kind: 'repo',
+      name: 'huggingface/transformers',
+      status: 'verified',
+      first_seen: '2026-08-18T00:00:00Z',
+      val: 4,
+      meta: { provenance: { source: 'paperswithcode' } },
+    },
+    {
+      id: 'p9',
+      kind: 'paper',
+      name: 'RAG',
+      status: 'verified',
+      first_seen: '2026-08-18T00:00:00Z',
+      val: 5,
+      meta: {},
+    },
+  ],
+  links: [
+    { source: 'r1', target: 'p9', relation: 'IMPLEMENTS', weight: 1, status: 'verified' },
+    { source: 'p9', target: 't1', relation: 'RELATED_TO', weight: 1, status: 'verified' },
+  ],
+}
+
+describe('Fremdquellen-Knotenarten', () => {
+  it('legt task auf die Wissens-, repo auf die Quellenebene', () => {
+    expect(KIND_TIER.task).toBe(KIND_TIER.concept)
+    expect(KIND_TIER.repo).toBe(KIND_TIER.paper)
+  })
+
+  it('gibt jeder Art eine eigene Gruppe mit eigener Farbe', () => {
+    const scene = buildScene(PWC, { theme: 'dark', groupMode: 'kind', showSystem: false })
+    const groups = new Map(scene.groups.map((g) => [g.id, g]))
+    expect(groups.get('task')?.label).toBe('Aufgaben')
+    expect(groups.get('repo')?.label).toBe('Code')
+    const colors = scene.groups.map((g) => g.color)
+    expect(new Set(colors).size).toBe(colors.length)
+  })
+
+  it('benennt einen Cluster nach der Aufgabe, wenn kein Konzept darin liegt', () => {
+    const scene = buildScene(PWC, { theme: 'dark', groupMode: 'cluster', showSystem: false })
+    expect(scene.groups.map((g) => g.label)).toContain('Question Answering')
+  })
+
+  it('kollabiert eine Fremdquellen-Gruppe wie jede andere', () => {
+    const scene = buildScene(PWC, { theme: 'dark', groupMode: 'kind', showSystem: false })
+    const hub = collapseGroups(scene, new Set(['repo'])).nodes.find((n) => n.members)
+    expect(hub?.name).toBe('Code')
+    expect(hub?.members).toEqual(['r1'])
   })
 })

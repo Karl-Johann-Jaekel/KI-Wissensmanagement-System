@@ -1,4 +1,14 @@
-export type NodeKind = 'paper' | 'concept' | 'model' | 'dataset'
+/** `task` und `repo` kommen aus Fremdquellen (Papers with Code, ADR-0017). */
+export type NodeKind = 'paper' | 'concept' | 'model' | 'dataset' | 'task' | 'repo'
+
+/** Quellenfilter für `GET /graph` — `native` = alles außer Fremdquellen. */
+export type GraphSource = 'all' | 'paperswithcode' | 'native'
+
+export const GRAPH_SOURCES: { id: GraphSource; label: string }[] = [
+  { id: 'all', label: 'alle' },
+  { id: 'native', label: 'eigener Korpus' },
+  { id: 'paperswithcode', label: 'Papers with Code' },
+]
 
 export interface GraphNode {
   id: string
@@ -44,12 +54,16 @@ export const KIND_COLORS: Record<'light' | 'dark', Record<NodeKind, string>> = {
     model: '#dc2626', // red-600
     // violett statt cyan: neben dem blauen paper-Knoten sonst nicht unterscheidbar
     dataset: '#7c3aed', // violet-600
+    task: '#65a30d', // lime-600 — deutlich neben dem Smaragd der Projekte
+    repo: '#db2777', // pink-600
   },
   dark: {
     paper: '#60a5fa', // primary-400
     concept: '#fbbf24', // amber-400
     model: '#f87171', // red-400
     dataset: '#a78bfa', // violet-400
+    task: '#a3e635', // lime-400
+    repo: '#f472b6', // pink-400
   },
 }
 

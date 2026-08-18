@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown, Minus, Search } from 'lucide-react'
 import type { ChangelogItem } from '../../api'
 import { cn } from '../../lib/cn'
+import { GRAPH_SOURCES, type GraphSource } from '../../types'
 import { LAYOUTS } from './layouts'
 import type { SceneGroup } from './scene'
 import { SLIDERS, type GraphSettings } from './settings'
@@ -26,6 +27,8 @@ interface Props {
   onCollapseAll: () => void
   filterDays: number | null
   onFilterDays: (days: number | null) => void
+  source: GraphSource
+  onSource: (source: GraphSource) => void
   canSeePending: boolean
   includePending: boolean
   onIncludePending: (value: boolean) => void
@@ -151,6 +154,8 @@ export default function ControlPanel({
   onCollapseAll,
   filterDays,
   onFilterDays,
+  source,
+  onSource,
   canSeePending,
   includePending,
   onIncludePending,
@@ -391,6 +396,20 @@ export default function ControlPanel({
           </Section>
 
           <Section title="Filter">
+            <label className="flex items-center justify-between text-[11px] text-ink">
+              Quelle
+              <select
+                value={source}
+                onChange={(e) => onSource(e.target.value as GraphSource)}
+                className="rounded border border-edge bg-surface px-1.5 py-0.5 text-[11px] text-ink focus:outline-none"
+              >
+                {GRAPH_SOURCES.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="flex items-center justify-between text-[11px] text-ink">
               Neu
               <select
