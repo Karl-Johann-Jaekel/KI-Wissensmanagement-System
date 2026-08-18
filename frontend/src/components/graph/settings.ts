@@ -24,6 +24,8 @@ export interface GraphSettings {
   detail: number
   /** Drift und Globus-Rotation (respektiert zusätzlich prefers-reduced-motion). */
   motion: boolean
+  /** Additiver Halo um die Knoten — nur im dunklen Theme wirksam. */
+  glow: boolean
 }
 
 export interface GraphPrefs {
@@ -44,6 +46,7 @@ export const DEFAULT_SETTINGS: GraphSettings = {
   spread: 1.45,
   detail: 5,
   motion: true,
+  glow: true,
 }
 
 export const SLIDERS = {
@@ -85,6 +88,7 @@ export function normalizeSettings(raw: unknown): GraphSettings {
     spread: clamp(s.spread, DEFAULT_SETTINGS.spread, SLIDERS.spread.min, SLIDERS.spread.max),
     detail: Math.round(clamp(s.detail, DEFAULT_SETTINGS.detail, SLIDERS.detail.min, SLIDERS.detail.max)),
     motion: bool(s.motion, DEFAULT_SETTINGS.motion),
+    glow: bool(s.glow, DEFAULT_SETTINGS.glow),
   }
 }
 

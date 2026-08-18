@@ -22,7 +22,10 @@ export const KIND_TIER: Record<SceneKind, number> = {
   concept: 1,
   model: 1,
   dataset: 1,
+  // Aufgabengebiete gliedern das Wissen, Code-Repos belegen eine Quelle.
+  task: 1,
   paper: 2,
+  repo: 2,
   project: 3,
   service: 4,
 }
@@ -32,16 +35,35 @@ const KIND_LABELS: Record<SceneKind, string> = {
   concept: 'Konzepte',
   model: 'Modelle',
   dataset: 'Datasets',
+  task: 'Aufgaben',
   paper: 'Papers',
+  repo: 'Code',
   project: 'Projekte',
   service: 'Dienste',
 }
 
-/** Farben je Knotenart; Wissensarten erben die bestehende Graph-Palette. */
+/**
+ * Farben je Knotenart; Wissensarten erben die bestehende Graph-Palette.
+ * Dienste tragen Türkis (vorher Grau); Projekte weichen deshalb auf Smaragd aus,
+ * damit die beiden äußeren Schichten unterscheidbar bleiben.
+ */
 export const SCENE_COLORS: Record<Theme, Record<SceneKind, string>> = {
-  light: { ...KIND_COLORS.light, system: '#ea580c', project: '#0d9488', service: '#64748b' },
-  dark: { ...KIND_COLORS.dark, system: '#fb923c', project: '#2dd4bf', service: '#94a3b8' },
+  light: { ...KIND_COLORS.light, system: '#ea580c', project: '#059669', service: '#0d9488' },
+  dark: { ...KIND_COLORS.dark, system: '#fb923c', project: '#34d399', service: '#2dd4bf' },
 }
+
+/** Sammelsektor „Weitere Inseln" — gedämpftes Türkis, klar neben den Diensten. */
+const REST_COLOR: Record<Theme, string> = { light: '#0f766e', dark: '#5eead4' }
+
+/**
+ * Ab so vielen Knoten wird der Sammelsektor nach Knotenart aufgefächert.
+ *
+ * Der lange Schwanz kleiner Themen war nach dem Fremdquellen-Import kein Schwanz
+ * mehr, sondern die Hälfte des Graphen (gemessen: 1.018 von 2.000 Knoten) — als
+ * ein Klumpen in einer Farbe. Nach Art getrennt bleibt er lesbar, und die Farbe
+ * sagt wenigstens noch, *was* dort liegt.
+ */
+const REST_SPLIT_MIN = 120
 
 /** Farbkreis für Themen-Cluster (Gruppenmodus „Themen"). */
 const CLUSTER_PALETTE: Record<Theme, string[]> = {
@@ -130,10 +152,12 @@ const LABEL_CHARS = 30
 
 /**
  * Namensgeber eines Clusters: das bestvernetzte Konzept — Konzeptnamen lesen sich
- * als Themen ("Retrieval-Augmented Generation"), Papertitel nicht.
+ * als Themen ("Retrieval-Augmented Generation"), Papertitel nicht. Aufgaben
+ * ("Question Answering") taugen ebenfalls als Themenname, Modelle nur notfalls.
  */
 function clusterLabel(list: SceneNode[]): string {
-  const rank = (n: SceneNode) => (n.kind === 'concept' ? 2 : n.kind === 'model' ? 1 : 0)
+  const RANK: Partial<Record<SceneKind, number>> = { concept: 3, task: 2, model: 1 }
+  const rank = (n: SceneNode) => RANK[n.kind] ?? 0
   const lead = [...list].sort(
     (a, b) => rank(b) - rank(a) || b.val - a.val || a.name.localeCompare(b.name),
   )[0]
@@ -148,16 +172,7 @@ function hashPhase(id: string): number {
 
 // ------------------------------------------------------------------ Cluster
 
-/**
- * Themen-Cluster = Zusammenhangskomponente.
- *
- * Der Korpus ist ein Archipel: 370 Knoten verteilen sich auf ~48 Komponenten rund
- * um je ein bis drei Papers, weil geteilte Konzepte nur bei kanonisch gleichem
- * Namen zusammenfallen (ADR-0012). Label-Propagation zerfiel darauf in Splitter;
- * die Komponente ist die Gruppierung, die den Daten wirklich entspricht.
- * Schlüssel ist die kleinste Knoten-Id der Komponente — deterministisch.
- */
-export function connectedComponents(nodes: SceneNode[], links: SceneLink[]): Map<string, string> {
+function adjacency(nodes: SceneNode[], links: SceneLink[]): Map<string, string[]> {
   const neighbours = new Map<string, string[]>(nodes.map((n) => [n.id, []]))
   for (const l of links) {
     const s = endpoint(l.source)
@@ -165,23 +180,129 @@ export function connectedComponents(nodes: SceneNode[], links: SceneLink[]): Map
     neighbours.get(s)?.push(t)
     neighbours.get(t)?.push(s)
   }
+  return neighbours
+}
+
+/**
+ * Zusammenhangskomponenten. Schlüssel ist die kleinste Knoten-Id — deterministisch.
+ */
+export function connectedComponents(nodes: SceneNode[], links: SceneLink[]): Map<string, string> {
+  const neighbours = adjacency(nodes, links)
   const label = new Map<string, string>()
   for (const start of [...nodes].sort((a, b) => a.id.localeCompare(b.id))) {
     if (label.has(start.id)) continue
     const stack = [start.id]
-    const seen = [start.id]
     label.set(start.id, start.id)
     while (stack.length > 0) {
       const id = stack.pop() as string
       for (const nb of neighbours.get(id) ?? []) {
         if (label.has(nb)) continue
         label.set(nb, start.id)
-        seen.push(nb)
         stack.push(nb)
       }
     }
   }
   return label
+}
+
+/** Arten, die ein Thema benennen können — Aufgaben zuerst, dann Konzepte. */
+const TOPIC_KINDS: SceneKind[] = ['task', 'concept']
+
+/**
+ * Themenzuordnung: Jeder Knoten geht an seinen bestvernetzten Themen-Nachbarn
+ * (`task` oder `concept`). Knoten ohne direkten Themen-Nachbarn — Code-Repos etwa
+ * hängen nur an ihrem Paper — erben das Thema über einen Zwischenschritt.
+ */
+export function topicGroups(
+  nodes: SceneNode[],
+  links: SceneLink[],
+): { assignment: Map<string, string>; labels: Map<string, string> } {
+  const neighbours = adjacency(nodes, links)
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const degree = new Map([...neighbours].map(([id, list]) => [id, list.length]))
+  const isTopic = (id: string) => {
+    const kind = byId.get(id)?.kind
+    return !!kind && TOPIC_KINDS.includes(kind)
+  }
+  // Stärkster Themen-Nachbar; bei Gleichstand die kleinere Id, damit die Zuordnung
+  // reproduzierbar bleibt.
+  const strongestTopic = (id: string): string | null => {
+    let best: string | null = null
+    for (const nb of neighbours.get(id) ?? []) {
+      if (!isTopic(nb)) continue
+      const better =
+        best === null ||
+        (degree.get(nb) ?? 0) > (degree.get(best) ?? 0) ||
+        ((degree.get(nb) ?? 0) === (degree.get(best) ?? 0) && nb < best)
+      if (better) best = nb
+    }
+    return best
+  }
+
+  const assignment = new Map<string, string>()
+  const labels = new Map<string, string>()
+  for (const node of [...nodes].sort((a, b) => a.id.localeCompare(b.id))) {
+    let topic = isTopic(node.id) ? node.id : strongestTopic(node.id)
+    if (topic === null) {
+      for (const nb of [...(neighbours.get(node.id) ?? [])].sort()) {
+        topic = strongestTopic(nb)
+        if (topic !== null) break
+      }
+    }
+    // Ohne Thema bleibt der Knoten für sich; als Einzelgruppe fällt er später in
+    // den Sammelsektor.
+    const group = `cluster:${topic ?? node.id}`
+    assignment.set(node.id, group)
+    if (topic !== null && !labels.has(group)) {
+      labels.set(group, byId.get(topic)?.name ?? '')
+    }
+  }
+  return { assignment, labels }
+}
+
+/**
+ * Ab diesem Anteil in einer einzigen Komponente gilt der Graph als dicht.
+ * Zwischen den beiden gemessenen Wirklichkeiten liegt viel Luft: eigener Korpus
+ * 15,9 %, nach dem Papers-with-Code-Import 78,8 %.
+ */
+const GIANT_COMPONENT_SHARE = 0.35
+
+/**
+ * …und so groß muss sie mindestens sein. Ein zusammenhängender Graph aus einer
+ * Handvoll Knoten ist auch als ein Cluster lesbar; aufgeteilt würde er nur zerfasern.
+ */
+const GIANT_COMPONENT_MIN = 50
+
+/**
+ * Cluster-Bildung, die sich an der Form der Daten ausrichtet.
+ *
+ * **Archipel** (eigener Korpus): 370 Knoten in ~48 Komponenten rund um je ein bis
+ * drei Papers, weil geteilte Konzepte nur bei kanonisch gleichem Namen
+ * zusammenfallen (ADR-0012). Hier ist die Komponente die ehrliche Gruppierung —
+ * Label-Propagation zerfiel darauf in Splitter, eine Themenzuordnung ebenso
+ * (gemessen: 199 Cluster auf 365 Knoten).
+ *
+ * **Dichter Graph** (nach dem Fremdquellen-Import): 78,8 % aller Knoten liegen in
+ * einer Komponente. Die Komponente sagt dann nichts mehr — sie färbt vier Fünftel
+ * des Bildes gleich. Dort greift die Themenzuordnung: größte Gruppe 13,4 %, und
+ * die Namen sind echte Gebiete („Retrieval", „Question Answering") statt der
+ * Notlösung, den bestvernetzten Knoten zum Namensgeber zu machen.
+ */
+export function clusterAssignment(
+  nodes: SceneNode[],
+  links: SceneLink[],
+): { assignment: Map<string, string>; labels: Map<string, string> } {
+  const components = connectedComponents(nodes, links)
+  const sizes = new Map<string, number>()
+  for (const key of components.values()) sizes.set(key, (sizes.get(key) ?? 0) + 1)
+  const largest = Math.max(0, ...sizes.values())
+
+  if (largest >= GIANT_COMPONENT_MIN && largest / nodes.length >= GIANT_COMPONENT_SHARE) {
+    return topicGroups(nodes, links)
+  }
+  const assignment = new Map<string, string>()
+  for (const [id, key] of components) assignment.set(id, `cluster:${key}`)
+  return { assignment, labels: new Map() }
 }
 
 // ------------------------------------------------------------------ Aufbau
@@ -219,10 +340,10 @@ export function buildScene(data: GraphData, opts: BuildOptions): Scene {
   const addGroup = (g: SceneGroup) => groups.set(g.id, g)
 
   if (groupMode === 'cluster') {
-    const label = connectedComponents(knowledge, links)
+    const { assignment, labels } = clusterAssignment(knowledge, links)
     const members = new Map<string, SceneNode[]>()
     for (const n of knowledge) {
-      const key = label.get(n.id) ?? n.id
+      const key = assignment.get(n.id) ?? `cluster:${n.id}`
       const list = members.get(key)
       if (list) list.push(n)
       else members.set(key, [n])
@@ -232,27 +353,49 @@ export function buildScene(data: GraphData, opts: BuildOptions): Scene {
       (a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]),
     )
     const rest: SceneNode[] = []
-    ordered.forEach(([key, list], index) => {
+    ordered.forEach(([id, list], index) => {
       if (index >= MAX_CLUSTERS) {
         rest.push(...list) // Der lange Schwanz kleiner Inseln wird ein Sammelsektor.
         return
       }
-      const id = `cluster:${key}`
       for (const n of list) n.group = id
       addGroup({
         id,
-        label: clusterLabel(list),
+        // Themen-Cluster kennen ihren Namen; sonst rät `clusterLabel`.
+        label: labels.get(id) ?? clusterLabel(list),
         color: palette[index % palette.length],
         tier: 1,
         count: list.length,
       })
     })
-    if (rest.length > 0) {
+    if (rest.length >= REST_SPLIT_MIN) {
+      const byKind = new Map<SceneKind, SceneNode[]>()
+      for (const n of rest) {
+        const list = byKind.get(n.kind)
+        if (list) list.push(n)
+        else byKind.set(n.kind, [n])
+      }
+      const ordered = [...byKind.entries()].sort(
+        (a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]),
+      )
+      for (const [kind, list] of ordered) {
+        const id = `${REST_GROUP}:${kind}`
+        for (const n of list) n.group = id
+        addGroup({
+          id,
+          label: `Weitere · ${KIND_LABELS[kind]}`,
+          // Ohne Thema bleibt die Art die einzige ehrliche Aussage — also ihre Farbe.
+          color: kindColors[kind] ?? REST_COLOR[theme],
+          tier: 1,
+          count: list.length,
+        })
+      }
+    } else if (rest.length > 0) {
       for (const n of rest) n.group = REST_GROUP
       addGroup({
         id: REST_GROUP,
         label: 'Weitere Inseln',
-        color: kindColors.service,
+        color: REST_COLOR[theme],
         tier: 1,
         count: rest.length,
       })

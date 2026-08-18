@@ -6,18 +6,25 @@
  * selbst in `onRenderFramePre` und ziehen die Knoten weich auf ihr Ziel — dadurch
  * sind Layout-Wechsel animiert und die Kugeln bleiben trotzdem in Bewegung.
  */
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
-import { LANDMARK_COLOR } from '../../types'
+import { FALLBACK_COLOR, LANDMARK_COLOR } from '../../types'
 import {
-  BASE,
   clusterCenters,
   layoutTargets,
   ringGeometry,
   tierLabelPositions,
   type Target,
 } from './layouts'
-import { endpoint, SCENE_COLORS, TIER_LABELS, type Scene, type SceneLink, type SceneNode, type Theme } from './scene'
+import {
+  endpoint,
+  SCENE_COLORS,
+  TIER_LABELS,
+  type Scene,
+  type SceneLink,
+  type SceneNode,
+  type Theme,
+} from './scene'
 import type { GraphSettings } from './settings'
 
 interface Props {
@@ -35,6 +42,14 @@ interface Props {
   onBackgroundClick: () => void
   onHover?: (node: SceneNode | null) => void
   onInstance?: (fg: unknown | null) => void
+  /** Rotation und Drift anhalten (z. B. während ein Knoten ausgewählt ist). */
+  paused?: boolean
+  /**
+   * Manueller Dreh-Offset (Radiant), von außen gesetzt — etwa durch Ziehen auf der
+   * Minimap. Ein Ref statt eines Props: Ändert sich pro Mausbewegung, ein State
+   * würde bei jedem Pixel neu rendern (siehe Minimap-Kommentar zum selben Thema).
+   */
+  rotationOffsetRef?: MutableRefObject<number>
 }
 
 const DIM_ALPHA = 0.1
@@ -65,6 +80,14 @@ function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 }
 
+/** `#rrggbb` → `rgba(r,g,b,a)`; Gruppenfarben liegen als Hex vor. */
+function withAlpha(hex: string, alpha: number): string {
+  const value = hex.replace('#', '')
+  const full = value.length === 3 ? value.replace(/./g, (c) => c + c) : value
+  const int = parseInt(full, 16)
+  return `rgba(${(int >> 16) & 255},${(int >> 8) & 255},${int & 255},${alpha})`
+}
+
 /** Radius aus Wissensmenge (`val`), Slider und Tiefe. */
 export function nodeRadius(node: SceneNode, nodeSize: number): number {
   const base = 2 + Math.sqrt(Math.max(0.4, node.val)) * 1.6
@@ -86,6 +109,8 @@ export default function GraphCanvas({
   onBackgroundClick,
   onHover,
   onInstance,
+  paused = false,
+  rotationOffsetRef,
 }: Props) {
   const fgRef = useRef<any>(null)
   const hoverRef = useRef<string | null>(null)
@@ -96,7 +121,8 @@ export default function GraphCanvas({
 
   const groupColor = useMemo(() => {
     const map = new Map(scene.groups.map((g) => [g.id, g.color]))
-    return (node: SceneNode) => map.get(node.group) ?? SCENE_COLORS[theme][node.kind] ?? '#94a3b8'
+    return (node: SceneNode) =>
+      map.get(node.group) ?? SCENE_COLORS[theme][node.kind] ?? FALLBACK_COLOR[theme]
   }, [scene.groups, theme])
 
   const layoutOpts = useMemo(
@@ -192,7 +218,7 @@ export default function GraphCanvas({
     const now = performance.now()
     const dt = Math.min(64, now - clockRef.current)
     clockRef.current = now
-    const animate = settings.motion && !prefersReducedMotion()
+    const animate = settings.motion && !prefersReducedMotion() && !paused
 
     if (settings.layout === 'cloud') {
       if (!animate) return
@@ -208,9 +234,12 @@ export default function GraphCanvas({
 
     if (settings.layout === 'globe') {
       if (animate) rotationRef.current += dt * 0.00012
+      // Manuelles Drehen (Minimap-Ziehen) wirkt immer, auch bei angehaltener
+      // Automatik — sonst ließe sich ein pausierter Globus nicht erkunden.
+      const manual = rotationOffsetRef?.current ?? 0
       targetsRef.current = layoutTargets('globe', scene.nodes, {
         ...layoutOpts,
-        rotation: rotationRef.current,
+        rotation: rotationRef.current + manual,
       })
     }
 
@@ -230,7 +259,7 @@ export default function GraphCanvas({
       n.fy = n.y
       n.depth = target.depth
     }
-  }, [scene, settings.layout, settings.motion, layoutOpts])
+  }, [scene, settings.layout, settings.motion, paused, layoutOpts, rotationOffsetRef])
 
   // ----------------------------------------------------------- Zeichnen
 
@@ -252,13 +281,6 @@ export default function GraphCanvas({
         ctx.beginPath()
         ctx.arc(0, 0, geo.inner, 0, 2 * Math.PI)
         ctx.stroke()
-      } else if (settings.layout === 'layers') {
-        for (const pos of tierLabelPositions('layers', layoutOpts)) {
-          ctx.beginPath()
-          ctx.moveTo(-BASE * 1.15, pos.y)
-          ctx.lineTo(BASE * 1.15, pos.y)
-          ctx.stroke()
-        }
       }
       ctx.restore()
     },
@@ -270,13 +292,40 @@ export default function GraphCanvas({
       const bright = isBright(node.id)
       const r = nodeRadius(node, settings.nodeSize)
       const color = groupColor(node)
+      const glow = settings.glow && theme === 'dark'
       const depth = node.depth ?? 1
       const x = node.x ?? 0
       const y = node.y ?? 0
       ctx.globalAlpha = bright ? 0.45 + 0.55 * depth : DIM_ALPHA
 
-      // Kern und Hubs bekommen einen Schein — sie tragen die Struktur.
-      if (bright && (node.kind === 'system' || node.members)) {
+      // Leuchten: additiver Halo auf dunklem Grund. Große Knoten und Hubs bekommen
+      // einen weichen Verlauf, das Punktraster nur einen billigen Schein — ein
+      // Gradient je Knoten und Frame wäre bei mehreren hundert Knoten zu teuer.
+      if (glow && bright) {
+        const structuralGlow = node.kind === 'system' || !!node.members
+        ctx.globalCompositeOperation = 'lighter'
+        if (r > 5 || structuralGlow || node.id === hoverRef.current) {
+          const halo = r * (structuralGlow ? 5 : 3.6)
+          const gradient = ctx.createRadialGradient(x, y, 0, x, y, halo)
+          gradient.addColorStop(0, withAlpha(color, 0.5))
+          gradient.addColorStop(0.4, withAlpha(color, 0.14))
+          gradient.addColorStop(1, withAlpha(color, 0))
+          ctx.globalAlpha = 1
+          ctx.fillStyle = gradient
+          ctx.beginPath()
+          ctx.arc(x, y, halo, 0, 2 * Math.PI)
+          ctx.fill()
+        } else {
+          ctx.globalAlpha = 0.16
+          ctx.fillStyle = color
+          ctx.beginPath()
+          ctx.arc(x, y, r * 2.2, 0, 2 * Math.PI)
+          ctx.fill()
+        }
+        ctx.globalCompositeOperation = 'source-over'
+        ctx.globalAlpha = 0.45 + 0.55 * depth
+      } else if (bright && (node.kind === 'system' || node.members)) {
+        // Helles Theme: flacher Schein statt Bloom.
         ctx.globalAlpha = 0.28
         ctx.beginPath()
         ctx.arc(x, y, r + 6, 0, 2 * Math.PI)
@@ -325,7 +374,16 @@ export default function GraphCanvas({
       }
       ctx.globalAlpha = 1
     },
-    [isBright, groupColor, settings.nodeSize, settings.labels, selectedId, styles, theme],
+    [
+      isBright,
+      groupColor,
+      settings.nodeSize,
+      settings.labels,
+      settings.glow,
+      selectedId,
+      styles,
+      theme,
+    ],
   )
 
   const paintPointerArea = useCallback(
@@ -349,35 +407,44 @@ export default function GraphCanvas({
 
       // Ring/Ebenen tragen zusätzlich die Namen der Systemschichten.
       if (settings.layout === 'ring' || settings.layout === 'layers') {
-        ctx.fillStyle = styles.tier
         ctx.textAlign = settings.layout === 'layers' ? 'left' : 'center'
         for (const pos of tierLabelPositions(settings.layout, layoutOpts)) {
+          // In den Ebenen färbt die Reihe ihren Namen — wie ihre Knoten.
+          ctx.fillStyle =
+            settings.layout === 'layers'
+              ? (scene.groups.find((g) => g.tier === pos.tier)?.color ?? styles.tier)
+              : styles.tier
+          ctx.globalAlpha = settings.layout === 'layers' ? 0.8 : 1
           ctx.fillText(TIER_LABELS[pos.tier].toUpperCase(), pos.x, pos.y)
         }
+        ctx.globalAlpha = 1
         ctx.textAlign = 'center'
-        if (settings.layout === 'layers') {
-          ctx.restore()
-          return
-        }
       }
 
-      // Cluster-Namen am Schwerpunkt ihrer Knoten (Wolke, Globus, Ring-Sektoren).
-      const sums = new Map<string, { x: number; y: number; n: number; top: number }>()
+      // Cluster-Namen: in den Ebenen unter der Spalte, sonst über der Wolke.
+      const sums = new Map<string, { x: number; y: number; n: number; top: number; bottom: number }>()
       for (const node of scene.nodes) {
         if (node.synthetic) continue
-        const acc = sums.get(node.group) ?? { x: 0, y: 0, n: 0, top: Infinity }
+        const acc = sums.get(node.group) ?? { x: 0, y: 0, n: 0, top: Infinity, bottom: -Infinity }
         acc.x += node.x ?? 0
         acc.y += node.y ?? 0
         acc.n += 1
         acc.top = Math.min(acc.top, node.y ?? 0)
+        acc.bottom = Math.max(acc.bottom, node.y ?? 0)
         sums.set(node.group, acc)
       }
+      const layers = settings.layout === 'layers'
       for (const group of scene.groups) {
         const acc = sums.get(group.id)
         if (!acc || acc.n === 0) continue
         ctx.fillStyle = group.color
-        ctx.globalAlpha = 0.75
-        ctx.fillText(group.label.toUpperCase(), acc.x / acc.n, acc.top - 12 / scale)
+        ctx.globalAlpha = layers ? 0.65 : 0.75
+        const label = group.label.toUpperCase()
+        ctx.fillText(
+          layers && label.length > 14 ? `${label.slice(0, 13)}…` : label,
+          acc.x / acc.n,
+          layers ? acc.bottom + 16 / scale : acc.top - 12 / scale,
+        )
       }
       ctx.restore()
     },

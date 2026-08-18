@@ -38,8 +38,22 @@ export default function ReaderPanel({ node, members, onSelectNode, onClose }: Pr
     confidence?: number
     projectId?: string
     source_document_ids?: string[]
+    // Fremdquellen-Felder (Papers with Code, ADR-0017)
+    url?: string
+    arxiv_id?: string
+    date?: string
+    framework?: string
+    is_official?: boolean
+    full_name?: string
+    provenance?: { source?: string; source_url?: string; fetched_at?: string; license?: string }
   }
   const docId = meta.source_document_ids?.[0]
+  const arxivId = meta.arxiv ?? meta.arxiv_id
+  const sourceUrl = meta.uri ?? meta.url ?? (arxivId ? `https://arxiv.org/abs/${arxivId}` : null)
+  const prov = meta.provenance
+  // "none" ist im PwC-Dump der Platzhalter für "kein Framework erkannt".
+  const usableFramework = meta.framework && meta.framework !== 'none' ? meta.framework : null
+  const otherName = meta.full_name && meta.full_name !== node.name ? meta.full_name : null
   const [doc, setDoc] = useState<DocumentDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -113,6 +127,25 @@ export default function ReaderPanel({ node, members, onSelectNode, onClose }: Pr
           </div>
         )}
 
+        {(meta.is_official || usableFramework || otherName) && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+            {meta.is_official && <Badge tone="green">offizielle Implementierung</Badge>}
+            {usableFramework && <Badge tone="sky">{meta.framework}</Badge>}
+            {otherName && <span className="text-muted">{meta.full_name}</span>}
+          </div>
+        )}
+
+        {prov?.source && (
+          <div className="mb-3 rounded-lg border border-edge bg-sunken px-2.5 py-2 text-[11px] text-muted">
+            <span className="font-medium text-ink">Herkunft:</span>{' '}
+            {prov.source === 'paperswithcode' ? 'Papers with Code' : prov.source}
+            {prov.license ? ` · ${prov.license}` : ''}
+            {prov.fetched_at
+              ? ` · geholt ${new Date(prov.fetched_at).toLocaleDateString('de-DE')}`
+              : ''}
+          </div>
+        )}
+
         {meta.note && <p className="mb-3 text-sm text-muted">{meta.note}</p>}
         {meta.abstract && <p className="mb-3 text-sm text-muted">{meta.abstract}</p>}
         {typeof meta.confidence === 'number' && (
@@ -150,9 +183,9 @@ export default function ReaderPanel({ node, members, onSelectNode, onClose }: Pr
           </Link>
         )}
 
-        {(meta.uri ?? meta.arxiv) && (
+        {sourceUrl && (
           <a
-            href={meta.uri ?? `https://arxiv.org/abs/${meta.arxiv}`}
+            href={sourceUrl}
             target="_blank"
             rel="noreferrer"
             className="mb-4 mr-2 inline-block"

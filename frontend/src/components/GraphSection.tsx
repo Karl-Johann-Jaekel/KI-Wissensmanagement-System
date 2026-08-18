@@ -8,7 +8,7 @@ import { fetchChangelog, fetchGraph, type ChangelogItem } from '../api'
 import { useAdminKey } from '../app/AdminKeyContext'
 import { useProjects } from '../lib/storage'
 import { useTheme } from '../lib/theme'
-import { endpointId, type GraphData } from '../types'
+import { endpointId, type GraphData, type GraphSource } from '../types'
 import { useElementSize } from '../useElementSize'
 import ControlPanel from './graph/ControlPanel'
 import GraphCanvas from './graph/GraphCanvas'
@@ -40,6 +40,7 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
   const [selected, setSelected] = useState<SceneNode | null>(null)
   const [includePending, setIncludePending] = useState(false)
   const [filterDays, setFilterDays] = useState<number | null>(null)
+  const [source, setSource] = useState<GraphSource>('all')
   const [changelog, setChangelog] = useState<ChangelogItem[]>([])
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [query, setQuery] = useState('')
@@ -47,12 +48,17 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
   const [fg, setFg] = useState<unknown>(null)
   const { ref, width, height } = useElementSize<HTMLDivElement>()
   const nonce = useRef(0)
+  // Globus: Rotation per Minimap-Klick anhalten, per Ziehen selbst drehen.
+  const [rotationPaused, setRotationPaused] = useState(false)
+  const [dragging, setDragging] = useState(false)
+  const rotationOffsetRef = useRef(0)
+  const isGlobe = settings.layout === 'globe'
 
   useEffect(() => {
     let cancelled = false
     setStatus('loading')
     setSelected(null)
-    fetchGraph(includePending, adminKey)
+    fetchGraph(includePending, adminKey, source)
       .then((d) => {
         if (cancelled) return
         setData(d)
@@ -69,7 +75,7 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
     return () => {
       cancelled = true
     }
-  }, [includePending, refreshKey, adminKey])
+  }, [includePending, refreshKey, adminKey, source])
 
   const prefsRef = useRef(prefs)
   const persist = useCallback((patch: Partial<GraphPrefs>) => {
@@ -178,8 +184,17 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
         )}
         {status === 'ready' && scene.nodes.length === 0 && (
           <div className="absolute inset-0 grid place-items-center p-6 text-center text-muted">
-            Keine Knoten in dieser Ansicht. Der Graph füllt sich über den
-            Living-Knowledge-Loop (<code>python -m app.update</code>).
+            {source === 'paperswithcode' ? (
+              <span>
+                Keine Fremdquellen-Knoten. Der Papers-with-Code-Dump wird über{' '}
+                <code>python -m app.corpus.pwc</code> importiert.
+              </span>
+            ) : (
+              <span>
+                Keine Knoten in dieser Ansicht. Der Graph füllt sich über den
+                Living-Knowledge-Loop (<code>python -m app.update</code>).
+              </span>
+            )}
           </div>
         )}
         {status === 'ready' && scene.nodes.length > 0 && width > 0 && (
@@ -193,6 +208,8 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
             activeIds={matches}
             selectedId={selected?.id ?? null}
             focus={focus}
+            paused={isGlobe && (rotationPaused || dragging || !!selected)}
+            rotationOffsetRef={rotationOffsetRef}
             onNodeClick={onNodeClick}
             onBackgroundClick={() => setSelected(null)}
             onInstance={setFg}
@@ -215,6 +232,8 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
             onCollapseAll={() => setCollapsed(new Set(base.groups.map((g) => g.id)))}
             filterDays={filterDays}
             onFilterDays={setFilterDays}
+            source={source}
+            onSource={setSource}
             canSeePending={!!adminKey}
             includePending={includePending}
             onIncludePending={setIncludePending}
@@ -231,6 +250,9 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
             graphWidth={width}
             graphHeight={height}
             theme={theme}
+            rotationOffsetRef={isGlobe ? rotationOffsetRef : undefined}
+            onRotateStateChange={isGlobe ? setDragging : undefined}
+            onToggleRotation={isGlobe ? () => setRotationPaused((v) => !v) : undefined}
           />
         )}
 

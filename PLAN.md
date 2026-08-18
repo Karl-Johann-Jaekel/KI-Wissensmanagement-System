@@ -371,6 +371,69 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
 - **DoD:** Wissens-Graph und Chat live unter eigener Domain;
   Deploy-Gate grün; Backup-Restore verifiziert.
 
+### Phase 11 — Fremdquellen & Provenienz  *(v6: Ausbau zur Wissensdatenbank)*
+
+Ausgangslage: Es gibt keine etablierte globale Wissensdatenbank zur KI-Forschung,
+die Souveränität **und** Provenienz **und** rekursive Updates abdeckt. Vier
+Teillandschaften existieren — bibliografische Substrate (OpenAlex, Semantic
+Scholar, Crossref), semantische aber schmale Systeme (ORKG, AI-KG), fragmentierte
+KI-Werkzeuge (Epoch AI, AI Index) und eingestellte Vorgänger (Microsoft Academic
+Graph, Papers with Code). Differenzierung dieses Systems ist **nicht Abdeckung**
+(dagegen verliert man gegen OpenAlex), sondern Souveränität, DSGVO-Konformität,
+Konfliktmarkierung im Update-Loop, deutschsprachiger Zugriff auf englischen
+Korpus und Tiefe in ausgewählten Teilgebieten.
+
+Lizenz- und DSGVO-Leitplanken für alle Schritte:
+- Volltext-Chunks nur aus CC-lizenzierten Quellen (ACL Anthology, CC-arXiv).
+- Abstracts aus arXiv/OpenReview/Semantic Scholar nur als invertierter Index,
+  nicht als Rohtext. (Papers with Code ist CC-BY-SA — dort sind Abstracts erlaubt.)
+- Keine E-Mail-Adressen harvesten, keine Cross-Source-Anreicherung auf
+  Autor:innen-Ebene.
+- `fetched_at`, `fetched_by`, `source_url` an jedem Datensatz — Grundlage für
+  spätere Löschanfragen.
+- Repo öffentlich: Code, Konfiguration, ID-Manifeste. Volltexte und Chunk-Tabellen
+  bleiben lokal.
+
+- [x] **11.1 Papers-with-Code-Adapter:** Dump (JSON/JSON.gz) → Papers, Code-Repos,
+      Datensätze, Tasks, Modelle; Kanten `IMPLEMENTS`, `USES_DATASET`,
+      `ACHIEVES_SOTA` (+ `RELATED_TO`, `USES`, `INTRODUCES`). Migration `0004`
+      erweitert die CHECKs; `--limit`/`--match` schneiden die Teilmenge zu;
+      `--ingest-abstracts` schreibt nach pgvector — ADR-0017.
+      **Live importiert (18.08.2026):** 5.000 Papers → 12.288 Knoten / 23.037
+      Kanten; Dump via `scripts/fetch_pwc_dump.py` von Hugging Face (Parquet)
+- [x] **11.2 Graph-Visualisierung der Fremdquelle:** Knotenarten `task`/`repo`
+      mit eigenen Farben, Ebenen und Cluster-Namen im Force-Graph-Explorer;
+      Quellenfilter (alle / eigener Korpus / Papers with Code) im Menü;
+      Herkunftszeile (Quelle, Lizenz, Abrufdatum) in der Leseansicht
+- [x] **11.3 Harvester-Grundgerüst:** `app/corpus/harvest/` — OAI-PMH-Client
+      (Blättern per `resumptionToken`), arXiv-Delta über das Änderungsdatum,
+      OpenReview API v2; Rate-Limiting mit `Retry-After`-Vorrang, exponentieller
+      Backoff, Dedupe (DOI + Titelschlüssel, quellenübergreifend), wiederaufnehmbarer
+      Zustand, Abstracts nur als invertierter Index — ADR-0018.
+      **Live geprüft:** arXiv 25 Datensätze/6 s, zweiter Lauf 25 Dubletten erkannt.
+      OpenReview braucht seit 2026 ein Konto (Browser-Challenge), Pfad daher nur
+      gegen Mocks geprüft
+- [x] **11.4 GROBID:** Compose-Profil `grobid` (CRF-Image, 0,5 GB statt 14,8 GB)
+      + `app/ingestion/grobid.py`: PDF → TEI-XML → Titel, Autor:innen, Sektionen,
+      Referenzen (Titel/Jahr/DOI/Autor:innen als Felder); `markdown_from_pdf`
+      passt auf die `to_md`-Naht der Ingest-Pipeline — ADR-0019.
+      **Live geprüft:** RAG-Paper 41 Sektionen / 69 Referenzen (69 mit Titel,
+      68 mit Jahr, 21 mit DOI), ~40 s je Paper auf CPU
+- [x] **11.5 Provenienz-Schema:** Migration `0005` — `document_sources`,
+      `authors` (+ `document_authors`), `entities_extracted`; eine Zeile **je
+      Beleg** statt eines JSONB-Felds je Aussage. Kontaktdaten per CHECK verboten,
+      Autor:innen-Identität je Quellsystem (keine Personenprofile über Quellen
+      hinweg), Konflikt-Flags bleiben gesetzt. Schreibwege: PwC-Import,
+      LLM-Extraktion, Harvester-`DbSink`; `scripts/backfill_provenance.py` trägt
+      den Bestand nach — ADR-0020.
+      **Live:** 37.197 Belege nachgetragen, Knoten ohne Beleg 12.461 → 141;
+      13 Knoten von beiden Extraktoren getragen (vorher still überschrieben)
+- [ ] **11.6 Multilingual-Embeddings:** BGE-M3 vs. mBERT vs. LaBSE gegen deutsche
+      Fragen auf englischem Korpus; Eval-Report
+- **DoD:** Fremdquellen sind importierbar, im Graphen als solche erkennbar und
+  vollständig mit Provenienz belegt; Harvester laufen inkrementell; Eval-Report
+  liegt vor.
+
 ---
 
 ## 8. Änderungsprotokoll

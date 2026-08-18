@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     docling_ocr: bool = False
     docling_table_structure: bool = True
 
+    # GROBID (Phase 11.4, ADR-0019). Referenz- und Sektionsparsing für PDFs;
+    # der Dienst läuft im Compose-Profil `grobid`, ist aber optional.
+    grobid_url: str = "http://grobid:8070"
+    grobid_timeout_s: float = 180.0
+
     # Ollama (confidential zone)
     ollama_base_url: str = "http://ollama:11434"
     ollama_llm_model: str = "qwen3:8b"

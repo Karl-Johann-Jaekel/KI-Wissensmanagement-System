@@ -85,17 +85,50 @@ export function clusterCenters(
   return centers
 }
 
-/** Kugel: Gruppen belegen Längengrad-Sektoren, Rotation dreht um die Y-Achse. */
+/**
+ * Mindestanteil einer Gruppe am Globus, als Bruchteil des gleichmäßigen Anteils.
+ * Rein proportional bekäme eine Ein-Knoten-Gruppe einen Sektor von Bruchteilen
+ * eines Grades und verschwände zwischen den Nachbarn.
+ */
+const GLOBE_MIN_SHARE = 0.25
+
+/**
+ * Kugel: Gruppen belegen Längengrad-Sektoren, Rotation dreht um die Y-Achse.
+ *
+ * Die Sektorbreite folgt der **Knotenzahl**, nicht der Gruppenzahl. Gleich breite
+ * Sektoren ließen die dichten Gruppen zu einem Band verklumpen, während kleine
+ * Gruppen dieselbe Fläche leer stehen ließen: gemessen 1.018 Knoten auf 9,1 % der
+ * Fläche gegen 32 Knoten auf ebenfalls 9,1 % — Faktor 28 im Gedränge. Auf einer
+ * Kugel ist die Fläche eines Längengrad-Sektors proportional zu seiner Breite,
+ * also macht ein Anteil nach Knotenzahl die Belegung gleichmäßig.
+ */
+/**
+ * Winkelbreite je Gruppe (Radiant), Summe 2π.
+ *
+ * Anteil nach Knotenzahl mit einem Boden, damit eine Ein-Knoten-Gruppe nicht auf
+ * Bruchteile eines Grades zusammenfällt. Als eigene Funktion, weil sich das
+ * Verhältnis so prüfen lässt — aus fertigen Kugelkoordinaten zurückgerechnet ist
+ * es nahe den Polen numerisch wertlos.
+ */
+export function globeSectors(sizes: number[]): number[] {
+  const total = sizes.reduce((a, b) => a + b, 0) || 1
+  const floor = GLOBE_MIN_SHARE / Math.max(1, sizes.length)
+  const raw = sizes.map((n) => Math.max(floor, n / total))
+  const sum = raw.reduce((a, b) => a + b, 0) || 1
+  return raw.map((share) => (2 * Math.PI * share) / sum)
+}
+
 function globeTargets(nodes: SceneNode[], opts: LayoutOptions): Map<string, Target> {
   const out = new Map<string, Target>()
   const groups = byGroup(nodes)
   const rotation = opts.rotation ?? 0
   const radius = BASE * (0.55 + opts.clusterGap / 40)
-  const sectors = Math.max(1, groups.size)
+  const widths = globeSectors([...groups.values()].map((list) => list.length))
+
+  let lonStart = 0
   let index = 0
   for (const [, list] of groups) {
-    const lonStart = (2 * Math.PI * index) / sectors
-    const lonWidth = (2 * Math.PI) / sectors
+    const lonWidth = widths[index]
     list.forEach((node, i) => {
       const t = (i + 0.5) / list.length
       // Golden-Ratio-Folge streut die Breitengrade, ohne sie zu bündeln.
@@ -110,6 +143,7 @@ function globeTargets(nodes: SceneNode[], opts: LayoutOptions): Map<string, Targ
         depth: (cosLat * Math.cos(lon) + 1) / 2,
       })
     })
+    lonStart += lonWidth
     index += 1
   }
   return out
@@ -172,37 +206,101 @@ function ringTargets(nodes: SceneNode[], opts: LayoutOptions): Map<string, Targe
   return out
 }
 
-/** Ebenen: die Systemschichten vertikal gestapelt, Fundament unten. */
+/**
+ * Spaltenbreite einer Wissensgruppe in Rasterzellen.
+ *
+ * Früher bei 9 gedeckelt — damit wurde die größte Gruppe 9 breit und 114 hoch, ein
+ * Turm, der die Ansicht sprengte und alles andere zu Streichhölzern schrumpfen
+ * ließ. Ohne Deckel wächst die Breite mit der Wurzel der Knotenzahl, das Seiten-
+ * verhältnis bleibt dadurch näherungsweise gleich: aus 1.018 Knoten werden 43 × 24
+ * statt 9 × 114.
+ */
+export function columnWidth(count: number): number {
+  return Math.min(48, Math.max(3, Math.round(Math.sqrt(count * 1.8))))
+}
+
+/** Maße der Ebenenansicht — der Canvas beschriftet damit Spalten und Reihen. */
+export function layerGeometry(opts: LayoutOptions) {
+  const cell = 8.5 * (0.6 + opts.clusterGap / 26)
+  return {
+    /** Rasterabstand innerhalb einer Spalte. */
+    cell,
+    /** Fußlinie: Spalten stehen darauf, Systemreihen liegen darunter. */
+    baseline: BASE * 0.2,
+    columnGap: cell * 2.6,
+    rowStep: cell * 3.2,
+    /** Abstand der ersten Systemreihe zur Fußlinie. */
+    rowOffset: cell * 7,
+  }
+}
+
+/**
+ * Gesamtbreite des Spaltenblocks — aus den Gruppengrößen, ohne die Knoten selbst.
+ * Beschriftung und Systemreihen richten sich danach aus; sonst stehen sie an einer
+ * geratenen Kante statt an der echten.
+ */
+export function layerSpan(opts: LayoutOptions): number {
+  const geo = layerGeometry(opts)
+  const columns = opts.groups.filter((g) => g.tier === 1 || g.tier === 2)
+  if (columns.length === 0) return BASE
+  return columns.reduce(
+    (sum, g) => sum + columnWidth(g.count) * geo.cell + geo.columnGap,
+    -geo.columnGap,
+  )
+}
+
+/** Systemreihen von unten nach oben: Fundament, Projekte, Dienste. */
+const LAYER_ROWS = [4, 3, 0] as const
+
+/**
+ * Ebenen: Wissensbereiche als Rasterspalten, unten bündig auf einer Fußlinie —
+ * die Spaltenhöhe zeigt so direkt, wie viel in einem Bereich steckt. Darunter
+ * liegen die Systemschichten als einzelne Reihen (Dienste ▸ Projekte ▸ Kern).
+ */
 function layerTargets(nodes: SceneNode[], opts: LayoutOptions): Map<string, Target> {
   const out = new Map<string, Target>()
-  const height = BASE * 1.4 * (0.6 + opts.clusterGap / 25)
-  const step = height / (TIER_COUNT - 1)
-  const width = BASE * 2.1
-  for (let tier = 0; tier < TIER_COUNT; tier += 1) {
-    const inTier = ordered(nodes.filter((n) => n.tier === tier))
-    if (inTier.length === 0) continue
-    const y = height / 2 - tier * step
-    const groups = byGroup(inTier)
-    const total = inTier.length
-    // Flache Schichten bleiben einreihig; große Schichten wachsen in die Tiefe.
-    const rows = Math.max(1, Math.min(9, Math.ceil(total / 26)))
-    let cursor = -width / 2
-    for (const [, list] of groups) {
-      const bandWidth = (width * list.length) / total
-      const cols = Math.max(1, Math.ceil(list.length / rows))
-      list.forEach((node, i) => {
-        const row = i % rows
-        const col = Math.floor(i / rows)
-        const depth = rows === 1 ? 1 : 1 - (0.45 * row) / (rows - 1)
-        out.set(node.id, {
-          x: cursor + (bandWidth * (col + 0.5)) / cols + jitter(node, i) * 2 * opts.spread,
-          y: y - row * 6 * opts.spread,
-          depth,
-        })
+  const geo = layerGeometry(opts)
+
+  const knowledge = ordered(nodes.filter((n) => n.tier === 1 || n.tier === 2))
+  const columns = [...byGroup(knowledge).entries()].sort(
+    (a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]),
+  )
+  const totalWidth = columns.reduce(
+    (sum, [, list]) => sum + columnWidth(list.length) * geo.cell + geo.columnGap,
+    -geo.columnGap,
+  )
+
+  let cursor = -totalWidth / 2
+  for (const [, list] of columns) {
+    const cols = Math.min(columnWidth(list.length), list.length)
+    const width = cols * geo.cell
+    list.forEach((node, i) => {
+      const col = i % cols
+      const row = Math.floor(i / cols)
+      out.set(node.id, {
+        x: cursor + (col + 0.5) * geo.cell,
+        // Zeile 0 unten: die Spalte wächst nach oben.
+        y: geo.baseline - row * geo.cell,
+        depth: 1,
       })
-      cursor += bandWidth
-    }
+    })
+    cursor += width + geo.columnGap
   }
+
+  // Systemreihen über dieselbe Breite spannen wie der Spaltenblock. Auf festem
+  // Rasterabstand drängten sich sechs Dienste auf einem Fünftel der Fläche —
+  // ihre Namen überlagerten sich zu einer unlesbaren Zeile.
+  LAYER_ROWS.forEach((tier, index) => {
+    const list = ordered(nodes.filter((n) => n.tier === tier))
+    if (list.length === 0) return
+    const y = geo.baseline + geo.rowOffset + index * geo.rowStep
+    const span = Math.max(totalWidth * 0.8, geo.cell * 2.4 * (list.length - 1))
+    const step = list.length > 1 ? span / (list.length - 1) : 0
+    list.forEach((node, i) => {
+      out.set(node.id, { x: -span / 2 + i * step, y, depth: 1 })
+    })
+  })
+
   return out
 }
 
@@ -238,12 +336,16 @@ export function tierLabelPositions(
     return geo.orbits.map((radius, i) => ({ tier: 3 + i, x: 0, y: -radius - 12 }))
   }
   if (layout === 'layers') {
-    const height = BASE * 1.4 * (0.6 + opts.clusterGap / 25)
-    const step = height / (TIER_COUNT - 1)
-    return Array.from({ length: TIER_COUNT }, (_, tier) => ({
+    // Nur die Systemreihen tragen links ihren Namen; die Spalten beschriftet
+    // der Canvas an ihrer Fußlinie. Der Name steht am echten linken Rand der
+    // Reihe, nicht an einer festen Koordinate — sonst überlappt er bei breitem
+    // Spaltenblock die Knoten oder schwebt bei schmalem im Nichts.
+    const geo = layerGeometry(opts)
+    const left = -Math.max(layerSpan(opts) * 0.8, BASE) / 2 - geo.cell * 3
+    return LAYER_ROWS.map((tier, index) => ({
       tier,
-      x: -BASE * 1.25,
-      y: height / 2 - tier * step,
+      x: left,
+      y: geo.baseline + geo.rowOffset + index * geo.rowStep,
     }))
   }
   return []

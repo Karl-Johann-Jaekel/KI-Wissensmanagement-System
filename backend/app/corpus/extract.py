@@ -28,10 +28,13 @@ from app.corpus.aliases import (
 )
 from app.db.graph import upsert_edge, upsert_node
 from app.db.models import Chunk, Document, GraphNode
+from app.db.provenance import Claim, record_authors, record_extraction
 
 Chat = Callable[[list[dict]], str]
 
 DEFAULT_CONFIDENCE = 0.8
+#: Kennung dieses Schreibwegs in ``entities_extracted`` (ADR-0020).
+EXTRACTOR = "llm:extract"
 ENTITY_KINDS = {"concept", "model", "dataset"}
 RELATIONS = {"INTRODUCES", "EVALUATES_ON", "IMPROVES_ON", "RELATED_TO"}
 # So viele bekannte Begriffe bekommt das Modell als Vorschlagsliste zu sehen.
@@ -174,6 +177,17 @@ def store_facts(
         meta={"arxiv": (doc.meta or {}).get("id"), "uri": doc.uri, "source_document_ids": [doc_id]},
         status="verified",
     )
+    # Zusätzlich zum JSONB-Feld ein Beleg je Aussage (ADR-0020). Erst dadurch kann
+    # derselbe Knoten von dieser Extraktion **und** von einer Fremdquelle getragen
+    # werden, statt dass eine die Provenienz der anderen überschreibt.
+    record_extraction(session, Claim(node_id=paper_id), extractor=EXTRACTOR, document_id=doc_id)
+    # Autorennamen als eigene Zeilen, ohne Kontaktfelder.
+    record_authors(
+        session,
+        [str(a) for a in ((doc.meta or {}).get("authors") or [])][:20],
+        source_system="arxiv",
+        document_id=doc_id,
+    )
     node_ids: dict[tuple[str, str], str] = {}
     n_nodes = n_edges = 0
 
@@ -192,7 +206,11 @@ def store_facts(
         vocab.setdefault((kind, key), name)
         cache_key = (kind, key)
         if cache_key not in node_ids:
-            node_ids[cache_key] = upsert_node(session, kind, name, status="pending")
+            node_id = upsert_node(session, kind, name, status="pending")
+            node_ids[cache_key] = node_id
+            record_extraction(
+                session, Claim(node_id=node_id), extractor=EXTRACTOR, document_id=doc_id
+            )
         return node_ids[cache_key]
 
     def link(src: str, tgt: str, relation: str, confidence: float) -> None:
@@ -205,6 +223,13 @@ def store_facts(
             weight=round(confidence, 3),
             meta={"source_document_ids": [doc_id], "confidence": round(confidence, 3)},
             status="pending",
+        )
+        record_extraction(
+            session,
+            Claim(edge=(src, tgt, relation)),
+            extractor=EXTRACTOR,
+            document_id=doc_id,
+            confidence=round(confidence, 3),
         )
         n_edges += 1
 

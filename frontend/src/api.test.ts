@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { handleSseEvent, type StreamHandlers } from './api'
+import { graphQuery, handleSseEvent, type StreamHandlers } from './api'
 
 function makeHandlers(): StreamHandlers & {
   tokens: string[]
@@ -42,5 +42,19 @@ describe('handleSseEvent', () => {
     expect(handleSseEvent(': keepalive comment', h)).toBe(false)
     expect(h.tokens).toEqual([])
     expect(h.onError).not.toHaveBeenCalled()
+  })
+})
+
+describe('graphQuery', () => {
+  it('lässt die Standardquelle aus dem Query-String', () => {
+    expect(graphQuery(false)).toBe('include_pending=false')
+    expect(graphQuery(true)).toBe('include_pending=true')
+  })
+
+  it('hängt den Quellenfilter an, sobald er gesetzt ist', () => {
+    expect(graphQuery(false, 'paperswithcode')).toBe(
+      'include_pending=false&source=paperswithcode',
+    )
+    expect(graphQuery(true, 'native')).toBe('include_pending=true&source=native')
   })
 })
