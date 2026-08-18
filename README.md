@@ -19,7 +19,7 @@ Frage ──▶ Hybrid-Retrieval ──▶ Kontext ──▶ LLM ──▶ Antwo
 
 |  |  |
 |---|---|
-| **Umfang** | Solo-Projekt, 22.07.–18.08.2026 · 62 Commits · 213 Dateien · 11 Phasen nach [PLAN.md](PLAN.md) |
+| **Umfang** | Solo-Projekt, 22.07.–18.08.2026 · 62 Commits · 213 Dateien · 12 Phasen nach [PLAN.md](PLAN.md) |
 | **Bestand** | 56 indexierte Papers (6.950 Chunks); Graph aus 13.271 Knoten — rund 370 aus eigener LLM-Extraktion, der Rest aus dem Papers-with-Code-Archiv |
 | **Retrieval** | Hit-Rate@5 0,94 (15 von 16 Golden-Fragen, deutsch und englisch), p95 221 ms |
 | **Stack** | FastAPI · Postgres 16 + pgvector · SQLAlchemy/Alembic · Docling · GROBID · Mistral EU-API · React 18 + TypeScript + Tailwind · Docker · GitHub Actions |
@@ -120,7 +120,7 @@ Fließtext. GROBID zerlegt genau diesen Teil und macht Referenzen zu Feldern
 PLAN §1 bisher als Nicht-Ziel führte.
 
 ```bash
-docker compose --profile grobid up -d          # CRF-Image, 0,5 GB
+docker compose --profile grobid up -d          # CRF-Image, 1,7 GB auf Platte
 docker compose exec backend python -m app.ingestion.grobid data/corpus/2005.11401.pdf
 docker compose exec backend python -m app.ingestion.grobid <pdf> --json      # volle Struktur
 docker compose exec backend python -m app.ingestion.grobid <pdf> --markdown  # für den Chunker
@@ -134,8 +134,8 @@ liefert GROBID mit, dieses Projekt liest sie nicht (ADR-0019).
 ### Herkunft je Aussage
 
 Jede Aussage im Graphen trägt ihre Belege in eigenen Zeilen — eine je Beleg, nicht
-eine je Aussage. Mehrere Quellen für denselben Fakt sind damit darstellbar; im
-vorherigen JSONB-Feld überschrieb die zweite Quelle die erste.
+eine je Aussage. Damit sind mehrere Quellen für denselben Fakt überhaupt
+darstellbar; im vorherigen JSONB-Feld überschrieb die zweite Quelle die erste.
 
 ```sql
 document_sources    -- woher ein Dokument stammt (mehrere je Dokument)
@@ -156,9 +156,9 @@ docker compose exec backend python scripts/backfill_provenance.py
 ```
 
 Am echten Bestand: 37.197 Belege nachgetragen, Knoten ohne Beleg 12.461 → 141.
-13 Knoten werden seither von der eigenen Extraktion **und** von Papers with Code
-getragen — „Retrieval-Augmented Generation", „Transformer", „Attention" unter
-anderem. Genau diese Fälle gingen vorher still verloren (ADR-0020).
+Von der eigenen Extraktion **und** von Papers with Code getragen werden 13 Knoten —
+„Retrieval-Augmented Generation", „Transformer", „Attention" unter anderem. Genau
+diese Fälle gingen vorher still verloren (ADR-0020).
 
 ---
 
@@ -175,9 +175,10 @@ Eine React-SPA mit Sidebar-Navigation, hellem und dunklem Theme, mobiltauglich:
 | **Skills** | Wiederverwendbare Prompt-Vorlagen, per „/" in den Chat einsetzbar. |
 | **Projekte** | Arbeitsbereiche, die Chats und Dokumente bündeln. |
 
-Der Graph zeichnet vielzitierte Grundlagenarbeiten mit einem goldenen Ring aus
-(Zitationszahlen von Semantic Scholar). Die Knotengröße bleibt dem
-Vernetzungsgrad vorbehalten — zwei Signale, zwei visuelle Kanäle.
+Der Graph zeichnet vielzitierte Grundlagenarbeiten mit einem goldenen Ring aus.
+Die Zitationszahlen stammen von Semantic Scholar und liegen bislang nur für die 56
+Papers des eigenen Korpus vor, nicht für die importierten Knoten. Die Knotengröße
+bleibt dem Vernetzungsgrad vorbehalten — zwei Signale, zwei visuelle Kanäle.
 
 **Der Graph-Explorer** (ADR-0016) zeigt denselben Bestand in vier Layouts:
 
@@ -227,11 +228,16 @@ Freigabe in der Review-Queue; Widersprüche werden als `disputed` markiert statt
 überschrieben. Entitätsnamen werden kanonisiert, damit „Cross-Encoder", „cross
 encoder" und „Cross Encoders" ein Knoten bleiben.
 
-**Quellen.** Vier Wege füllen den Bestand: arXiv per OAI-PMH-Delta über das
-Änderungsdatum, OpenReview über API v2 (Konto erforderlich), das
-Papers-with-Code-Archiv als Kaltstart-Import und eigene Uploads. Jede Aussage trägt
-ihre Belege in `entities_extracted` — mehrere Quellen je Aussage sind der Normalfall,
-nicht der Sonderfall.
+**Quellen.** Korpus und Graph füllen heute drei Wege: `scripts/fetch_corpus.py`
+(arXiv-PDFs → Chunks), der Papers-with-Code-Import (Graph-Knoten) und eigene Uploads
+über die Oberfläche. Die Harvester für arXiv-OAI-PMH und OpenReview erzeugen
+normalisierte Datensätze und Quellenzeilen; sie an `documents` zu hängen und die PDFs
+nachzuladen ist noch nicht verdrahtet.
+
+Jede Aussage trägt ihre Belege in `entities_extracted`. Mehrfach belegt sind bislang
+13 von 13.271 Knoten — nicht weil die Quellen sich selten decken, sondern weil sie
+die Knotenart verschieden ableiten: „BERT" liegt als `concept` **und** als `model`
+im Graphen, und dedupliziert wird nur innerhalb einer Art (ADR-0020).
 
 ---
 
@@ -297,9 +303,10 @@ ob nach Komponenten oder nach Themen gruppiert wird (größte Gruppe: 12,9 %).
 unabhängig von ihrer Größe: 1.018 Knoten auf 9,1 % der Fläche gegen 32 Knoten auf
 ebenfalls 9,1 %. Die Sektorbreite folgt jetzt der Knotenzahl.
 
-**`mcp_server/server.py` parste sieben Wochen lang nicht.** Ein Refactoring hatte den
-schließenden `"""` des Modul-Docstrings mitgenommen. `ruff check .` meldete 67
-Syntaxfehler, der MCP-Server startete nicht — beides war unbemerkt geblieben.
+**`mcp_server/server.py` parste acht Tage lang nicht.** Ein Refactoring hatte den
+schließenden `"""` des Modul-Docstrings mitgenommen. `ruff check .` meldete daraufhin
+67 Syntaxfehler und der MCP-Server startete nicht — beides fiel erst beim nächsten
+vollständigen Check-Lauf auf.
 
 ---
 
@@ -307,9 +314,9 @@ Syntaxfehler, der MCP-Server startete nicht — beides war unbemerkt geblieben.
 
 Der öffentliche Betrieb liest nur: Der Korpus wird lokal gebaut und als
 Datenbank-Dump eingespielt, Embeddings und Antworten kommen über die Mistral-EU-API,
-es läuft kein lokales Modell. Das Backend-Image ist dabei nicht schlank (rund 10 GB,
-Docling und torch sind mitinstalliert) — im Prod-Betrieb werden sie nur nicht
-aufgerufen. Ein getrenntes Ingest-Image wäre der nächste Schritt.
+es läuft kein lokales Modell. Das Backend-Image ist dabei nicht schlank: rund 10 GB,
+weil Docling und torch mitinstalliert sind. Im Prod-Betrieb werden sie nicht
+aufgerufen, liegen aber im Image.
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile public up -d --build
