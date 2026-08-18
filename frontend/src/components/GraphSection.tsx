@@ -48,6 +48,11 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
   const [fg, setFg] = useState<unknown>(null)
   const { ref, width, height } = useElementSize<HTMLDivElement>()
   const nonce = useRef(0)
+  // Globus: Rotation per Minimap-Klick anhalten, per Ziehen selbst drehen.
+  const [rotationPaused, setRotationPaused] = useState(false)
+  const [dragging, setDragging] = useState(false)
+  const rotationOffsetRef = useRef(0)
+  const isGlobe = settings.layout === 'globe'
 
   useEffect(() => {
     let cancelled = false
@@ -203,6 +208,8 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
             activeIds={matches}
             selectedId={selected?.id ?? null}
             focus={focus}
+            paused={isGlobe && (rotationPaused || dragging || !!selected)}
+            rotationOffsetRef={rotationOffsetRef}
             onNodeClick={onNodeClick}
             onBackgroundClick={() => setSelected(null)}
             onInstance={setFg}
@@ -243,6 +250,9 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
             graphWidth={width}
             graphHeight={height}
             theme={theme}
+            rotationOffsetRef={isGlobe ? rotationOffsetRef : undefined}
+            onRotateStateChange={isGlobe ? setDragging : undefined}
+            onToggleRotation={isGlobe ? () => setRotationPaused((v) => !v) : undefined}
           />
         )}
 

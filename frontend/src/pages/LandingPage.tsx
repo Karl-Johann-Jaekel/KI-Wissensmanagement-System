@@ -14,7 +14,7 @@ import {
   Sun,
 } from 'lucide-react'
 import { fetchDocuments, fetchGraph } from '../api'
-import GraphView from '../components/GraphView'
+import GlobePreview from '../components/graph/GlobePreview'
 import Button from '../components/ui/Button'
 import { cn } from '../lib/cn'
 import { useTheme } from '../lib/theme'
@@ -191,17 +191,7 @@ export default function LandingPage() {
         <div className="overflow-hidden rounded-2xl border border-edge bg-surface">
           <div ref={ref} className="relative h-[320px] sm:h-[440px]">
             {graph.nodes.length > 0 && width > 0 ? (
-              <GraphView
-                key={theme}
-                data={graph}
-                width={width}
-                height={height}
-                activeIds={null}
-                selectedId={null}
-                glowDays={7}
-                onNodeClick={() => navigate('/wissen?tab=graph')}
-                theme={theme}
-              />
+              <GlobePreview data={graph} width={width} height={height} theme={theme} />
             ) : (
               <div className="grid h-full place-items-center px-6 text-center text-sm text-muted">
                 {offline

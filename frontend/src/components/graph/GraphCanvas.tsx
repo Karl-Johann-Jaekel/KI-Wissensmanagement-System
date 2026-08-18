@@ -6,7 +6,7 @@
  * selbst in `onRenderFramePre` und ziehen die Knoten weich auf ihr Ziel — dadurch
  * sind Layout-Wechsel animiert und die Kugeln bleiben trotzdem in Bewegung.
  */
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import { FALLBACK_COLOR, LANDMARK_COLOR } from '../../types'
 import {
@@ -42,6 +42,14 @@ interface Props {
   onBackgroundClick: () => void
   onHover?: (node: SceneNode | null) => void
   onInstance?: (fg: unknown | null) => void
+  /** Rotation und Drift anhalten (z. B. während ein Knoten ausgewählt ist). */
+  paused?: boolean
+  /**
+   * Manueller Dreh-Offset (Radiant), von außen gesetzt — etwa durch Ziehen auf der
+   * Minimap. Ein Ref statt eines Props: Ändert sich pro Mausbewegung, ein State
+   * würde bei jedem Pixel neu rendern (siehe Minimap-Kommentar zum selben Thema).
+   */
+  rotationOffsetRef?: MutableRefObject<number>
 }
 
 const DIM_ALPHA = 0.1
@@ -101,6 +109,8 @@ export default function GraphCanvas({
   onBackgroundClick,
   onHover,
   onInstance,
+  paused = false,
+  rotationOffsetRef,
 }: Props) {
   const fgRef = useRef<any>(null)
   const hoverRef = useRef<string | null>(null)
@@ -208,7 +218,7 @@ export default function GraphCanvas({
     const now = performance.now()
     const dt = Math.min(64, now - clockRef.current)
     clockRef.current = now
-    const animate = settings.motion && !prefersReducedMotion()
+    const animate = settings.motion && !prefersReducedMotion() && !paused
 
     if (settings.layout === 'cloud') {
       if (!animate) return
@@ -224,9 +234,12 @@ export default function GraphCanvas({
 
     if (settings.layout === 'globe') {
       if (animate) rotationRef.current += dt * 0.00012
+      // Manuelles Drehen (Minimap-Ziehen) wirkt immer, auch bei angehaltener
+      // Automatik — sonst ließe sich ein pausierter Globus nicht erkunden.
+      const manual = rotationOffsetRef?.current ?? 0
       targetsRef.current = layoutTargets('globe', scene.nodes, {
         ...layoutOpts,
-        rotation: rotationRef.current,
+        rotation: rotationRef.current + manual,
       })
     }
 
@@ -246,7 +259,7 @@ export default function GraphCanvas({
       n.fy = n.y
       n.depth = target.depth
     }
-  }, [scene, settings.layout, settings.motion, layoutOpts])
+  }, [scene, settings.layout, settings.motion, paused, layoutOpts, rotationOffsetRef])
 
   // ----------------------------------------------------------- Zeichnen
 
