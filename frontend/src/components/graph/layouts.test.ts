@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   clusterCenters,
   columnWidth,
+  globeBasis,
+  globeFrame,
   globeSectors,
   layerGeometry,
   layoutTargets,
@@ -139,6 +141,33 @@ describe('layoutTargets: globe', () => {
     const turned = layoutTargets('globe', NODES, { ...OPTS, rotation: Math.PI / 2 })
     expect(a.get('c1')).toEqual(b.get('c1'))
     expect(turned.get('c1')).not.toEqual(a.get('c1'))
+  })
+
+  it('trennt Basis und Drehung, ohne das Bild zu ändern', () => {
+    // Die Bildschleife rechnet nur noch globeFrame; das Ergebnis muss dasselbe
+    // sein wie der vollständige Durchlauf von vorher.
+    const basis = globeBasis(NODES, OPTS)
+    for (const rotation of [0, 0.7, Math.PI, 4.2]) {
+      expect(globeFrame(basis, rotation)).toEqual(
+        layoutTargets('globe', NODES, { ...OPTS, rotation }),
+      )
+    }
+  })
+
+  it('hält die Basis von der Drehung unabhängig', () => {
+    expect(globeBasis(NODES, OPTS)).toEqual(globeBasis(NODES, { ...OPTS, rotation: 2.5 }))
+  })
+
+  it('schreibt in eine vorhandene Map statt eine neue anzulegen', () => {
+    // Spart in der Bildschleife eine Allokation je Bild.
+    const basis = globeBasis(NODES, OPTS)
+    const target = new Map()
+    expect(globeFrame(basis, 0, target)).toBe(target)
+    const first = target.get('c1')
+    globeFrame(basis, 1.0, target)
+    // Dieselbe Objektidentität, neue Werte.
+    expect(target.get('c1')).toBe(first)
+    expect(target.get('c1')).toEqual(globeFrame(basis, 1.0).get('c1'))
   })
 })
 
