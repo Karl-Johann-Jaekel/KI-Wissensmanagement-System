@@ -60,8 +60,10 @@ def test_retry_recovers_when_the_model_adds_prose() -> None:
         calls.append(len(messages))
         return next(answers)
 
-    facts = _extract_with_retry(chat, [{"role": "user", "content": "x"}], "Titel")
+    facts, tokens = _extract_with_retry(chat, [{"role": "user", "content": "x"}], "Titel")
     assert facts.concepts == ["RAG"]
+    # Beide Richtungen beider Versuche zaehlen — Ausgabe eingeschlossen.
+    assert tokens > 0
     # Der zweite Aufruf traegt den zusaetzlichen Hinweis.
     assert calls == [1, 2]
 

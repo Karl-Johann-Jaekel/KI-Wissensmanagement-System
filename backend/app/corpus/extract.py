@@ -125,6 +125,9 @@ class ExtractStats:
     failed: int = 0
     #: Titel der gescheiterten Papers — sonst weiss niemand, welche nachzuholen sind.
     failed_titles: list[str] = field(default_factory=list)
+    #: Geschaetzte Tokens beider Richtungen. Grobe Schaetzung (ADR-0003), aber die
+    #: einzige Zahl, die den Aufwand eines Laufs ueberhaupt sichtbar macht.
+    tokens: int = 0
 
 
 class ExtractionParseError(ValueError):
@@ -323,17 +326,34 @@ _RETRY_HINT = {
 }
 
 
-def _extract_with_retry(chat: Chat, messages: list[dict], title: str) -> ExtractedFacts:
+def _extract_with_retry(chat: Chat, messages: list[dict], title: str) -> tuple[ExtractedFacts, int]:
     """Einmal nachfassen, bevor ein Paper als gescheitert gilt.
 
     Ein Lauf kostet Tokens; ein verlorenes Paper kostet einen ganzen Extraktionszyklus,
-    weil es ohne ``--force`` nie wiederkommt.
+    weil es ohne ``--force`` nie wiederkommt. Gibt die Fakten und die geschaetzten
+    Tokens **beider Richtungen** zurueck — Ausgabe eingeschlossen, denn bezahlt wird
+    sie ebenso.
     """
+    spent = _tokens_of(messages)
+    answer = chat(messages)
+    spent += estimate_tokens(answer)
     try:
-        return parse_extraction(chat(messages))
+        return parse_extraction(answer), spent
     except ExtractionParseError as first:
         log.info("no JSON from the model for %r, retrying once: %s", title[:80], first)
-        return parse_extraction(chat([*messages, _RETRY_HINT]))
+        retry = [*messages, _RETRY_HINT]
+        spent += _tokens_of(retry)
+        answer = chat(retry)
+        spent += estimate_tokens(answer)
+        return parse_extraction(answer), spent
+
+
+def _tokens_of(messages: list[dict]) -> int:
+    """Alle Nachrichten, nicht nur die letzte.
+
+    Der System-Prompt und der Vokabularblock gingen vorher gar nicht ins Budget ein.
+    """
+    return sum(estimate_tokens(str(m.get("content", ""))) for m in messages)
 
 
 def extract_corpus(
@@ -363,12 +383,16 @@ def extract_corpus(
             stats.skipped += 1
             continue
         messages = build_messages(doc.title, abstract, vocab)
-        used_tokens += estimate_tokens(messages[-1]["content"])
-        if used_tokens > token_budget:
-            log.warning("token budget %s reached — stopping", token_budget)
+        # Vor dem Aufruf pruefen, nicht danach: sonst wird das Budget immer um
+        # genau einen Aufruf ueberschritten.
+        if used_tokens + _tokens_of(messages) > token_budget:
+            log.warning(
+                "token budget %s reached after ~%s tokens — stopping", token_budget, used_tokens
+            )
             break
         try:
-            facts = _extract_with_retry(chat, messages, doc.title)
+            facts, spent = _extract_with_retry(chat, messages, doc.title)
+            used_tokens += spent
         except Exception as exc:  # noqa: BLE001 — one bad paper must not abort the run
             # Kein facts_extracted setzen: das Paper bleibt fuer den naechsten Lauf
             # offen, statt still als erledigt zu gelten.
@@ -383,6 +407,7 @@ def extract_corpus(
         stats.papers += 1
         stats.nodes += n_nodes
         stats.edges += n_edges
+        stats.tokens = used_tokens
         print(f"  ✓ {doc.title[:50]}: +{n_nodes} nodes, +{n_edges} edges")
 
     return stats
