@@ -16,7 +16,7 @@ Token hinein, 300 hinaus):
 | `mistral-medium-latest` | 1,50 $/M | 7,50 $/M | ~0,0068 $ | ~1.470 Züge |
 | `mistral-small-latest` | 0,15 $/M | 0,60 $/M | ~0,0006 $ | ~15.800 Züge |
 | `mistral-embed` | 0,10 $/M | — | ~0,000005 $ | praktisch unbegrenzt |
-| Groq `llama-3.3-70b-versatile` (freier Tarif) | — | — | 0 $ | wenige tausend Token/Minute, je Organisation |
+| Groq `openai/gpt-oss-120b` (freier Tarif) | — | — | 0 $ | wenige tausend Token/Minute, je Organisation |
 
 Der Consumer-Plan von Mistral enthält 10 $ API-Guthaben im Monat. Das trägt die
 Demo, ist aber ein Budget und keine Flatrate.
@@ -32,11 +32,16 @@ das zwei bis vier Fragen pro Minute, dann HTTP 429. Dieselbe Wand ist beim
 Sprachassistenten-Projekt bereits aufgeschlagen — das dasselbe Groq-Konto nutzt und
 sich das Kontingent damit teilt.
 
-**Modellwahl innerhalb von Groq:** `llama-3.3-70b-versatile`, nicht
-`openai/gpt-oss-*`. Die gpt-oss-Reihe verbraucht Token für internes „reasoning",
-bevor Inhalt entsteht; bei knappem `max_tokens` kommt sogar eine leere Antwort
-zurück. Auf einem Minutenkontingent ist das Budget, das nie sichtbar wird — und
-für RAG unnötig, weil das Retrieval die Auswahlarbeit bereits geleistet hat.
+**Modellwahl innerhalb von Groq:** `openai/gpt-oss-120b`. Erste Wahl war
+`llama-3.3-70b-versatile`, weil die gpt-oss-Reihe Token für internes „reasoning"
+verbraucht, bevor Inhalt entsteht. Das Konto hat die Llama-Modelle aber nicht
+freigeschaltet — `GET /v1/models` listet nur die gpt-oss-Reihe, alles andere
+antwortet mit 404 `model_not_found`. **Die Modellliste je Konto weicht von der
+öffentlichen Doku ab und gehört vor dem Setzen gegengeprüft.**
+
+Zwischen den beiden verbliebenen entscheidet der Verbrauch: auf dieselbe Frage
+(85 Token Prompt) brauchte `gpt-oss-120b` 145 Completion-Token für einen
+vollständigen Satz, `gpt-oss-20b` lief bei 200 in den Deckel und brach ab.
 
 ## Entscheidung
 
@@ -100,3 +105,10 @@ für RAG unnötig, weil das Retrieval die Auswahlarbeit bereits geleistet hat.
 - Tests dürfen `GROQ_API_KEY` nicht aus der `.env` erben. Wie beim
   `EMBED_PROVIDER` (ADR-0014) setzen die Router- und Gate-Tests beide Schlüssel
   ausdrücklich.
+- **Jeder Wechsel wird als WARNING protokolliert.** Ein stiller Rückfall ist von
+  einem gesunden Dienst nicht zu unterscheiden: Beim ersten Deploy stand ein
+  Modellname in der `.env`, den das Konto nicht freigeschaltet hatte. Groq
+  antwortete auf *jede* Anfrage mit 404, der Rückfall fing alles ab, die Demo
+  sah einwandfrei aus — und verbrauchte dabei Mistral-Guthaben statt des
+  kostenlosen Kontingents. Sichtbar wurde es erst am `provider`-Feld im
+  `sources`-Ereignis.

@@ -63,12 +63,14 @@ class Settings(BaseSettings):
     # Groq (ADR-0021). Mit Schlüssel antwortet Groq, Mistral wird zur Rückfallebene.
     # Kein Embedding-Endpunkt bei Groq — der Schlüssel wirkt nur auf den Chat.
     groq_api_key: str = ""
-    # llama-3.3-70b statt gpt-oss-120b: Letzteres verbraucht Token fuer internes
-    # "reasoning", bevor Inhalt entsteht. Bei einem Minutenkontingent von wenigen
-    # tausend Token ist das Budget, das nie sichtbar wird — und bei knappem
-    # Limit kommt eine leere Antwort zurueck. Fuer RAG hat das Retrieval die
-    # Denkarbeit ohnehin schon geleistet.
-    groq_model: str = "llama-3.3-70b-versatile"
+    # Die Modellliste je Konto weicht von der Doku ab: llama-3.3-70b ist dort
+    # als Produktionsmodell gelistet, auf einem freien Konto aber nicht
+    # freigeschaltet (404 model_not_found). Vor dem Aendern gegenpruefen:
+    #   curl -H "Authorization: Bearer $GROQ_API_KEY" \
+    #        https://api.groq.com/openai/v1/models
+    # gpt-oss-120b verbraucht Token fuer internes "reasoning", bevor Inhalt
+    # entsteht — bei zu kleinem max_tokens kommt eine leere Antwort zurueck.
+    groq_model: str = "openai/gpt-oss-120b"
 
     # Promotion pending -> verified (Phase 8). Lockern erhöht die Ausbeute, senkt aber
     # die Belegtiefe — Provenienz bleibt in jedem Fall Pflicht (PLAN §2.7, ADR-0010).

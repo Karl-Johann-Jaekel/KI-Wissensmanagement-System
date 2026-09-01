@@ -116,6 +116,23 @@ def test_fallback_switches_silently_before_first_token() -> None:
     assert client.model == "secondary-model"
 
 
+def test_fallback_logs_every_switch(caplog: pytest.LogCaptureFixture) -> None:
+    """Ein stiller Rueckfall sieht aus wie ein gesunder Dienst.
+
+    Beim ersten Deploy stand ein Modellname in der .env, den das Konto nicht
+    freigeschaltet hatte: dauerhaft 404, jede Anfrage lief auf den Rueckfall,
+    und von aussen war nichts zu sehen. Die Warnung macht das sichtbar.
+    """
+    client = FallbackChatClient(_Rejecting(), _Answering())
+    with caplog.at_level("WARNING", logger="app.generation.llm"):
+        client.chat([{"role": "user", "content": "x"}])
+
+    assert any(
+        r.levelname == "WARNING" and "429" in r.getMessage() and "secondary" in r.getMessage()
+        for r in caplog.records
+    )
+
+
 def test_fallback_is_untouched_when_primary_answers() -> None:
     primary, secondary = _Answering(), _Rejecting()
     client = FallbackChatClient(primary, secondary)

@@ -12,10 +12,13 @@ Name und Modell. ``FallbackChatClient`` stellt beide hintereinander (ADR-0021).
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterator
 from typing import Protocol
 
 import httpx
+
+log = logging.getLogger(__name__)
 
 MISTRAL_API = "https://api.mistral.ai"
 # Groq spricht das OpenAI-Format unter /openai/v1 — die Basis endet deshalb
@@ -122,6 +125,12 @@ class FallbackChatClient:
 
     ``name`` und ``model`` zeigen, wer tatsächlich geantwortet hat — sie werden
     im Stream gesetzt und erst nach dessen Ende ausgelesen (``sources``-Ereignis).
+
+    **Jeder Wechsel wird protokolliert.** Ein stiller Rückfall sieht von außen
+    aus wie ein gesunder Dienst: ein falsch geschriebener Modellname liefert
+    dauerhaft 404, der Rückfall fängt jede Anfrage ab, und die Rechnung läuft
+    beim vermeintlichen Reservekanal auf. Genau das ist beim ersten Deploy
+    passiert.
     """
 
     def __init__(self, primary: LLMClient, fallback: LLMClient) -> None:
@@ -140,13 +149,23 @@ class FallbackChatClient:
         except StopIteration:  # leere Antwort — kein Grund zu wechseln
             self._use(self._primary)
             return
-        except httpx.HTTPError:
+        except httpx.HTTPError as exc:
             # Noch kein Token beim Client: der Wechsel bleibt unbemerkt.
             # Der abgebrochene Strom haelt eine offene Verbindung; schliessen,
             # sobald er es kann (das Protokoll verspricht nur einen Iterator).
             close = getattr(stream, "close", None)
             if close is not None:
                 close()
+            status = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None
+            # WARNING, nicht INFO: ein Dauerzustand hier heisst, dass der
+            # primaere Anbieter gar nicht arbeitet (falsches Modell, ungueltiger
+            # Schluessel) — und nicht bloss, dass sein Kontingent voll war.
+            log.warning(
+                "%s abgewiesen (%s), Rueckfall auf %s",
+                self._primary.name,
+                status or type(exc).__name__,
+                self._fallback.name,
+            )
             self._use(self._fallback)
             yield from self._fallback.chat_stream(messages)
             return
