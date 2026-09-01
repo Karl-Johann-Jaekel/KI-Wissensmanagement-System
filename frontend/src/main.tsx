@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
 import AppShell from './app/AppShell'
+import ErrorBoundary from './components/ErrorBoundary'
 import { ToastProvider } from './components/ui/Toast'
 import { applyTheme } from './lib/theme'
 import ChatPage from './pages/ChatPage'
@@ -18,6 +19,13 @@ applyTheme()
 
 const router = createBrowserRouter([
   {
+    // Ohne errorElement zeigt der Router bei einem Fehler seine eigene,
+    // nackte Seite — und ein Render-Fehler nahm bisher die ganze App mit.
+    errorElement: (
+      <ErrorBoundary area="Diese Seite">
+        <AppShell />
+      </ErrorBoundary>
+    ),
     element: <AppShell />,
     children: [
       // Die Wissenskarte ist der Einstieg: sie zeigt in einem Bild, was das

@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowUp, Network, Plus, Upload } from 'lucide-react'
+import { ArrowUp, Network, Plus, Square } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import Popover from '../ui/Popover'
-import Spinner from '../ui/Spinner'
 import ChatSettingsMenu from './ChatSettingsMenu'
 import SkillPicker from './SkillPicker'
 
@@ -14,6 +13,8 @@ interface ChatInputProps {
   onChange: (value: string) => void
   onSend: () => void
   busy: boolean
+  /** Laufende Antwort abbrechen. Ohne das bliebe nur Wegnavigieren. */
+  onStop: () => void
   topK: number
   onTopKChange: (topK: number) => void
   rerank: boolean
@@ -30,6 +31,7 @@ export default function ChatInput({
   onChange,
   onSend,
   busy,
+  onStop,
   topK,
   onTopKChange,
   rerank,
@@ -110,18 +112,6 @@ export default function ChatInput({
                     role="menuitem"
                     onClick={() => {
                       close()
-                      navigate('/wissen')
-                    }}
-                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm hover:bg-sunken"
-                  >
-                    <Upload className="h-4 w-4 shrink-0 text-muted" />
-                    Dokument hochladen
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      close()
                       navigate('/wissen?tab=graph')
                     }}
                     className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm hover:bg-sunken"
@@ -147,20 +137,24 @@ export default function ChatInput({
                 rerank={rerank}
                 onRerankChange={onRerankChange}
               />
+              {/* Waehrend einer laufenden Antwort wird aus Senden ein Abbrechen:
+                  vorher drehte sich hier nur ein Spinner und eine aus dem Ruder
+                  gelaufene Antwort liess sich gar nicht stoppen. */}
               <button
                 type="button"
-                onClick={onSend}
-                disabled={!canSend}
-                aria-label="Senden"
-                title="Senden (Enter) · Zeilenumbruch mit Shift+Enter"
+                onClick={busy ? onStop : onSend}
+                disabled={!busy && !canSend}
+                aria-label={busy ? 'Antwort abbrechen' : 'Senden'}
+                title={busy ? 'Antwort abbrechen' : 'Senden (Enter) · Zeilenumbruch mit Shift+Enter'}
                 className={cn(
                   'ml-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
-                  'bg-primary-600 text-white transition-colors hover:bg-primary-700',
+                  'text-white transition-colors',
                   'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
                   'disabled:pointer-events-none disabled:opacity-40',
+                  busy ? 'bg-rose-600 hover:bg-rose-700' : 'bg-primary-600 hover:bg-primary-700',
                 )}
               >
-                {busy ? <Spinner className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
+                {busy ? <Square className="h-3.5 w-3.5 fill-current" /> : <ArrowUp className="h-4 w-4" />}
               </button>
             </div>
           </div>

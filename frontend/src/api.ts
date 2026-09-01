@@ -68,11 +68,18 @@ export function handleSseEvent(event: string, handlers: StreamHandlers): boolean
   return false
 }
 
-/** POST to an SSE chat endpoint and dispatch token/sources events. */
+/**
+ * POST to an SSE chat endpoint and dispatch token/sources events.
+ *
+ * `signal` bricht den Abruf ab. Ohne ihn lief die Antwort weiter, wenn der
+ * Nutzer wegnavigierte: das Modell erzeugte zu Ende, die Verbindung blieb
+ * offen, und `onDone` feuerte auf eine nicht mehr sichtbare Ansicht.
+ */
 export async function streamChat(
   path: string,
   body: Record<string, unknown>,
   handlers: StreamHandlers,
+  signal?: AbortSignal,
 ): Promise<void> {
   let res: Response
   try {
@@ -80,30 +87,44 @@ export async function streamChat(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal,
     })
   } catch (err) {
+    // Ein Abbruch ist kein Fehler, den der Nutzer sehen muss.
+    if (signal?.aborted) return
     handlers.onError(err instanceof Error ? err.message : String(err))
     return
   }
   if (!res.ok || !res.body) {
+    // Body verwerfen, sonst bleibt die Verbindung bis zum Timeout offen.
+    await res.body?.cancel().catch(() => {})
     handlers.onError(`HTTP ${res.status}`)
     return
   }
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const events = buffer.split('\n\n')
-    buffer = events.pop() ?? ''
-    for (const event of events) {
-      if (handleSseEvent(event, handlers)) {
-        handlers.onDone()
-        return
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const events = buffer.split('\n\n')
+      buffer = events.pop() ?? ''
+      for (const event of events) {
+        if (handleSseEvent(event, handlers)) {
+          handlers.onDone()
+          return
+        }
       }
     }
+  } catch (err) {
+    if (signal?.aborted) return
+    handlers.onError(err instanceof Error ? err.message : String(err))
+    return
+  } finally {
+    // Reader schliessen, damit ein abgebrochener Strom die Verbindung freigibt.
+    await reader.cancel().catch(() => {})
   }
   handlers.onDone()
 }
