@@ -4,6 +4,10 @@ Upload takes the raw file bytes as the request body (no multipart — keeps the
 dependency set unchanged); filename via query. Ingestion reuses the Phase 3 pipeline
 (idempotent via content_hash) and is admin-key gated. Markdown documents can be
 edited in place (re-chunk + re-embed, hash moves — ADR-0007).
+
+Die drei Schreibwege (Upload, Bearbeiten, Loeschen) haengen an
+``require_writes_enabled`` und sind ausgeliefert abgeschaltet — in Produktion bietet
+die Oberflaeche sie nicht an, offen waeren sie nur Angriffsflaeche (ADR-0024).
 """
 
 from __future__ import annotations
@@ -16,7 +20,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.security import rate_limit, require_admin
+from app.core.security import rate_limit, require_admin, require_writes_enabled
 from app.db.models import Chunk, Document
 from app.db.session import get_db
 from app.ingestion.pipeline import (
@@ -112,13 +116,30 @@ def get_document(doc_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
     }
 
 
-@router.post("/ingest", dependencies=[Depends(rate_limit)])
+@router.post(
+    "/ingest",
+    dependencies=[Depends(require_writes_enabled), Depends(rate_limit)],
+)
 async def ingest_upload(
     request: Request,
     filename: str = Query(min_length=1, max_length=200),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Admin-only: upload a PDF or Markdown file (raw bytes body)."""
+    """Admin-only: upload a PDF or Markdown file (raw bytes body).
+
+    Nur erreichbar mit WRITES_ENABLED=true (ADR-0024). Bevor dieser Weg je wieder
+    oeffentlich geschaltet wird, sind drei bekannte Fehler zu beheben:
+
+    1. Der Handler ist ``async``, ruft aber synchron Docling und blockierende
+       Embeddings — waehrend eines PDFs steht der Event-Loop samt laufender
+       SSE-Streams. Entweder ``def`` (Threadpool) oder ``run_in_executor``.
+    2. Der Body wird ohne Groessengrenze in den RAM gelesen; die Pruefung unten
+       greift nur im Markdown-Zweig. Der PDF-Zweig braucht ein eigenes Limit und
+       Caddy ein ``request_body max_size``.
+    3. Das Ziel ist ``data/uploads/<basename>``: zwei PDFs gleichen Namens
+       ueberschreiben sich auf der Platte, obwohl die DB per Hash dedupliziert.
+       Hash-Praefix in den Dateinamen.
+    """
     require_admin(request)
     raw = await request.body()
     if not raw:
@@ -158,7 +179,10 @@ class ContentUpdate(BaseModel):
     content: str = Field(min_length=1, max_length=2_000_000)
 
 
-@router.put("/documents/{doc_id}/content", dependencies=[Depends(rate_limit)])
+@router.put(
+    "/documents/{doc_id}/content",
+    dependencies=[Depends(require_writes_enabled), Depends(rate_limit)],
+)
 def update_document_content(
     request: Request,
     doc_id: uuid.UUID,
@@ -194,7 +218,11 @@ def update_document_content(
     return {"id": str(doc.id), "status": "updated", "chunks": n_chunks}
 
 
-@router.delete("/documents/{doc_id}", status_code=204)
+@router.delete(
+    "/documents/{doc_id}",
+    status_code=204,
+    dependencies=[Depends(require_writes_enabled)],
+)
 def delete_document(request: Request, doc_id: uuid.UUID, db: Session = Depends(get_db)) -> Response:
     """Admin-only: delete a document (chunks cascade in the DB)."""
     require_admin(request)

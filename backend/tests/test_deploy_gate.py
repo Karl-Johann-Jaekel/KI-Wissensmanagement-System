@@ -27,6 +27,7 @@ PROD_SETTINGS = Settings(
     mistral_api_key="sk-prod",
     cors_origins="https://wissen.example.com",
     embed_provider="mistral",
+    writes_enabled=False,
 )
 
 
@@ -56,6 +57,21 @@ def test_gate_green_with_ready_environment(db_session: Session) -> None:
     assert results["Env: Chat-Anbieter konfiguriert (Groq und/oder Mistral)"] is True
     assert results["Env: CORS ohne localhost"] is True
     assert results["Env: EMBED_PROVIDER kommt ohne lokales Modell aus"] is True
+    assert results["Env: Schreibrouten abgeschaltet (WRITES_ENABLED=false)"] is True
+
+
+def test_gate_red_with_writes_enabled(db_session: Session) -> None:
+    """Offene Schreibrouten auf einem oeffentlichen Server halten das Gate rot (ADR-0024)."""
+    open_writes = Settings(
+        app_env="production",
+        admin_api_key="x" * 32,
+        mistral_api_key="sk-prod",
+        cors_origins="https://wissen.example.com",
+        embed_provider="mistral",
+        writes_enabled=True,
+    )
+    results = _results(gate.run_checks(settings=open_writes, session=db_session))
+    assert results["Env: Schreibrouten abgeschaltet (WRITES_ENABLED=false)"] is False
 
 
 def test_gate_needs_mistral_even_when_groq_answers(db_session: Session) -> None:
