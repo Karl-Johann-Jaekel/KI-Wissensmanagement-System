@@ -17,7 +17,8 @@ services:
     ports:
       # Host-side port is separate from the in-container port (always 5432) so a local
       # Postgres on 5432 doesn't block the stack. Override POSTGRES_HOST_PORT in .env.
-      - "${POSTGRES_HOST_PORT:-5432}:5432"
+      # Bound to loopback: reachable from this machine, invisible to the rest of the network.
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -42,7 +43,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./backend:/app
       - ./data:/app/data
@@ -58,7 +59,8 @@ services:
     profiles: ["local"]
     restart: unless-stopped
     ports:
-      - "11434:11434"
+      # Ollama kennt keine Authentifizierung: gehoert ausschliesslich auf Loopback.
+      - "127.0.0.1:11434:11434"
     volumes:
       - ollama_data:/root/.ollama
 
@@ -71,7 +73,7 @@ services:
     profiles: ["grobid"]
     restart: unless-stopped
     ports:
-      - "${GROBID_HOST_PORT:-8070}:8070"
+      - "127.0.0.1:${GROBID_HOST_PORT:-8070}:8070"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8070/api/isalive || exit 1"]
       interval: 10s
@@ -87,7 +89,8 @@ services:
     profiles: ["full"]
     restart: unless-stopped
     ports:
-      - "5173:5173"
+      # Zum Testen vom Handy aus voruebergehend auf "5173:5173" zurueckstellen.
+      - "127.0.0.1:5173:5173"
     depends_on:
       - backend
 
@@ -117,7 +120,7 @@ services:
     profiles: ["full"]
     restart: unless-stopped
     ports:
-      - "5678:5678"
+      - "127.0.0.1:5678:5678"
     environment:
       N8N_SECURE_COOKIE: "false"
     volumes:
