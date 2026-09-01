@@ -14,7 +14,8 @@ from app import __version__
 from app.api import chat, documents, graph, health, review, search
 from app.core.config import get_settings
 from app.core.logging import configure_logging
-from app.ingestion.embedding import EmbeddingError
+from app.db.session import SessionLocal
+from app.ingestion.embedding import EmbeddingError, assert_index_matches_settings
 
 log = logging.getLogger(__name__)
 
@@ -23,6 +24,14 @@ log = logging.getLogger(__name__)
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     settings = get_settings()
+
+    # Lieber gar nicht starten als still die falschen Treffer liefern: läuft die
+    # App gegen einen Index, der mit einem anderen Modell gebaut wurde, sieht
+    # niemand einen Fehler — die Suche antwortet einfach daneben. Der Docstring
+    # der Prüfung nennt das den teuersten Fehler dieses Systems; aufgerufen wurde
+    # sie bis hierher nur aus einem Test.
+    with SessionLocal() as session:
+        assert_index_matches_settings(session)
     log.info(
         "kwms %s gestartet (env=%s, embed=%s/%s, writes=%s)",
         __version__,
