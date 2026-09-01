@@ -98,3 +98,64 @@ def test_chat_reports_provider_error_and_still_closes(
     assert "ausgelastet" in body
     assert '"type": "sources"' in body  # Belege kommen trotzdem
     assert "[DONE]" in body
+
+
+# ------------------------------------------- Strom endet immer geordnet (L6)
+
+
+class BrokenFrameClient:
+    """Wirft mitten im Strom etwas, das *kein* httpx-Fehler ist.
+
+    Genau der Fall, den ein Anbieter-Rahmen ohne ``choices`` ausgeloest hat:
+    vorher fing chat.py nur httpx.HTTPError, der KeyError flog durch und der
+    Strom endete ohne sources und ohne [DONE].
+    """
+
+    name = "fake"
+    model = "fake-model"
+
+    def chat_stream(self, messages: list[dict]):
+        yield "Angefangene "
+        raise KeyError("choices")
+
+    def chat(self, messages: list[dict]) -> str:
+        return "".join(self.chat_stream(messages))
+
+
+def test_unexpected_stream_error_still_closes_the_stream(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan = _plan_with(BrokenFrameClient())
+    monkeypatch.setattr("app.api.chat.prepare_answer", lambda *a, **k: plan)
+
+    body = client.post("/chat", json={"query": "Wie funktioniert Self-Attention?"}).text
+
+    assert "Angefangene" in body  # bereits gesendete Token bleiben erhalten
+    assert '"type": "error"' in body
+    assert '"type": "sources"' in body
+    assert body.rstrip().endswith("[DONE]")
+
+
+def test_sse_frames_without_choices_are_skipped() -> None:
+    """Fehlerobjekte, Usage-Rahmen und Keep-Alives duerfen den Strom nicht abreissen."""
+    from app.generation.llm import _OpenAICompatChatClient
+
+    frames = [
+        'data: {"choices":[{"delta":{"content":"Hallo "}}]}',
+        "data: {}",  # Keep-Alive ohne choices
+        'data: {"choices":[]}',  # leeres choices
+        'data: {"error":{"message":"kaputt"}}',  # Fehlerobjekt des Anbieters
+        "data: {nicht json",  # kaputtes JSON
+        'data: {"choices":[{"delta":{}}]}',  # Rahmen ohne content
+        'data: {"choices":[{"delta":{"content":"Welt"}}]}',
+        "data: [DONE]",
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text="\n\n".join(frames))
+
+    transport = httpx.MockTransport(handler)
+    llm = _OpenAICompatChatClient(
+        "k", "m", client=httpx.Client(transport=transport, base_url="https://example.invalid")
+    )
+    assert "".join(llm.chat_stream([{"role": "user", "content": "x"}])) == "Hallo Welt"

@@ -70,15 +70,29 @@ def chat(request: Request, req: ChatRequest, db: Session = Depends(get_db)) -> S
             # ihn danach regulaer mit [DONE] schliessen.
             log.warning("chat stream failed (%s): %s", plan.client.name, exc)
             yield sse({"type": "error", "message": error_message(exc)})
+        except Exception as exc:  # noqa: BLE001 — der Strom muss geordnet enden
+            # Alles Unerwartete (kaputtes JSON, ein Rahmen ohne choices, ein Fehler
+            # im Anbieter-Client) endete bisher hier ohne sources und ohne [DONE]:
+            # der Browser wartete danach endlos. GeneratorExit faellt nicht
+            # hierunter, ein abgebrochener Abruf bleibt also ein Abbruch.
+            log.error("chat stream failed unexpectedly (%s)", plan.client.name, exc_info=exc)
+            yield sse({"type": "error", "message": "Die Antwort konnte nicht erzeugt werden."})
+
         # answer already streamed; the cap is best-effort here
         with contextlib.suppress(HTTPException):
             budget.add(key, estimate_tokens("".join(parts)))
+
+        try:
+            sources = plan.sources()
+        except Exception:  # noqa: BLE001 — lieber ohne Quellen als ohne Abschluss
+            log.exception("sources could not be assembled")
+            sources = []
         yield sse(
             {
                 "type": "sources",
                 "model": plan.client.model,
                 "provider": plan.client.name,
-                "sources": plan.sources(),
+                "sources": sources,
             }
         )
         yield "data: [DONE]\n\n"
