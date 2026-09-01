@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
 import AppShell from './app/AppShell'
 import { ToastProvider } from './components/ui/Toast'
-import { applyTheme, resolveTheme } from './lib/theme'
+import { applyTheme } from './lib/theme'
 import ChatPage from './pages/ChatPage'
 import DocumentPage from './pages/DocumentPage'
 import InboxPage from './pages/InboxPage'
@@ -14,7 +14,7 @@ import SkillsPage from './pages/SkillsPage'
 import WissenPage from './pages/WissenPage'
 import './index.css'
 
-applyTheme(resolveTheme())
+applyTheme()
 
 const router = createBrowserRouter([
   {

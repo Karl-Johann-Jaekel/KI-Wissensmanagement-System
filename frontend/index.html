@@ -1,11 +1,19 @@
 <!doctype html>
-<html lang="de">
+<!--
+  dark steht hier statt erst in main.tsx: bis das Bündel geladen ist, wäre die
+  Seite sonst kurz hell und klappte dann um.
+-->
+<html lang="de" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-    <meta name="theme-color" content="#2563eb" />
+    <meta name="theme-color" content="#020617" />
     <title>KI-Wissensmanagement-System — RAG &amp; Wissens-Graph</title>
+    <style>
+      /* Grund vor dem ersten Render — sonst blitzt Weiß auf. */
+      html { background: #020617; }
+    </style>
   </head>
   <body>
     <div id="root"></div>

@@ -7,11 +7,14 @@
  * darf nicht in einer Render-Schleife versteckt entstehen.
  */
 import type { Project } from '../../lib/storage'
+import type { Theme } from '../../lib/theme'
 import { endpointId, KIND_COLORS, type GraphData, type GraphNode, type NodeKind } from '../../types'
 
 export type SceneKind = NodeKind | 'system' | 'project' | 'service'
 export type GroupMode = 'kind' | 'cluster'
-export type Theme = 'light' | 'dark'
+// Eine Quelle fuer das Theme (lib/theme). Frueher hier eigenstaendig
+// deklariert — dadurch blieben helle Paletten unbemerkt gueltig.
+export type { Theme }
 
 /** Ringe von innen bzw. Ebenen von unten — die Systemschichten der Anwendung. */
 export const TIER_LABELS = ['Fundament', 'Wissen', 'Quellen', 'Projekte', 'Dienste'] as const
@@ -48,12 +51,11 @@ const KIND_LABELS: Record<SceneKind, string> = {
  * damit die beiden äußeren Schichten unterscheidbar bleiben.
  */
 export const SCENE_COLORS: Record<Theme, Record<SceneKind, string>> = {
-  light: { ...KIND_COLORS.light, system: '#ea580c', project: '#059669', service: '#0d9488' },
   dark: { ...KIND_COLORS.dark, system: '#fb923c', project: '#34d399', service: '#2dd4bf' },
 }
 
 /** Sammelsektor „Weitere Inseln" — gedämpftes Türkis, klar neben den Diensten. */
-const REST_COLOR: Record<Theme, string> = { light: '#0f766e', dark: '#5eead4' }
+const REST_COLOR: Record<Theme, string> = { dark: '#5eead4' }
 
 /**
  * Ab so vielen Knoten wird der Sammelsektor nach Knotenart aufgefächert.
@@ -67,10 +69,6 @@ const REST_SPLIT_MIN = 120
 
 /** Farbkreis für Themen-Cluster (Gruppenmodus „Themen"). */
 const CLUSTER_PALETTE: Record<Theme, string[]> = {
-  light: [
-    '#2563eb', '#d97706', '#dc2626', '#7c3aed', '#059669',
-    '#db2777', '#0891b2', '#65a30d', '#9333ea', '#e11d48',
-  ],
   dark: [
     '#60a5fa', '#fbbf24', '#f87171', '#a78bfa', '#34d399',
     '#f472b6', '#22d3ee', '#a3e635', '#c084fc', '#fb7185',

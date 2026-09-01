@@ -41,22 +41,13 @@ export interface GraphData {
 }
 
 /** Goldton für vielzitierte Primärquellen — bewusst außerhalb der Typ-Palette. */
-export const LANDMARK_COLOR = { light: '#b45309', dark: '#fbbf24' } as const
+export const LANDMARK_COLOR = { dark: '#fbbf24' } as const
 
 /** Knoten ohne bekannte Art oder Gruppe: Türkis statt Grau. */
-export const FALLBACK_COLOR = { light: '#0d9488', dark: '#2dd4bf' } as const
+export const FALLBACK_COLOR = { dark: '#2dd4bf' } as const
 
-/** Knoten-Farben je Theme — paper trägt das Markenblau (primary). */
-export const KIND_COLORS: Record<'light' | 'dark', Record<NodeKind, string>> = {
-  light: {
-    paper: '#2563eb', // primary-600
-    concept: '#d97706', // amber-600
-    model: '#dc2626', // red-600
-    // violett statt cyan: neben dem blauen paper-Knoten sonst nicht unterscheidbar
-    dataset: '#7c3aed', // violet-600
-    task: '#65a30d', // lime-600 — deutlich neben dem Smaragd der Projekte
-    repo: '#db2777', // pink-600
-  },
+/** Knoten-Farben — paper trägt das Markenblau (primary). */
+export const KIND_COLORS: Record<'dark', Record<NodeKind, string>> = {
   dark: {
     paper: '#60a5fa', // primary-400
     concept: '#fbbf24', // amber-400

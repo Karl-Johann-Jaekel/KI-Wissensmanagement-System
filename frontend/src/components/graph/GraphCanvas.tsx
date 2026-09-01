@@ -62,15 +62,6 @@ const DIM_ALPHA = 0.1
 const EASE = 0.12
 
 const THEME_STYLES = {
-  light: {
-    background: '#f8fafc',
-    label: '#334155',
-    tier: 'rgba(51,65,85,0.55)',
-    ring: '#0f172a',
-    linkHover: 'rgba(51,65,85,0.85)',
-    link: 'rgba(71,85,105,0.28)',
-    linkDim: 'rgba(71,85,105,0.05)',
-  },
   dark: {
     background: '#020617',
     label: '#e2e8f0',

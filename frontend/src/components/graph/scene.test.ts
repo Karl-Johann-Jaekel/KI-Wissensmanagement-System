@@ -95,7 +95,7 @@ describe('buildScene', () => {
 
   it('hängt Projekte über die Quell-Dokumente an echte Knoten', () => {
     const scene = buildScene(DATA, {
-      theme: 'light',
+      theme: 'dark',
       groupMode: 'kind',
       showSystem: true,
       projects: [PROJECT],

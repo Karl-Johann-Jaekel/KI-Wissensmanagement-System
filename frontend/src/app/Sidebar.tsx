@@ -6,21 +6,18 @@ import {
   FolderKanban,
   Inbox,
   MessageSquare,
-  Moon,
   MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
   Search,
   Sparkles,
-  Sun,
 } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Modal from '../components/ui/Modal'
 import { cn } from '../lib/cn'
 import { deleteChat, renameChat, useChatIndex, type ChatMeta } from '../lib/storage'
-import { useTheme } from '../lib/theme'
 
 // Wissen zuerst: dort landet der Einstieg (siehe Route "/"), und der Graph ist
 // das, was das System in einem Bild zeigt. Suche und Inbox folgen darauf.
@@ -50,7 +47,6 @@ export default function Sidebar({
     ? location.pathname.slice('/chat/'.length)
     : undefined
   const chats = useChatIndex()
-  const { theme, toggleTheme } = useTheme()
   const [renameTarget, setRenameTarget] = useState<ChatMeta | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<ChatMeta | null>(null)
@@ -209,22 +205,6 @@ export default function Sidebar({
         </div>
       )}
       {collapsed && <div className="flex-1" />}
-
-      {/* Footer */}
-      <div
-        className={cn(
-          'flex items-center gap-1 border-t border-edge px-3 py-2.5',
-          collapsed && 'flex-col px-2',
-        )}
-      >
-        <button
-          onClick={toggleTheme}
-          aria-label={theme === 'dark' ? 'Helles Theme' : 'Dunkles Theme'}
-          className="rounded-lg p-2 text-muted hover:bg-sunken hover:text-ink"
-        >
-          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </button>
-      </div>
 
       <Modal open={renameTarget !== null} onClose={() => setRenameTarget(null)} title="Chat umbenennen">
         <Input
