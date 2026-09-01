@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.db.models import Chunk, Document
 from app.ingestion.embedding import embed_query
-from app.retrieval.hybrid import keyword_search, vector_search
+from app.retrieval.hybrid import TEXT_CONFIGS, keyword_search, vector_search
 from app.retrieval.rrf import reciprocal_rank_fusion
 
 EmbedQuery = Callable[[str], list[float]]
@@ -57,10 +57,23 @@ def hybrid_search(
     q_emb = embed_fn(query)
 
     vec = vector_search(session, q_emb, top_k=candidate_k)
-    kw = keyword_search(session, query, top_k=candidate_k)
-    vec_scores, kw_scores = dict(vec), dict(kw)
+    # Je Textsuch-Konfiguration ein eigener Arm statt einer fest verdrahteten:
+    # ``content_tsv`` entsteht mit der Sprache des Dokuments, und eine deutsche
+    # tsvector trifft nie eine englische tsquery. Als getrennte Arme in die RRF
+    # zu gehen ist zudem sauberer als Ränge zu mischen, die aus verschiedenen
+    # Konfigurationen stammen und gar nicht vergleichbar sind.
+    keyword_arms = [
+        keyword_search(session, query, top_k=candidate_k, config=c) for c in TEXT_CONFIGS
+    ]
+    vec_scores = dict(vec)
+    kw_scores: dict[str, float] = {}
+    for arm in keyword_arms:
+        for chunk_id, rank in arm:
+            kw_scores[chunk_id] = max(kw_scores.get(chunk_id, 0.0), rank)
 
-    fused = reciprocal_rank_fusion([[i for i, _ in vec], [i for i, _ in kw]])
+    fused = reciprocal_rank_fusion(
+        [[i for i, _ in vec], *[[i for i, _ in arm] for arm in keyword_arms]]
+    )
     rrf_scores = dict(fused)
     cand_ids = [cid for cid, _ in fused][:candidate_k]
     rows = _load_chunks(session, cand_ids)
