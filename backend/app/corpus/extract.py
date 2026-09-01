@@ -12,6 +12,7 @@ concepts/models/datasets and the edges asserting them are ``pending``.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -29,6 +30,8 @@ from app.corpus.aliases import (
 from app.db.graph import upsert_edge, upsert_node
 from app.db.models import Chunk, Document, GraphNode
 from app.db.provenance import Claim, record_authors, record_extraction
+
+log = logging.getLogger(__name__)
 
 Chat = Callable[[list[dict]], str]
 
@@ -310,12 +313,12 @@ def extract_corpus(
         messages = build_messages(doc.title, abstract, vocab)
         used_tokens += estimate_tokens(messages[-1]["content"])
         if used_tokens > token_budget:
-            print(f"  token budget {token_budget} reached — stopping")
+            log.warning("token budget %s reached — stopping", token_budget)
             break
         try:
             facts = parse_extraction(chat(messages))
         except Exception as exc:  # noqa: BLE001 — one bad paper must not abort the run
-            print(f"  ! {doc.title[:50]}: {exc}")
+            log.warning("extraction failed for %r: %s", doc.title[:80], exc)
             stats.failed += 1
             continue
         n_nodes, n_edges = store_facts(session, doc, facts, vocab)

@@ -21,6 +21,7 @@ from pathlib import Path
 import yaml
 
 from app.core.llm_router import choose_client
+from app.core.logging import configure_logging
 from app.corpus.arxiv import delta_fetch
 from app.corpus.extract import extract_corpus
 from app.corpus.promote import promote_graph
@@ -52,6 +53,9 @@ def main(argv: list[str] | None = None) -> int:
         help="Konfidenz-Schwelle für Auto-Promotion (Default: PROMOTE_CONFIDENCE)",
     )
     args = parser.parse_args(argv)
+    # Ohne das schluckt der Root-Logger jede Warnung der Bibliotheksmodule und ein
+    # Lauf, in dem reihenweise Papers scheitern, sieht aus wie ein sauberer.
+    configure_logging()
 
     client = choose_client()
     report: dict = {"started_at": datetime.now(UTC).isoformat(), "llm": client.name}

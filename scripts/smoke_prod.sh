@@ -24,6 +24,11 @@ echo "Smoke-Test gegen $BASE_URL"
 if curl -fsS --max-time 10 "$BASE_URL/health" | grep -q '"ok"'; then ok=0; else ok=1; fi
 check "/health" $ok
 
+# 1b. Health *mit* Datenbank. /health ist bewusst abhaengigkeitsfrei und bleibt
+# gruen, waehrend die Datenbank weg ist — Uptime-Monitoring gehoert auf /health/db.
+if curl -fsS --max-time 10 "$BASE_URL/health/db" | grep -q '"ok"'; then ok=0; else ok=1; fi
+check "/health/db" $ok
+
 # 2. Graph hat Knoten
 NODES=$(curl -fsS --max-time 15 "$BASE_URL/graph" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["nodes"]))' 2>/dev/null || echo 0)
 if [ "$NODES" -gt 0 ]; then ok=0; else ok=1; fi

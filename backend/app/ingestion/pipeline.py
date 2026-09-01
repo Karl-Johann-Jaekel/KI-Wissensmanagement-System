@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,6 +22,8 @@ from app.db.models import Chunk, Document
 from app.ingestion.chunking import ChunkSpec, chunk_markdown
 from app.ingestion.embedding import embed_texts
 from app.ingestion.ocr import to_markdown
+
+log = logging.getLogger(__name__)
 
 ToMarkdown = Callable[[Path], str]
 EmbedFn = Callable[[list[str]], list[list[float]]]
@@ -242,7 +245,7 @@ def ingest_path(
             status, n = ingest_file(session, pdf, lang, to_md=to_md, embed_fn=embed_fn)
         except Exception as exc:  # noqa: BLE001 — one bad PDF must not abort the run
             session.rollback()
-            print(f"  ! {pdf.name}: {exc}")
+            log.warning("ingest failed for %s: %s", pdf.name, exc)
             stats.failed += 1
             continue
         if status == "added":
