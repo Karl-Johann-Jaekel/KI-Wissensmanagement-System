@@ -7,6 +7,7 @@ import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
 import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
+import { safeHref } from '../lib/safeHref'
 
 function ScoreBars({ scores }: { scores: Record<string, number | null> }) {
   const entries = Object.entries(scores).filter(([, v]) => typeof v === 'number') as [
@@ -40,9 +41,9 @@ function ResultCard({ hit }: { hit: SearchHitRow }) {
   return (
     <Card className="p-3">
       <div className="flex flex-wrap items-center gap-2">
-        {hit.uri ? (
+        {safeHref(hit.uri) ? (
           <a
-            href={hit.uri}
+            href={safeHref(hit.uri)}
             target="_blank"
             rel="noreferrer"
             className="font-medium text-primary-700 hover:underline dark:text-primary-300"

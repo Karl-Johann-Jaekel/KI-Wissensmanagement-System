@@ -1,12 +1,16 @@
 import type { ChatSource } from '../../api'
+import { safeHref } from '../../lib/safeHref'
 
 export default function SourceCard({ source }: { source: ChatSource }) {
+  // Quellen-URLs kommen aus Fremddaten (PwC-Dump, PDF-Metadaten) — ungeprüft
+  // stünde hier auch ein javascript:-URI.
+  const href = safeHref(source.uri ?? source.url)
   return (
     <li className="rounded-lg bg-sunken px-2.5 py-1.5 text-xs">
       <div className="flex flex-wrap items-center gap-2">
-        {source.uri || source.url ? (
+        {href ? (
           <a
-            href={source.uri ?? source.url ?? '#'}
+            href={href}
             target="_blank"
             rel="noreferrer"
             className="font-medium text-primary-700 hover:underline dark:text-primary-300"
