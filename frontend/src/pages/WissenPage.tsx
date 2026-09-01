@@ -1,32 +1,28 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { fetchDocuments, type DocumentRow } from '../api'
-import { useAdminKey } from '../app/AdminKeyContext'
 import GraphSection from '../components/GraphSection'
 import DocumentTable from '../components/wissen/DocumentTable'
-import UploadPanel from '../components/wissen/UploadPanel'
 import { cn } from '../lib/cn'
 
 type WissenTab = 'dokumente' | 'graph'
 
 export default function WissenPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { adminKey } = useAdminKey()
-  const tab: WissenTab = searchParams.get('tab') === 'graph' ? 'graph' : 'dokumente'
+  // Graph ist der Einstieg und deshalb auch ohne Parameter der Standard.
+  const tab: WissenTab = searchParams.get('tab') === 'dokumente' ? 'dokumente' : 'graph'
 
   const [docs, setDocs] = useState<DocumentRow[]>([])
   const [error, setError] = useState('')
 
-  const load = useCallback(() => {
-    fetchDocuments(adminKey)
+  useEffect(() => {
+    fetchDocuments()
       .then(setDocs)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
-  }, [adminKey])
-
-  useEffect(load, [load])
+  }, [])
 
   const setTab = (next: WissenTab) => {
-    setSearchParams(next === 'graph' ? { tab: 'graph' } : {}, { replace: true })
+    setSearchParams(next === 'dokumente' ? { tab: 'dokumente' } : {}, { replace: true })
   }
 
   return (
@@ -36,8 +32,8 @@ export default function WissenPage() {
         <nav className="flex gap-1 text-sm" aria-label="Wissen-Bereiche">
           {(
             [
-              { id: 'dokumente', label: `Dokumente (${docs.length})` },
               { id: 'graph', label: 'Graph' },
+              { id: 'dokumente', label: `Dokumente (${docs.length})` },
             ] as const
           ).map((t) => (
             <button
@@ -62,7 +58,6 @@ export default function WissenPage() {
         ) : (
           <div className="h-full overflow-y-auto">
             <div className="mx-auto flex max-w-4xl flex-col gap-4 p-4 lg:p-6">
-              <UploadPanel onUploaded={load} />
               {error && <p className="text-sm text-rose-500">{error}</p>}
               <DocumentTable docs={docs} />
             </div>

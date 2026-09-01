@@ -1,7 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
-import { AdminKeyProvider } from './app/AdminKeyContext'
 import AppShell from './app/AppShell'
 import { ToastProvider } from './components/ui/Toast'
 import { applyTheme, resolveTheme } from './lib/theme'
@@ -41,10 +40,8 @@ const router = createBrowserRouter([
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <AdminKeyProvider>
-      <ToastProvider>
-        <RouterProvider router={router} />
-      </ToastProvider>
-    </AdminKeyProvider>
+    <ToastProvider>
+      <RouterProvider router={router} />
+    </ToastProvider>
   </React.StrictMode>,
 )

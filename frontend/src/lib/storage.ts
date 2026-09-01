@@ -9,7 +9,6 @@ import { useSyncExternalStore } from 'react'
 import type { ChatSource } from '../api'
 
 const NS = 'kwms.v1.'
-const LEGACY_ADMIN_KEY = 'kwms-admin-key'
 
 export const MAX_CHATS = 100
 export const MAX_MESSAGES_PER_CHAT = 200
@@ -93,30 +92,6 @@ export function newId(): string {
   return typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-}
-
-// ------------------------------------------------------------------ admin key
-
-export function getAdminKey(): string | null {
-  const current = read<string | null>('adminKey', null)
-  if (current) return current
-  // Migration vom Vor-Redesign-Schlüssel.
-  try {
-    const legacy = localStorage.getItem(LEGACY_ADMIN_KEY)
-    if (legacy) {
-      write('adminKey', legacy)
-      localStorage.removeItem(LEGACY_ADMIN_KEY)
-      return legacy
-    }
-  } catch {
-    return null
-  }
-  return null
-}
-
-export function setAdminKey(key: string | null): void {
-  if (key) write('adminKey', key)
-  else remove('adminKey')
 }
 
 // ------------------------------------------------------------------ chats

@@ -10,7 +10,6 @@ import {
   X,
 } from 'lucide-react'
 import { fetchDocuments, type DocumentRow } from '../api'
-import { useAdminKey } from '../app/AdminKeyContext'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import Modal from '../components/ui/Modal'
@@ -26,7 +25,6 @@ import {
 export default function ProjektDetailPage() {
   const { projectId } = useParams()
   const navigate = useNavigate()
-  const { adminKey } = useAdminKey()
   const projects = useProjects()
   const chats = useChatIndex()
   const project: Project | null = projects.find((p) => p.id === projectId) ?? null
@@ -36,10 +34,10 @@ export default function ProjektDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => {
-    fetchDocuments(adminKey)
+    fetchDocuments()
       .then(setAllDocs)
       .catch(() => setAllDocs([]))
-  }, [adminKey])
+  }, [])
 
   useEffect(() => {
     if (projectId && getProject(projectId) === null) navigate('/projekte', { replace: true })

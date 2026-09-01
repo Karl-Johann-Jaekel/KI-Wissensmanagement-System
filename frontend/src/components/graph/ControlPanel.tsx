@@ -29,9 +29,6 @@ interface Props {
   onFilterDays: (days: number | null) => void
   source: GraphSource
   onSource: (source: GraphSource) => void
-  canSeePending: boolean
-  includePending: boolean
-  onIncludePending: (value: boolean) => void
   changelog: ChangelogItem[]
   position: { x: number; y: number } | null
   onPosition: (pos: { x: number; y: number }) => void
@@ -157,9 +154,6 @@ export default function ControlPanel({
   onFilterDays,
   source,
   onSource,
-  canSeePending,
-  includePending,
-  onIncludePending,
   changelog,
   position,
   onPosition,
@@ -423,13 +417,6 @@ export default function ControlPanel({
                 <option value="30">30 Tage</option>
               </select>
             </label>
-            {canSeePending && (
-              <Toggle
-                checked={includePending}
-                onChange={onIncludePending}
-                label="pending einblenden"
-              />
-            )}
           </Section>
 
           {changelog.length > 0 && (

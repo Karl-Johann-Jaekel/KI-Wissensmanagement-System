@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { FolderKanban } from 'lucide-react'
 import { streamChat } from '../api'
-import { useAdminKey } from '../app/AdminKeyContext'
 import ChatInput from '../components/chat/ChatInput'
 import MessageList from '../components/chat/MessageList'
 import { useToast } from '../components/ui/Toast'
@@ -29,7 +28,6 @@ export default function ChatPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const navState = (location.state ?? {}) as ChatNavState
-  const { adminKey } = useAdminKey()
   const toast = useToast()
 
   const [input, setInput] = useState('')
@@ -128,7 +126,6 @@ export default function ChatPage() {
           persist()
         },
       },
-      adminKey,
     )
   }
 

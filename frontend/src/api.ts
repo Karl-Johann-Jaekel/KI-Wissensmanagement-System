@@ -9,15 +9,12 @@ export function graphQuery(includePending: boolean, source: GraphSource = 'all')
   return params.toString()
 }
 
-/** Fetch the knowledge graph (pending nodes only visible with an admin key). */
+/** Fetch the knowledge graph. */
 export async function fetchGraph(
   includePending = false,
-  apiKey?: string | null,
   source: GraphSource = 'all',
 ): Promise<GraphData> {
-  const res = await fetch(`${BASE}/graph?${graphQuery(includePending, source)}`, {
-    headers: apiKey ? { 'X-API-Key': apiKey } : {},
-  })
+  const res = await fetch(`${BASE}/graph?${graphQuery(includePending, source)}`)
   if (!res.ok) throw new Error(`graph: HTTP ${res.status}`)
   return (await res.json()) as GraphData
 }
@@ -76,16 +73,12 @@ export async function streamChat(
   path: string,
   body: Record<string, unknown>,
   handlers: StreamHandlers,
-  apiKey?: string | null,
 ): Promise<void> {
   let res: Response
   try {
     res = await fetch(`${BASE}${path}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(apiKey ? { 'X-API-Key': apiKey } : {}),
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
   } catch (err) {
@@ -126,10 +119,8 @@ export interface DocumentRow {
   chunks: number
 }
 
-export async function fetchDocuments(apiKey?: string | null): Promise<DocumentRow[]> {
-  const res = await fetch(`${BASE}/documents`, {
-    headers: apiKey ? { 'X-API-Key': apiKey } : {},
-  })
+export async function fetchDocuments(): Promise<DocumentRow[]> {
+  const res = await fetch(`${BASE}/documents`)
   if (!res.ok) throw new Error(`documents: HTTP ${res.status}`)
   return (await res.json()) as DocumentRow[]
 }
@@ -148,59 +139,10 @@ export interface DocumentDetail {
   editable: boolean
 }
 
-export async function fetchDocument(id: string, apiKey?: string | null): Promise<DocumentDetail> {
-  const res = await fetch(`${BASE}/documents/${id}`, {
-    headers: apiKey ? { 'X-API-Key': apiKey } : {},
-  })
+export async function fetchDocument(id: string): Promise<DocumentDetail> {
+  const res = await fetch(`${BASE}/documents/${id}`)
   if (!res.ok) throw new Error(`document: HTTP ${res.status}`)
   return (await res.json()) as DocumentDetail
-}
-
-/** Upload a PDF or Markdown file (raw bytes, admin-only). */
-export async function uploadDocument(
-  file: File,
-  apiKey: string,
-): Promise<{ filename: string; status: string; chunks: number }> {
-  const isMarkdown = file.name.toLowerCase().endsWith('.md')
-  const params = new URLSearchParams({ filename: file.name })
-  const res = await fetch(`${BASE}/ingest?${params}`, {
-    method: 'POST',
-    headers: {
-      'X-API-Key': apiKey,
-      'Content-Type': isMarkdown ? 'text/markdown' : 'application/pdf',
-    },
-    body: file,
-  })
-  if (!res.ok) {
-    const detail = await res.text()
-    throw new Error(`Upload fehlgeschlagen (HTTP ${res.status}): ${detail}`)
-  }
-  return res.json()
-}
-
-export async function updateDocumentContent(
-  id: string,
-  content: string,
-  apiKey: string,
-): Promise<{ id: string; status: string; chunks: number }> {
-  const res = await fetch(`${BASE}/documents/${id}/content`, {
-    method: 'PUT',
-    headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content }),
-  })
-  if (!res.ok) {
-    const detail = await res.text()
-    throw new Error(`Speichern fehlgeschlagen (HTTP ${res.status}): ${detail}`)
-  }
-  return res.json()
-}
-
-export async function deleteDocument(id: string, apiKey: string): Promise<void> {
-  const res = await fetch(`${BASE}/documents/${id}`, {
-    method: 'DELETE',
-    headers: { 'X-API-Key': apiKey },
-  })
-  if (!res.ok) throw new Error(`Löschen fehlgeschlagen (HTTP ${res.status})`)
 }
 
 // ---------------------------------------------------------------- search
@@ -217,14 +159,10 @@ export interface SearchHitRow {
 export async function postSearch(
   query: string,
   options: { topK?: number; rerank?: boolean | null } = {},
-  apiKey?: string | null,
 ): Promise<SearchHitRow[]> {
   const res = await fetch(`${BASE}/search`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(apiKey ? { 'X-API-Key': apiKey } : {}),
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       query,
       top_k: options.topK ?? 5,
@@ -250,51 +188,3 @@ export async function fetchChangelog(days = 7): Promise<ChangelogItem[]> {
   return (await res.json()).items as ChangelogItem[]
 }
 
-export interface PendingItem {
-  id: string
-  kind: string
-  name: string
-  sources: number
-  confidence: number
-  first_seen: string
-}
-
-export async function fetchReview(apiKey: string): Promise<PendingItem[]> {
-  const res = await fetch(`${BASE}/review`, { headers: { 'X-API-Key': apiKey } })
-  if (!res.ok) throw new Error(`review: HTTP ${res.status}`)
-  return (await res.json()).pending as PendingItem[]
-}
-
-export async function reviewNode(
-  id: string,
-  action: 'verify' | 'reject',
-  apiKey: string,
-): Promise<void> {
-  const res = await fetch(`${BASE}/review/node/${id}?action=${action}`, {
-    method: 'POST',
-    headers: { 'X-API-Key': apiKey },
-  })
-  if (!res.ok) throw new Error(`review ${action}: HTTP ${res.status}`)
-}
-
-export interface BulkReviewResult {
-  action: 'verify' | 'reject'
-  processed: number
-  edges_verified: number
-  not_found: string[]
-}
-
-/** Sammelfreigabe: mehrere pending-Fakten in einem Aufruf. */
-export async function reviewBulk(
-  ids: string[],
-  action: 'verify' | 'reject',
-  apiKey: string,
-): Promise<BulkReviewResult> {
-  const res = await fetch(`${BASE}/review/bulk`, {
-    method: 'POST',
-    headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ids, action }),
-  })
-  if (!res.ok) throw new Error(`review bulk ${action}: HTTP ${res.status}`)
-  return (await res.json()) as BulkReviewResult
-}

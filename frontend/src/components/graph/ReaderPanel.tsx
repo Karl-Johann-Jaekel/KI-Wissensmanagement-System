@@ -8,7 +8,6 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { ExternalLink, FileText, X } from 'lucide-react'
 import { fetchDocument, type DocumentDetail } from '../../api'
-import { useAdminKey } from '../../app/AdminKeyContext'
 import { useTheme } from '../../lib/theme'
 import Badge from '../ui/Badge'
 import Button from '../ui/Button'
@@ -28,7 +27,6 @@ interface Props {
 const PREVIEW_CHARS = 6000
 
 export default function ReaderPanel({ node, members, onSelectNode, onClose }: Props) {
-  const { adminKey } = useAdminKey()
   const { theme } = useTheme()
   const meta = node.meta as {
     abstract?: string
@@ -64,14 +62,14 @@ export default function ReaderPanel({ node, members, onSelectNode, onClose }: Pr
     if (!docId) return
     let cancelled = false
     setLoading(true)
-    fetchDocument(docId, adminKey)
+    fetchDocument(docId)
       .then((d) => !cancelled && setDoc(d))
       .catch((e: unknown) => !cancelled && setError(e instanceof Error ? e.message : String(e)))
       .finally(() => !cancelled && setLoading(false))
     return () => {
       cancelled = true
     }
-  }, [docId, adminKey])
+  }, [docId])
 
   const preview = doc ? doc.content.slice(0, PREVIEW_CHARS) : ''
   const truncated = doc ? doc.content.length > PREVIEW_CHARS : false

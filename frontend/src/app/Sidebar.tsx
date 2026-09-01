@@ -5,7 +5,6 @@ import {
   Brain,
   FolderKanban,
   Inbox,
-  Lock,
   MessageSquare,
   Moon,
   MoreHorizontal,
@@ -15,7 +14,6 @@ import {
   Search,
   Sparkles,
   Sun,
-  Unlock,
 } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
@@ -23,8 +21,6 @@ import Modal from '../components/ui/Modal'
 import { cn } from '../lib/cn'
 import { deleteChat, renameChat, useChatIndex, type ChatMeta } from '../lib/storage'
 import { useTheme } from '../lib/theme'
-import { useAdminKey } from './AdminKeyContext'
-import AdminKeyModal from './AdminKeyModal'
 
 // Wissen zuerst: dort landet der Einstieg (siehe Route "/"), und der Graph ist
 // das, was das System in einem Bild zeigt. Suche und Inbox folgen darauf.
@@ -40,14 +36,12 @@ interface SidebarProps {
   collapsed: boolean
   onToggleCollapsed: () => void
   onNavigate?: () => void
-  pendingCount?: number
 }
 
 export default function Sidebar({
   collapsed,
   onToggleCollapsed,
   onNavigate,
-  pendingCount = 0,
 }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -56,9 +50,7 @@ export default function Sidebar({
     ? location.pathname.slice('/chat/'.length)
     : undefined
   const chats = useChatIndex()
-  const { adminKey } = useAdminKey()
   const { theme, toggleTheme } = useTheme()
-  const [keyModalOpen, setKeyModalOpen] = useState(false)
   const [renameTarget, setRenameTarget] = useState<ChatMeta | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<ChatMeta | null>(null)
@@ -144,14 +136,6 @@ export default function Sidebar({
           >
             <Icon className="h-4 w-4 shrink-0" />
             {!collapsed && <span className="flex-1 truncate">{label}</span>}
-            {!collapsed && label === 'Inbox' && pendingCount > 0 && (
-              <span className="rounded-full bg-primary-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                {pendingCount}
-              </span>
-            )}
-            {!collapsed && label === 'Bibliothek' && !adminKey && (
-              <Lock className="h-3 w-3 shrink-0 opacity-60" />
-            )}
           </NavLink>
         ))}
       </nav>
@@ -234,20 +218,6 @@ export default function Sidebar({
         )}
       >
         <button
-          onClick={() => setKeyModalOpen(true)}
-          className={cn(
-            'flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-xs',
-            collapsed && 'flex-none',
-            adminKey
-              ? 'text-primary-700 hover:bg-sunken dark:text-primary-300'
-              : 'text-muted hover:bg-sunken hover:text-ink',
-          )}
-          title={adminKey ? 'Admin-Modus aktiv' : 'Öffentlicher Modus'}
-        >
-          {adminKey ? <Unlock className="h-4 w-4 shrink-0" /> : <Lock className="h-4 w-4 shrink-0" />}
-          {!collapsed && <span className="truncate">{adminKey ? 'Admin' : 'Öffentlich'}</span>}
-        </button>
-        <button
           onClick={toggleTheme}
           aria-label={theme === 'dark' ? 'Helles Theme' : 'Dunkles Theme'}
           className="rounded-lg p-2 text-muted hover:bg-sunken hover:text-ink"
@@ -255,8 +225,6 @@ export default function Sidebar({
           {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
       </div>
-
-      <AdminKeyModal open={keyModalOpen} onClose={() => setKeyModalOpen(false)} />
 
       <Modal open={renameTarget !== null} onClose={() => setRenameTarget(null)} title="Chat umbenennen">
         <Input

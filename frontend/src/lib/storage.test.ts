@@ -6,7 +6,6 @@ import {
   deleteChat,
   deleteProject,
   deleteSkill,
-  getAdminKey,
   getChatMessages,
   getChatMeta,
   listChats,
@@ -19,27 +18,10 @@ import {
   saveChat,
   saveProject,
   saveSkill,
-  setAdminKey,
 } from './storage'
 
 beforeEach(() => localStorage.clear())
 afterEach(() => vi.restoreAllMocks())
-
-describe('admin key', () => {
-  it('migrates the legacy key on first read', () => {
-    localStorage.setItem('kwms-admin-key', 'secret')
-    expect(getAdminKey()).toBe('secret')
-    expect(localStorage.getItem('kwms-admin-key')).toBeNull()
-    expect(localStorage.getItem('kwms.v1.adminKey')).toBe(JSON.stringify('secret'))
-  })
-
-  it('set/clear roundtrip', () => {
-    setAdminKey('abc')
-    expect(getAdminKey()).toBe('abc')
-    setAdminKey(null)
-    expect(getAdminKey()).toBeNull()
-  })
-})
 
 describe('chats', () => {
   it('create + save + list roundtrip, sorted by updatedAt', () => {

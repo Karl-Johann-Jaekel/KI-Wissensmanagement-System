@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Brain, Menu } from 'lucide-react'
-import { fetchReview } from '../api'
 import { cn } from '../lib/cn'
 import { useTheme } from '../lib/theme'
-import { useAdminKey } from './AdminKeyContext'
 import Sidebar from './Sidebar'
 
 const SIDEBAR_KEY = 'kwms.v1.sidebar'
@@ -20,12 +18,10 @@ function initialCollapsed(): boolean {
 
 export default function AppShell() {
   const location = useLocation()
-  const { adminKey } = useAdminKey()
   // Theme-Hook hier mounten, damit die dark-Klasse ab dem ersten Render stimmt.
   useTheme()
   const [collapsed, setCollapsed] = useState(initialCollapsed)
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [pendingCount, setPendingCount] = useState(0)
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
@@ -47,21 +43,6 @@ export default function AppShell() {
     }
   }, [drawerOpen])
 
-  // Inbox-Badge: pending-Fakten (nur Admin).
-  useEffect(() => {
-    if (!adminKey) {
-      setPendingCount(0)
-      return
-    }
-    let cancelled = false
-    fetchReview(adminKey)
-      .then((items) => !cancelled && setPendingCount(items.length))
-      .catch(() => !cancelled && setPendingCount(0))
-    return () => {
-      cancelled = true
-    }
-  }, [adminKey, location.pathname])
-
   return (
     <div className="flex h-full">
       {/* Desktop-Sidebar */}
@@ -74,7 +55,7 @@ export default function AppShell() {
         <Sidebar
           collapsed={collapsed}
           onToggleCollapsed={toggleCollapsed}
-          pendingCount={pendingCount}
+         
         />
       </aside>
 
@@ -87,7 +68,7 @@ export default function AppShell() {
               collapsed={false}
               onToggleCollapsed={() => {}}
               onNavigate={() => setDrawerOpen(false)}
-              pendingCount={pendingCount}
+             
             />
           </aside>
         </div>

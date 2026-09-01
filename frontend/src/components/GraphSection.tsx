@@ -5,7 +5,6 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchChangelog, fetchGraph, type ChangelogItem } from '../api'
-import { useAdminKey } from '../app/AdminKeyContext'
 import { useProjects } from '../lib/storage'
 import { useTheme } from '../lib/theme'
 import { endpointId, type GraphData, type GraphSource } from '../types'
@@ -27,7 +26,6 @@ import { loadPrefs, savePrefs, type GraphPrefs, type GraphSettings } from './gra
 const EMPTY: GraphData = { nodes: [], links: [] }
 
 export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }) {
-  const { adminKey } = useAdminKey()
   const { theme } = useTheme()
   const projects = useProjects()
   const [prefs] = useState(loadPrefs)
@@ -38,7 +36,6 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<SceneNode | null>(null)
-  const [includePending, setIncludePending] = useState(false)
   const [filterDays, setFilterDays] = useState<number | null>(null)
   const [source, setSource] = useState<GraphSource>('all')
   const [changelog, setChangelog] = useState<ChangelogItem[]>([])
@@ -64,7 +61,7 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
     let cancelled = false
     setStatus('loading')
     setSelected(null)
-    fetchGraph(includePending, adminKey, source)
+    fetchGraph(false, source)
       .then((d) => {
         if (cancelled) return
         setData(d)
@@ -81,7 +78,7 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
     return () => {
       cancelled = true
     }
-  }, [includePending, refreshKey, adminKey, source])
+  }, [refreshKey, source])
 
   const prefsRef = useRef(prefs)
   const persist = useCallback((patch: Partial<GraphPrefs>) => {
@@ -241,9 +238,6 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
             onFilterDays={setFilterDays}
             source={source}
             onSource={setSource}
-            canSeePending={!!adminKey}
-            includePending={includePending}
-            onIncludePending={setIncludePending}
             changelog={changelog}
             position={panelPos}
             onPosition={movePanel}

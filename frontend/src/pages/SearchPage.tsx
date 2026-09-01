@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown, ChevronUp, MessageSquarePlus, Search as SearchIcon } from 'lucide-react'
 import { postSearch, type SearchHitRow } from '../api'
-import { useAdminKey } from '../app/AdminKeyContext'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
@@ -77,7 +76,6 @@ function ResultCard({ hit }: { hit: SearchHitRow }) {
 }
 
 export default function SearchPage() {
-  const { adminKey } = useAdminKey()
   const [query, setQuery] = useState('')
   const [topK, setTopK] = useState(5)
   const [rerank, setRerank] = useState(false)
@@ -91,11 +89,7 @@ export default function SearchPage() {
     setBusy(true)
     setError('')
     try {
-      const result = await postSearch(
-        q,
-        { topK, rerank: rerank || null },
-        adminKey,
-      )
+      const result = await postSearch(q, { topK, rerank: rerank || null })
       setHits(result)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
