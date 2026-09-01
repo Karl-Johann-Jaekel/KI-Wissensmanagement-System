@@ -8,13 +8,14 @@ import logging
 from collections.abc import Iterator
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.security import (
     MAX_INPUT_CHARS,
+    client_key,
     estimate_tokens,
     get_budget,
     rate_limit,
@@ -51,10 +52,11 @@ def error_message(exc: httpx.HTTPError) -> str:
 
 
 @router.post("/chat", dependencies=[Depends(rate_limit)])
-def chat(req: ChatRequest, db: Session = Depends(get_db)) -> StreamingResponse:
+def chat(request: Request, req: ChatRequest, db: Session = Depends(get_db)) -> StreamingResponse:
     plan = prepare_answer(db, req.query, top_k=req.top_k, rerank=req.rerank)
     budget = get_budget()
-    budget.add(estimate_tokens(plan.messages[-1]["content"]))  # may raise 429
+    key = client_key(request)
+    budget.add(key, estimate_tokens(plan.messages[-1]["content"]))  # may raise 429
 
     def gen() -> Iterator[str]:
         parts: list[str] = []
@@ -70,7 +72,7 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)) -> StreamingResponse:
             yield sse({"type": "error", "message": error_message(exc)})
         # answer already streamed; the cap is best-effort here
         with contextlib.suppress(HTTPException):
-            budget.add(estimate_tokens("".join(parts)))
+            budget.add(key, estimate_tokens("".join(parts)))
         yield sse(
             {
                 "type": "sources",
