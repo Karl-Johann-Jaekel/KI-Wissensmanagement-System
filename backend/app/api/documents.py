@@ -92,7 +92,7 @@ def _reassembled_content(db: Session, doc_id: uuid.UUID) -> str:
 
 @router.get("/documents/{doc_id}", dependencies=[Depends(rate_limit)])
 def get_document(doc_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
-    """Document detail incl. full content for the reader/editor."""
+    """Document detail incl. full content for the reader."""
     doc = _get_document(db, doc_id)
     n_chunks = db.execute(
         select(func.count(Chunk.id)).where(Chunk.document_id == doc.id)

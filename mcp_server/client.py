@@ -2,7 +2,7 @@
 
 The MCP tools in ``server.py`` are thin wrappers over these functions. Everything
 goes through the backend's HTTP API, so the MCP server needs no DB/model access —
-just an API base URL and (optionally) the admin key for confidential/pending data.
+just an API base URL and (optionally) the admin key for pending facts.
 """
 
 from __future__ import annotations
@@ -77,7 +77,7 @@ class KWMSClient:
         return {"answer": "".join(answer), "sources": sources}
 
     def list_documents(self) -> list[dict[str, Any]]:
-        """List indexed documents (admin key returns confidential too)."""
+        """List indexed documents (admin key required for pending facts)."""
         resp = self._client.get("/documents", headers=self._headers())
         resp.raise_for_status()
         docs = resp.json()

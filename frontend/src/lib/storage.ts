@@ -1,5 +1,5 @@
 /**
- * Versionierter localStorage-Layer (ADR-0006): Chats, Skills, Projekte, Admin-Key.
+ * Versionierter localStorage-Layer (ADR-0006): Chats, Skills, Projekte, Einstellungen.
  *
  * Alles bleibt im Browser des Nutzers — der Server speichert keine Konversationen
  * (DSGVO-freundlich, kein User-Modell nötig). Schreibfehler (Quota, blockierter
