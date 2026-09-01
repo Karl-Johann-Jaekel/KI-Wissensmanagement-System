@@ -26,11 +26,17 @@ import {
   type Theme,
 } from './scene'
 import type { GraphSettings } from './settings'
+import { boundsOf, fitTransform } from './viewport'
 
 interface Props {
   scene: Scene
   width: number
   height: number
+  /**
+   * Vom Bedienmenü belegte Bildpunkte am rechten Rand. Die Kamera passt den
+   * Graphen in die Fläche *daneben* ein, statt ihn teilweise darunter zu legen.
+   */
+  insetRight?: number
   settings: GraphSettings
   theme: Theme
   /** Suchtreffer; null = kein Filter. */
@@ -118,6 +124,7 @@ export default function GraphCanvas({
   scene,
   width,
   height,
+  insetRight = 0,
   settings,
   theme,
   activeIds,
@@ -202,10 +209,22 @@ export default function GraphCanvas({
   }, [settings.layout, settings.clusterGap, settings.spread, scene])
 
   // Kamera nach Layout-Wechsel neu einpassen (nach dem Einschwingen).
+  //
+  // Eigene Rechnung statt `zoomToFit`: dessen Polsterung gilt ringsum und
+  // bezieht sich auf die volle Breite. Das Bedienmenü liegt aber darauf, und in
+  // der Ebenenansicht lag die rechte Spalte komplett dahinter.
   useEffect(() => {
-    const timer = setTimeout(() => fgRef.current?.zoomToFit(700, 50), 400)
+    const timer = setTimeout(() => {
+      const fg = fgRef.current
+      if (!fg) return
+      const bounds = boundsOf(scene.nodes)
+      if (!bounds) return
+      const { k, x, y } = fitTransform(bounds, { width, height, insetRight })
+      fg.centerAt(x, y, 700)
+      fg.zoom(k, 700)
+    }, 400)
     return () => clearTimeout(timer)
-  }, [settings.layout, settings.detail, settings.groupMode, width, height])
+  }, [settings.layout, settings.detail, settings.groupMode, width, height, insetRight, scene])
 
   useEffect(() => {
     if (!focus) return

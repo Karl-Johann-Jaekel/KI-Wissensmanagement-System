@@ -10,7 +10,7 @@ import { useProjects } from '../lib/storage'
 import { useTheme } from '../lib/theme'
 import { endpointId, type GraphData, type GraphSource } from '../types'
 import { useElementSize } from '../useElementSize'
-import ControlPanel from './graph/ControlPanel'
+import ControlPanel, { PANEL_WIDTH } from './graph/ControlPanel'
 import GraphCanvas from './graph/GraphCanvas'
 import Minimap from './graph/Minimap'
 import ReaderPanel from './graph/ReaderPanel'
@@ -47,6 +47,12 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
   const [focus, setFocus] = useState<{ id: string; nonce: number } | null>(null)
   const [fg, setFg] = useState<unknown>(null)
   const { ref, width, height } = useElementSize<HTMLDivElement>()
+  // Das Menü liegt als Überlagerung auf dem Canvas. Steht es rechts — der
+  // Standard, und dort bleibt es, solange niemand es wegzieht —, muss die
+  // Kamera diese Breite freihalten, sonst verschwindet die letzte Spalte
+  // dahinter (in der Ebenenansicht traf es "Konzepte").
+  const panelOnRight = panelPos === null || panelPos.x + PANEL_WIDTH / 2 > width / 2
+  const insetRight = panelOnRight ? PANEL_WIDTH + 32 : 0
   const nonce = useRef(0)
   // Globus: Rotation per Minimap-Klick anhalten, per Ziehen selbst drehen.
   const [rotationPaused, setRotationPaused] = useState(false)
@@ -203,6 +209,7 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
             scene={scene}
             width={width}
             height={height}
+            insetRight={insetRight}
             settings={settings}
             theme={theme}
             activeIds={matches}

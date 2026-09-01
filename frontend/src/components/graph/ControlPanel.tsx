@@ -37,7 +37,8 @@ interface Props {
   onPosition: (pos: { x: number; y: number }) => void
 }
 
-const PANEL_WIDTH = 232
+/** Auch der Canvas braucht das Maß: er passt den Graphen daneben ein. */
+export const PANEL_WIDTH = 232
 
 function useIsDesktop(): boolean {
   const [desktop, setDesktop] = useState(

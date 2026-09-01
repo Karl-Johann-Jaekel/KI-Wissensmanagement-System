@@ -26,10 +26,12 @@ import { useTheme } from '../lib/theme'
 import { useAdminKey } from './AdminKeyContext'
 import AdminKeyModal from './AdminKeyModal'
 
+// Wissen zuerst: dort landet der Einstieg (siehe Route "/"), und der Graph ist
+// das, was das System in einem Bild zeigt. Suche und Inbox folgen darauf.
 const NAV_ITEMS = [
+  { to: '/wissen', label: 'Wissen', icon: BookOpen },
   { to: '/suche', label: 'Suche', icon: Search },
   { to: '/inbox', label: 'Inbox', icon: Inbox },
-  { to: '/wissen', label: 'Wissen', icon: BookOpen },
   { to: '/skills', label: 'Skills', icon: Sparkles },
   { to: '/projekte', label: 'Projekte', icon: FolderKanban },
 ]
