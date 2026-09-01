@@ -8,7 +8,7 @@ separate, rule-based step).
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -58,6 +58,8 @@ def upsert_edge(
 
 
 def graph_counts(session: Session) -> dict[str, int]:
-    nodes = session.execute(select(GraphNode.id)).all()
-    edges = session.execute(select(GraphEdge.source)).all()
-    return {"nodes": len(nodes), "edges": len(edges)}
+    """Zählt in der Datenbank statt jede Zeile nach Python zu holen."""
+    return {
+        "nodes": session.execute(select(func.count()).select_from(GraphNode)).scalar_one(),
+        "edges": session.execute(select(func.count()).select_from(GraphEdge)).scalar_one(),
+    }

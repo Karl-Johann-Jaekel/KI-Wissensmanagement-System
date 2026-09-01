@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Iterator
+from contextlib import contextmanager
 
 from fastapi.testclient import TestClient
 from sqlalchemy import text
@@ -126,3 +127,65 @@ def test_cap_by_kind_fills_leftover_slots_by_degree() -> None:
     nodes = _cap_nodes({"paper": 7, "repo": 3})
     val = {n.id: 1.0 for n in nodes}
     assert len(_cap_by_kind(nodes, val, 5)) == 5
+
+
+# ------------------------------------------------- Kantenfilter + Caching (L2)
+
+
+@contextmanager
+def _bind(session: Session) -> Iterator[None]:
+    """FastAPI braucht eine Generator-*Funktion*, kein zurueckgegebenes Generator-Objekt."""
+
+    def _override() -> Iterator[Session]:
+        yield session
+
+    app.dependency_overrides[get_db] = _override
+    try:
+        yield
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_edges_to_filtered_out_nodes_are_not_returned(
+    db_session: Session, client: TestClient
+) -> None:
+    """Kanten werden in SQL auf die ausgewaehlte Knotenmenge eingeschraenkt.
+
+    Vorher las der Endpunkt *alle* Kanten und warf sie in Python weg — bei 23k
+    Kanten je anonymem Aufruf. Der Filter muss dieselbe Antwort liefern.
+    """
+    _reset_graph(db_session)
+    native = upsert_node(db_session, "paper", "Native Paper")
+    foreign = upsert_node(
+        db_session, "paper", "Foreign Paper", {"provenance": {"source": "paperswithcode"}}
+    )
+    upsert_edge(db_session, native, foreign, "RELATED_TO")
+    db_session.commit()
+
+    with _bind(db_session):
+        native_view = client.get("/graph", params={"source": "native"}).json()
+        all_view = client.get("/graph").json()
+
+    assert {n["name"] for n in native_view["nodes"]} == {"Native Paper"}
+    # Die Kante haengt an einem Knoten, der herausgefiltert wurde -> darf nicht kommen.
+    assert native_view["links"] == []
+    # Ohne Filter ist sie da: der Filter schneidet, er verliert nicht.
+    assert len(all_view["links"]) == 1
+
+
+def test_public_graph_is_cacheable_review_view_is_not(
+    db_session: Session, client: TestClient
+) -> None:
+    _reset_graph(db_session)
+    _seed_knowledge(db_session)
+    with _bind(db_session):
+        public = client.get("/graph")
+        review = client.get(
+            "/graph",
+            params={"include_pending": "true"},
+            headers={"X-API-Key": get_settings().admin_api_key},
+        )
+
+    assert "max-age" in public.headers["cache-control"]
+    # Ungeprüfte Fakten gehoeren in keinen geteilten Cache.
+    assert review.headers["cache-control"] == "private, no-store"

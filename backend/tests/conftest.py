@@ -25,6 +25,19 @@ def _pin_embed_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(get_settings(), "embed_provider", "ollama", raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter() -> None:
+    """Der Limiter ist ein Prozess-Global (ADR-0003).
+
+    Ohne Reset summieren sich die Anfragen *aller* Tests auf denselben Schluessel
+    ("testclient") und der naechste hinzugefuegte API-Test faellt mit 429 um —
+    ein Fehlerbild, das nichts mit dem Test zu tun haette.
+    """
+    from app.core import security
+
+    security._limiter = None
+
+
 @pytest.fixture
 def client() -> TestClient:
     return TestClient(app)

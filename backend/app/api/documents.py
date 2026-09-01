@@ -36,9 +36,9 @@ UPLOAD_DIR = Path("data/uploads")
 MAX_MARKDOWN_BYTES = 2 * 1024 * 1024  # 2 MB
 
 
-@router.get("/documents")
-def list_documents(request: Request, db: Session = Depends(get_db)) -> list[dict]:
-    """All documents (admin) or public-only (everyone), with chunk counts."""
+@router.get("/documents", dependencies=[Depends(rate_limit)])
+def list_documents(db: Session = Depends(get_db)) -> list[dict]:
+    """Alle Dokumente mit Chunk-Zahl. Öffentlich lesbar, aber gedrosselt."""
     stmt = (
         select(
             Document.id,
@@ -90,7 +90,7 @@ def _reassembled_content(db: Session, doc_id: uuid.UUID) -> str:
     return "\n\n".join(parts)
 
 
-@router.get("/documents/{doc_id}")
+@router.get("/documents/{doc_id}", dependencies=[Depends(rate_limit)])
 def get_document(doc_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
     """Document detail incl. full content for the reader/editor."""
     doc = _get_document(db, doc_id)
