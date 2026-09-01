@@ -9,7 +9,20 @@ encode zstd gzip
 
 handle /api/* {
 	uri strip_prefix /api
-	reverse_proxy backend:8000
+	reverse_proxy backend:8000 {
+		# X-Forwarded-For unveraendert weiterreichen statt anzuhaengen.
+		#
+		# Steht noch ein Proxy davor (auf einem Server mit mehreren Hosts der
+		# Normalfall), setzt dieser bereits die Besucher-IP. Caddys Standard
+		# haengt die eigene Sicht an, der Header wird zu "<Besucher>, <Proxy>"
+		# — und uvicorn nimmt daraus den letzten Eintrag, also den Proxy.
+		# Folge: RATE_LIMIT zaehlt alle Besucher als einen einzigen, ein
+		# Nutzer sperrt alle anderen aus.
+		#
+		# Gegen Faelschung schuetzt der aeussere Proxy, indem er den Header
+		# mit der echten Gegenstelle ueberschreibt statt ihn zu ergaenzen.
+		header_up X-Forwarded-For {http.request.header.X-Forwarded-For}
+	}
 }
 
 handle {
