@@ -8,7 +8,6 @@ import { applyTheme, resolveTheme } from './lib/theme'
 import ChatPage from './pages/ChatPage'
 import DocumentPage from './pages/DocumentPage'
 import InboxPage from './pages/InboxPage'
-import LandingPage from './pages/LandingPage'
 import ProjektDetailPage from './pages/ProjektDetailPage'
 import ProjektePage from './pages/ProjektePage'
 import SearchPage from './pages/SearchPage'
@@ -19,11 +18,13 @@ import './index.css'
 applyTheme(resolveTheme())
 
 const router = createBrowserRouter([
-  // Öffentliche Startseite ohne App-Shell.
-  { path: '/', element: <LandingPage /> },
   {
     element: <AppShell />,
     children: [
+      // Die Wissenskarte ist der Einstieg: sie zeigt in einem Bild, was das
+      // System enthaelt. Eine vorgeschaltete Startseite kostete einen Klick,
+      // bevor ueberhaupt etwas vom Inhalt zu sehen war.
+      { path: '/', element: <Navigate to="/wissen?tab=graph" replace /> },
       { path: '/chat', element: <ChatPage /> },
       { path: '/chat/:chatId', element: <ChatPage /> },
       { path: '/suche', element: <SearchPage /> },

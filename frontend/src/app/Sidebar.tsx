@@ -89,7 +89,7 @@ export default function Sidebar({
         <NavLink
           to="/"
           onClick={onNavigate}
-          title="Zur Startseite"
+          title="Zur Wissenskarte"
           className={cn('flex min-w-0 items-center gap-2', collapsed && 'justify-center')}
         >
           <span className="shrink-0 rounded-lg bg-primary-600 p-1.5 text-white">

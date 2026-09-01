@@ -41,7 +41,10 @@ export const DEFAULT_SETTINGS: GraphSettings = {
   hubLabels: true,
   minimap: true,
   linksOnHover: true,
-  nodeSize: 1,
+  // 0,7 statt 1: bei rund 2000 Knoten ueberlagern sich die Punkte am aeusseren
+  // Rand des Globus sonst zu einer geschlossenen Flaeche, und die Cluster sind
+  // nicht mehr auseinanderzuhalten. Der Regler geht bis 2 fuer kleine Graphen.
+  nodeSize: 0.7,
   clusterGap: 10,
   spread: 1.45,
   detail: 5,
