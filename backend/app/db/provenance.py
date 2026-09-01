@@ -256,6 +256,28 @@ def sources_for(session: Session, claim: Claim) -> list[str]:
     return sorted(row for row in rows if row)
 
 
+def independent_source_counts_by_node(session: Session) -> dict[str, int]:
+    """Belegzahl **je Knoten** in einer Abfrage.
+
+    ``independent_source_count`` einzeln je Knoten aufzurufen wäre ein N+1: die
+    Promotion läuft über den gesamten Graphen. Gezählt wird wie dort — nach
+    unterschiedlichem Herkunftsdokument, ersatzweise nach Quellsystem.
+    """
+    rows = session.execute(
+        select(
+            EntityExtraction.node_id,
+            func.count(
+                func.distinct(
+                    func.coalesce(EntityExtraction.document_id, EntityExtraction.source_id)
+                )
+            ),
+        )
+        .where(EntityExtraction.node_id.is_not(None))
+        .group_by(EntityExtraction.node_id)
+    )
+    return {str(node_id): int(count) for node_id, count in rows}
+
+
 def independent_source_count(session: Session, claim: Claim) -> int:
     """Wie viele **unterschiedliche** Quellen eine Aussage belegen.
 
@@ -288,6 +310,7 @@ __all__ = [
     "FORBIDDEN_AUTHOR_META",
     "find_duplicate_source",
     "independent_source_count",
+    "independent_source_counts_by_node",
     "mark_conflict",
     "name_key",
     "record_authors",

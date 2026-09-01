@@ -5,6 +5,16 @@ documents** and the extraction confidence clears a threshold. Edges are verified
 when both endpoints are verified, so the public (verified-only) graph never dangles.
 Conflicting claims (reciprocal IMPROVES_ON) are flagged ``meta.disputed`` and never
 auto-verified — knowledge is added, never silently overwritten (PLAN §2.7).
+
+Gezählt wird in ``entities_extracted`` — eine Zeile je Beleg (ADR-0020). Vorher
+zählte diese Regel Dokument-Ids in ``meta.source_document_ids``, also in genau dem
+JSONB-Feld, das ADR-0020 als „gar nicht dafür gebaut" ablöste: der Upsert ersetzte
+die Liste, statt sie zu ergänzen. Auf dem Bestand findet die Zählung über die
+Belegtabelle 17 Knoten mit mindestens zwei unabhängigen Quellen, die alte über das
+JSONB-Feld nur 7 — ADR-0022.
+
+Ohne Beleg keine Promotion: ein Knoten, zu dem keine Zeile in ``entities_extracted``
+steht, bleibt pending. Provenienz ist Pflicht (PLAN §2.7), nicht Beiwerk.
 """
 
 from __future__ import annotations
@@ -18,6 +28,7 @@ from sqlalchemy.orm import Session, attributes
 
 from app.core.config import get_settings
 from app.db.models import GraphEdge, GraphNode
+from app.db.provenance import independent_source_counts_by_node
 
 # Voreinstellung (PLAN §2.7). Über PROMOTE_MIN_SOURCES / PROMOTE_CONFIDENCE bzw. die
 # CLI-Flags von app.update anpassbar — Provenienzpflicht bleibt davon unberührt.
@@ -34,6 +45,11 @@ class PromoteStats:
 
 
 def _sources_and_confidence(edges: list[GraphEdge]) -> tuple[set[str], float]:
+    """Belegte Dokument-Ids und höchste Konfidenz aus den anliegenden Kanten.
+
+    Die Dokument-Ids dienen nur noch der Nachvollziehbarkeit im ``meta`` des
+    promoteten Knotens; **gezählt** wird über ``entities_extracted``.
+    """
     sources: set[str] = set()
     max_conf = 0.0
     for e in edges:
@@ -66,17 +82,22 @@ def promote_graph(
         incident[e.target].append(e)
 
     verified_ids = {n.id for n in nodes if n.status == "verified"}
+    # Eine Sammelabfrage statt einer je Knoten — die Schleife läuft über den
+    # gesamten Graphen.
+    source_counts = independent_source_counts_by_node(session)
 
     # 1) promote well-supported pending entity nodes
     for node in nodes:
         if node.status != "pending" or node.kind not in PROMOTABLE_KINDS:
             continue
         sources, max_conf = _sources_and_confidence(incident[node.id])
-        if len(sources) >= min_sources and max_conf >= confidence_threshold:
+        n_sources = source_counts.get(str(node.id), 0)
+        if n_sources >= min_sources and max_conf >= confidence_threshold:
             node.status = "verified"
             node.meta = {
                 **(node.meta or {}),
                 "source_document_ids": sorted(sources),
+                "independent_sources": n_sources,
                 "confidence": round(max_conf, 3),
                 "promoted_at": datetime.now(UTC).isoformat(),
             }
