@@ -20,6 +20,8 @@ from pathlib import Path
 import httpx
 import yaml
 
+from app.corpus.harvest.base import request_with_backoff
+
 ARXIV_API = "http://export.arxiv.org/api/query"
 NS = {"atom": "http://www.w3.org/2005/Atom"}
 USER_AGENT = "ki-wissensmanagement-system/0.1 (delta fetch; contact via repo)"
@@ -88,7 +90,11 @@ def delta_fetch(
                 break
             if qi > 0:
                 time.sleep(POLITE_DELAY_S)
-            resp = http.get(
+            # Mit Backoff und Retry-After-Vorrang statt einem einzigen Versuch:
+            # ein 503 riss sonst den gesamten Wochenlauf mit (ADR-0018 hatte die
+            # Mechanik langst, der Loop nutzte sie nur nicht).
+            resp = request_with_backoff(
+                http,
                 ARXIV_API,
                 params={
                     "search_query": build_search_query(query),
@@ -97,7 +103,6 @@ def delta_fetch(
                     "max_results": per_query,
                 },
             )
-            resp.raise_for_status()
             for entry in ET.fromstring(resp.text).findall("atom:entry", NS):
                 if len(fetched) >= cap:
                     break
@@ -111,8 +116,7 @@ def delta_fetch(
                 if pdf_path.exists():
                     continue
                 time.sleep(POLITE_DELAY_S)
-                pdf = http.get(meta["pdf_url"])
-                pdf.raise_for_status()
+                pdf = request_with_backoff(http, meta["pdf_url"])
                 pdf_path.write_bytes(pdf.content)
                 (out / f"{meta['id']}.json").write_text(
                     json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8"
