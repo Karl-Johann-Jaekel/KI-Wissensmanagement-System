@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -15,6 +16,16 @@ from app.db.session import get_db
 from app.main import app
 
 ADMIN_KEY = get_settings().admin_api_key
+
+
+@pytest.fixture(autouse=True)
+def _enable_writes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Schreibrouten sind ausgeliefert aus (ADR-0024).
+
+    Die Tests unten pruefen deren Verhalten, brauchen sie also an. Dass sie ohne
+    das Flag verschwinden, prueft ``test_write_routes_are_gone_when_disabled``.
+    """
+    monkeypatch.setattr(get_settings(), "writes_enabled", True, raising=False)
 
 
 def _seed_docs(session: Session) -> None:
@@ -225,3 +236,38 @@ def test_delete_document_cascades(db_session: Session, client: TestClient) -> No
     assert db_session.get(Document, doc_id) is None
     remaining = db_session.execute(select(Chunk).where(Chunk.document_id == doc_id)).first()
     assert remaining is None
+
+
+# --------------------------------------------------- Schreibwege abschaltbar (ADR-0024)
+
+
+def test_write_routes_are_gone_when_disabled(
+    db_session: Session, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ohne WRITES_ENABLED existieren die drei Schreibrouten nach aussen nicht.
+
+    404 statt 403 ist Absicht: ein 403 verriete, dass es den Endpunkt gibt und nur
+    der Schluessel fehlt.
+    """
+    monkeypatch.setattr(get_settings(), "writes_enabled", False, raising=False)
+    doc = _seed_md_doc(db_session)
+    admin = {"X-API-Key": ADMIN_KEY}
+    with _bind_db(db_session):
+        post = client.post("/ingest?filename=a.md", content=b"# x", headers=admin)
+        assert post.status_code == 404
+        put = client.put(f"/documents/{doc.id}/content", json={"content": "# Neu"}, headers=admin)
+        assert put.status_code == 404
+        assert client.delete(f"/documents/{doc.id}", headers=admin).status_code == 404
+    # Der Ausschalter darf nichts loeschen.
+    assert db_session.get(Document, doc.id) is not None
+
+
+def test_reads_stay_open_when_writes_are_disabled(
+    db_session: Session, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Nur die Schreibwege sind zu — Lesen bleibt oeffentlich."""
+    monkeypatch.setattr(get_settings(), "writes_enabled", False, raising=False)
+    doc = _seed_md_doc(db_session)
+    with _bind_db(db_session):
+        assert client.get("/documents").status_code == 200
+        assert client.get(f"/documents/{doc.id}").status_code == 200

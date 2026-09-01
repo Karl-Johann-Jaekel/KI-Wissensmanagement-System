@@ -87,6 +87,11 @@ class Settings(BaseSettings):
     daily_token_cap: int = 200_000
     rate_limit: str = Field(default="30/minute")
 
+    # Schreibwege (Upload, Bearbeiten, Loeschen). Standard aus: die Oberflaeche bietet
+    # sie seit dem Redesign nicht mehr an, offen waeren sie nur Angriffsflaeche auf
+    # einem oeffentlichen Server. Befuellt wird per `python -m app.ingest` (ADR-0024).
+    writes_enabled: bool = False
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

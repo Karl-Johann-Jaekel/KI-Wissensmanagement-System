@@ -89,5 +89,15 @@ def require_admin(request: Request) -> None:
         raise HTTPException(status_code=401, detail="admin API key required")
 
 
+def require_writes_enabled() -> None:
+    """Schreibrouten sind ausgeschaltet, solange WRITES_ENABLED false ist (ADR-0024).
+
+    404 statt 403: nach aussen soll der Endpunkt nicht existieren. Ein 403 verriete,
+    dass es ihn gibt und nur der Schluessel fehlt.
+    """
+    if not get_settings().writes_enabled:
+        raise HTTPException(status_code=404, detail="Not Found")
+
+
 def estimate_tokens(text: str) -> int:
     return max(1, len(text) // 4)

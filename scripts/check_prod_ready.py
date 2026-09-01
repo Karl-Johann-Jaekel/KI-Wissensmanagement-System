@@ -10,8 +10,8 @@ Exit 0 = deploybar, Exit 1 = mindestens ein Check rot. Geprüft wird:
   Modell. Ein Mismatch liefert sonst still die falschen Treffer (ADR-0014).
 * **Umgebung** — `APP_ENV=production`, ausreichend starker Admin-Key,
   `MISTRAL_API_KEY` gesetzt (die Embeddings hängen daran), ein konfigurierter
-  Chat-Anbieter, CORS ohne localhost und ein Embedding-Anbieter, der ohne
-  lokales Modell auskommt.
+  Chat-Anbieter, CORS ohne localhost, abgeschaltete Schreibrouten und ein
+  Embedding-Anbieter, der ohne lokales Modell auskommt.
 """
 
 from __future__ import annotations
@@ -100,6 +100,15 @@ def run_checks(settings=None, session=None) -> list[tuple[str, bool, str]]:  # t
             "Env: CORS ohne localhost",
             not any("localhost" in o or "127.0.0.1" in o for o in settings.cors_origins_list),
             settings.cors_origins,
+        )
+    )
+    # Die Schreibrouten sind in Produktion zu. Die Oberflaeche bietet sie nicht an,
+    # offen waeren sie nur Angriffsflaeche mit einem einzigen Schluessel davor (ADR-0024).
+    checks.append(
+        (
+            "Env: Schreibrouten abgeschaltet (WRITES_ENABLED=false)",
+            not settings.writes_enabled,
+            f"WRITES_ENABLED={settings.writes_enabled}",
         )
     )
     # Ein kleiner VPS hat kein Ollama. Mit EMBED_PROVIDER=ollama scheitert dort
