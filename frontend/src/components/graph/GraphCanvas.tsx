@@ -88,9 +88,27 @@ function withAlpha(hex: string, alpha: number): string {
   return `rgba(${(int >> 16) & 255},${(int >> 8) & 255},${int & 255},${alpha})`
 }
 
-/** Radius aus Wissensmenge (`val`), Slider und Tiefe. */
+/** Wie weit ein Knoten vom Median seiner Art abweichen darf. */
+const REL_MIN = 0.3
+const REL_MAX = 9
+
+/**
+ * Radius aus Wissensmenge, Slider und Tiefe.
+ *
+ * Gemessen **relativ zum Median der eigenen Art** (`sizeRef`), nicht absolut:
+ * `val` heißt je Art etwas anderes — Repos liegen im Median bei 1, Aufgaben bei
+ * 25 mit Ausreißern bis 598. Absolut gerechnet wurde eine Aufgabe elfmal so
+ * groß wie ein Repo, und Aufgaben und Konzepte erschlugen als grüne und orange
+ * Klumpen den Rest des Graphen.
+ *
+ * Die Deckelung hält das Verhältnis zwischen kleinstem und größtem Knoten bei
+ * rund 1:2,7 statt 1:11 — genug, um eine Rangfolge zu sehen, zu wenig, um zu
+ * dominieren.
+ */
 export function nodeRadius(node: SceneNode, nodeSize: number): number {
-  const base = 2 + Math.sqrt(Math.max(0.4, node.val)) * 1.6
+  const ref = node.sizeRef && node.sizeRef > 0 ? node.sizeRef : node.val || 1
+  const rel = Math.min(REL_MAX, Math.max(REL_MIN, node.val / ref))
+  const base = 2 + Math.sqrt(rel) * 2.2
   const hub = node.members ? 3.5 : 0
   const core = node.kind === 'system' ? 4 : 0
   return (base + hub + core) * nodeSize * (0.55 + 0.45 * (node.depth ?? 1))

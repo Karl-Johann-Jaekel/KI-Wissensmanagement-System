@@ -97,6 +97,16 @@ export interface SceneNode {
   status: string
   first_seen: string
   val: number
+  /**
+   * Median-`val` der eigenen Art — Bezugsgröße für den Radius.
+   *
+   * `val` ist über die Arten hinweg nicht vergleichbar: ein Repo liegt im
+   * Median bei 1, eine Aufgabe bei 25 und erreicht 598. Absolut gezeichnet
+   * werden Aufgaben und Konzepte dadurch zu Klumpen, die alles andere
+   * erschlagen. Relativ zur eigenen Art bleibt die Rangfolge innerhalb einer
+   * Art erhalten, ohne dass eine Art die anderen überstrahlt.
+   */
+  sizeRef?: number
   citations?: number | null
   landmark?: boolean
   meta: Record<string, unknown>
@@ -315,6 +325,31 @@ export interface BuildOptions {
   projects?: Project[]
 }
 
+/**
+ * Setzt je Knoten den Median-`val` seiner Art als Bezugsgröße (`sizeRef`).
+ *
+ * Der Median statt des Mittelwerts, weil die Verteilungen lange Schwänze haben:
+ * Aufgaben liegen im Median bei 25 und reichen bis 598. Ein Mittelwert würde von
+ * den Ausreißern nach oben gezogen und die typischen Knoten zu klein zeichnen.
+ */
+export function assignSizeRefs(nodes: SceneNode[]): void {
+  const byKind = new Map<SceneKind, number[]>()
+  for (const n of nodes) {
+    const list = byKind.get(n.kind)
+    if (list) list.push(n.val)
+    else byKind.set(n.kind, [n.val])
+  }
+  const medians = new Map<SceneKind, number>()
+  for (const [kind, vals] of byKind) {
+    vals.sort((a, b) => a - b)
+    const mid = Math.floor(vals.length / 2)
+    const median =
+      vals.length % 2 === 0 ? (vals[mid - 1] + vals[mid]) / 2 : vals[mid]
+    medians.set(kind, median > 0 ? median : 1)
+  }
+  for (const n of nodes) n.sizeRef = medians.get(n.kind)
+}
+
 /** Rohdaten + lokale Projekte → Szene mit Clustern und Systemschichten. */
 export function buildScene(data: GraphData, opts: BuildOptions): Scene {
   const { theme, groupMode, showSystem, projects = [] } = opts
@@ -328,6 +363,7 @@ export function buildScene(data: GraphData, opts: BuildOptions): Scene {
     tier: KIND_TIER[n.kind],
     phase: hashPhase(n.id),
   }))
+  assignSizeRefs(knowledge)
   const links: SceneLink[] = data.links.map((l) => ({
     source: endpointId(l.source),
     target: endpointId(l.target),
@@ -624,6 +660,9 @@ export function collapseGroups(scene: Scene, collapsed: Set<string>): Scene {
     const hub = hubs.get(hubId)
     if (hub) {
       hub.val += n.val
+      // Bezugsgröße mitsummieren: sonst stünde die Summe vieler Mitglieder
+      // gegen den Median eines einzelnen, und jeder Hub liefe in den Deckel.
+      hub.sizeRef = (hub.sizeRef ?? 0) + (n.sizeRef ?? n.val)
       hub.members?.push(n.id)
       if (n.landmark) hub.landmark = true
     } else {
@@ -635,6 +674,7 @@ export function collapseGroups(scene: Scene, collapsed: Set<string>): Scene {
         status: 'verified',
         first_seen: n.first_seen,
         val: n.val,
+        sizeRef: n.sizeRef ?? n.val,
         meta: {},
         group: n.group,
         tier: group?.tier ?? n.tier,

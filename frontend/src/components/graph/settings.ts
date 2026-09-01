@@ -34,7 +34,10 @@ export interface GraphPrefs {
 }
 
 export const DEFAULT_SETTINGS: GraphSettings = {
-  layout: 'cloud',
+  // Globus statt Wolke: die Demo oeffnet direkt auf dieser Ansicht, und der
+  // Globus zeigt in einem Bild, dass der Graph eine Struktur hat. Die Wolke
+  // wirkt beim ersten Blick wie ein Rauschfeld.
+  layout: 'globe',
   groupMode: 'kind',
   showSystem: true,
   labels: false,
