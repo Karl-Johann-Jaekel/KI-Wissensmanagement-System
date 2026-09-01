@@ -56,10 +56,15 @@ export function handleSseEvent(event: string, handlers: StreamHandlers): boolean
       text?: string
       sources?: ChatSource[]
       model?: string
+      message?: string
     }
     if (obj.type === 'token' && obj.text) handlers.onToken(obj.text)
     else if (obj.type === 'sources' && obj.sources)
       handlers.onSources(obj.sources, obj.model)
+    // Der Anbieter hat mitten im Strom abgewiesen (ADR-0021). Die Kopfzeilen
+    // waren da laengst raus, deshalb kommt der Fehler als Ereignis statt als
+    // Statuscode — ohne diesen Zweig bliebe die Antwort wortlos stehen.
+    else if (obj.type === 'error' && obj.message) handlers.onError(obj.message)
   } catch {
     // ignore malformed event
   }

@@ -55,9 +55,20 @@ class Settings(BaseSettings):
     rerank_enabled: bool = False
     rerank_model: str = "bge-reranker-v2-m3"
 
-    # Mistral (public zone, Phase 5)
+    # Mistral (public zone, Phase 5). Trägt auch die Embeddings (ADR-0014) und ist
+    # damit gesetzt, selbst wenn die Antworten von Groq kommen.
     mistral_api_key: str = ""
     mistral_model: str = "mistral-medium-latest"
+
+    # Groq (ADR-0021). Mit Schlüssel antwortet Groq, Mistral wird zur Rückfallebene.
+    # Kein Embedding-Endpunkt bei Groq — der Schlüssel wirkt nur auf den Chat.
+    groq_api_key: str = ""
+    # llama-3.3-70b statt gpt-oss-120b: Letzteres verbraucht Token fuer internes
+    # "reasoning", bevor Inhalt entsteht. Bei einem Minutenkontingent von wenigen
+    # tausend Token ist das Budget, das nie sichtbar wird — und bei knappem
+    # Limit kommt eine leere Antwort zurueck. Fuer RAG hat das Retrieval die
+    # Denkarbeit ohnehin schon geleistet.
+    groq_model: str = "llama-3.3-70b-versatile"
 
     # Promotion pending -> verified (Phase 8). Lockern erhöht die Ausbeute, senkt aber
     # die Belegtiefe — Provenienz bleibt in jedem Fall Pflicht (PLAN §2.7, ADR-0010).

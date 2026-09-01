@@ -9,8 +9,9 @@ Exit 0 = deploybar, Exit 1 = mindestens ein Check rot. Geprüft wird:
 * **Bestand** — Korpus vorhanden und die Embeddings passen zum konfigurierten
   Modell. Ein Mismatch liefert sonst still die falschen Treffer (ADR-0014).
 * **Umgebung** — `APP_ENV=production`, ausreichend starker Admin-Key,
-  `MISTRAL_API_KEY` gesetzt, CORS ohne localhost und ein Embedding-Anbieter,
-  der ohne lokales Modell auskommt.
+  `MISTRAL_API_KEY` gesetzt (die Embeddings hängen daran), ein konfigurierter
+  Chat-Anbieter, CORS ohne localhost und ein Embedding-Anbieter, der ohne
+  lokales Modell auskommt.
 """
 
 from __future__ import annotations
@@ -73,11 +74,25 @@ def run_checks(settings=None, session=None) -> list[tuple[str, bool, str]]:  # t
             f"Länge {len(settings.admin_api_key)}",
         )
     )
+    # Der Mistral-Schlüssel bleibt Pflicht, auch wenn Groq antwortet: Groq hat
+    # keinen Embedding-Endpunkt, und ohne Query-Embedding findet die Suche nichts.
     checks.append(
         (
-            "Env: MISTRAL_API_KEY gesetzt (Antworten via EU-API)",
+            "Env: MISTRAL_API_KEY gesetzt (Embeddings via EU-API)",
             bool(settings.mistral_api_key),
             "gesetzt" if settings.mistral_api_key else "leer",
+        )
+    )
+    chat_providers = [
+        name
+        for name, key in (("groq", settings.groq_api_key), ("mistral", settings.mistral_api_key))
+        if key
+    ]
+    checks.append(
+        (
+            "Env: Chat-Anbieter konfiguriert (Groq und/oder Mistral)",
+            bool(chat_providers),
+            " + ".join(chat_providers) if chat_providers else "keiner — Ollama-Fallback",
         )
     )
     checks.append(

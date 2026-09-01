@@ -36,6 +36,16 @@ describe('handleSseEvent', () => {
     expect(handleSseEvent('data: [DONE]', h)).toBe(true)
   })
 
+  it('reicht Anbieterfehler aus dem Strom an onError weiter', () => {
+    // Ein 429 kommt als Ereignis, nicht als Statuscode: die Kopfzeilen sind
+    // zu diesem Zeitpunkt raus (ADR-0021). Ohne diesen Pfad bliebe die halb
+    // geschriebene Antwort kommentarlos stehen.
+    const h = makeHandlers()
+    handleSseEvent('data: {"type":"error","message":"Das Sprachmodell ist ausgelastet."}', h)
+    expect(h.onError).toHaveBeenCalledWith('Das Sprachmodell ist ausgelastet.')
+    expect(h.tokens).toEqual([])
+  })
+
   it('ignores malformed payloads and non-data lines', () => {
     const h = makeHandlers()
     expect(handleSseEvent('data: {not json', h)).toBe(false)
