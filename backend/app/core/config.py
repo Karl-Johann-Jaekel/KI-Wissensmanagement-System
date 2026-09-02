@@ -82,6 +82,11 @@ class Settings(BaseSettings):
     promote_min_sources: int = 2
     promote_confidence: float = 0.7
 
+    # GitHub-Token für scripts/enrich_repo_stars.py. Nur öffentliche Zahlen werden
+    # gelesen, ein Token ohne Rechte genügt — ohne Token erlaubt GitHub 60 Abfragen
+    # je Stunde, mit Token 5.000.
+    github_token: str = ""
+
     # Zitationsmetriken (ADR-0013). Ohne Key gilt das freie Kontingent von
     # Semantic Scholar; ab dieser Zitationszahl gilt ein Paper als Primärquelle.
     semantic_scholar_api_key: str = ""
