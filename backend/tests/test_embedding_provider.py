@@ -71,3 +71,17 @@ def test_index_mismatch_raises(db_session: Session) -> None:
     with pytest.raises(IndexModelMismatch) as exc:
         assert_index_matches_settings(db_session)
     assert "reindex" in str(exc.value)
+
+
+def test_dimension_mismatch_is_caught(db_session, monkeypatch) -> None:
+    """Ein Modellwechsel bei gleichem Namen, aber anderer Dimension kam bisher durch.
+
+    EMBED_DIM wird beim Import in die ORM eingebacken; was die Tabelle wirklich
+    traegt, stand nirgends zur Pruefung.
+    """
+    from app.core.config import get_settings
+    from app.ingestion.embedding import IndexModelMismatch, assert_index_matches_settings
+
+    monkeypatch.setattr(get_settings(), "embed_dim", 768, raising=False)
+    with pytest.raises(IndexModelMismatch, match="EMBED_DIM"):
+        assert_index_matches_settings(db_session)

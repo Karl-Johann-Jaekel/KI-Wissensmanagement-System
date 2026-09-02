@@ -30,6 +30,14 @@ def vector_search(
     return [(str(cid), 1.0 - float(dist)) for cid, dist in session.execute(stmt)]
 
 
+#: Textsuch-Konfigurationen, die im Bestand vorkommen können. ``content_tsv`` wird je
+#: Zeile mit der Sprache des Dokuments erzeugt (models.py); eine deutsche tsvector
+#: trifft nie eine englische tsquery. Wer nur mit einer Konfiguration sucht, macht
+#: alle Dokumente der jeweils anderen Sprache lexikalisch unsichtbar — sie kämen dann
+#: allein über den Vektorarm zurück.
+TEXT_CONFIGS = ("english", "german")
+
+
 def keyword_search(
     session: Session,
     query_text: str,

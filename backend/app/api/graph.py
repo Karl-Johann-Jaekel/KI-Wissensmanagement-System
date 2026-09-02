@@ -3,20 +3,27 @@
 Public view shows only ``verified`` facts; ``include_pending=true`` (Review-Queue,
 Phase 8) also returns pending ones. ``val`` is the summed incident edge weight so the
 frontend can size nodes.
+
+Die Abfrage laeuft in drei Schritten, damit der oeffentliche Endpunkt nicht den
+halben Graphen durch Python zieht: erst die Kennzahlen der infrage kommenden Knoten
+(ohne JSONB-``meta``), dann die Kanten *zwischen* genau diesen Knoten, und die
+vollen Knotenzeilen erst fuer die Auswahl, die tatsaechlich ausgeliefert wird.
 """
 
 from __future__ import annotations
 
+import uuid
 from collections import defaultdict
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
+from typing import NamedTuple
 
-from fastapi import APIRouter, Depends, Query, Request
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, Query, Request, Response
+from sqlalchemy import ColumnElement, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.security import require_admin
+from app.core.security import rate_limit, require_admin
 from app.db.models import GraphEdge, GraphNode
 from app.db.session import get_db
 
@@ -29,8 +36,21 @@ KNOWLEDGE_KINDS = ("paper", "concept", "model", "dataset", "task", "repo")
 #: Zehntausende Knoten heben; ungebremst friert das die Force-Simulation ein.
 DEFAULT_NODE_LIMIT = 2000
 
+#: Der Graph waechst im Wochentakt (Update-Loop), nicht im Sekundentakt. Fuenf
+#: Minuten Caching nehmen den Wiederholungsverkehr auf der Einstiegsseite weg,
+#: ohne dass eine Aenderung sichtbar spaet ankommt.
+PUBLIC_CACHE_SECONDS = 300
 
-def _cap_by_kind(nodes: Sequence[GraphNode], val: dict[str, float], limit: int) -> list[GraphNode]:
+
+class NodeRef(NamedTuple):
+    """Knoten ohne ``meta`` — genug zum Ranken und Kappen, ein Bruchteil der Bytes."""
+
+    id: uuid.UUID
+    kind: str
+    name: str
+
+
+def _cap_by_kind(nodes: Sequence[NodeRef], val: dict[str, float], limit: int) -> list[NodeRef]:
     """Auf ``limit`` Knoten kappen, ohne eine Knotenart auszulöschen.
 
     Rein nach Vernetzungsgrad zu kappen bevorzugt strukturell die Naben: Nach dem
@@ -39,15 +59,15 @@ def _cap_by_kind(nodes: Sequence[GraphNode], val: dict[str, float], limit: int) 
     im Verhältnis ihres Bestands (mindestens eines) und füllt es mit ihren
     bestvernetzten Knoten; ungenutzte Plätze gehen an den Rest nach Grad.
     """
-    by_kind: dict[str, list[GraphNode]] = defaultdict(list)
+    by_kind: dict[str, list[NodeRef]] = defaultdict(list)
     for node in nodes:
         by_kind[node.kind].append(node)
 
-    def rank(node: GraphNode) -> tuple[float, str]:
+    def rank(node: NodeRef) -> tuple[float, str]:
         return (-val.get(str(node.id), 0.0), node.name)
 
-    keep: list[GraphNode] = []
-    leftovers: list[GraphNode] = []
+    keep: list[NodeRef] = []
+    leftovers: list[NodeRef] = []
     for kind_nodes in by_kind.values():
         quota = max(1, round(limit * len(kind_nodes) / len(nodes)))
         ranked = sorted(kind_nodes, key=rank)
@@ -61,9 +81,10 @@ def _cap_by_kind(nodes: Sequence[GraphNode], val: dict[str, float], limit: int) 
     return keep
 
 
-@router.get("/graph")
+@router.get("/graph", dependencies=[Depends(rate_limit)])
 def get_graph(
     request: Request,
+    response: Response,
     include_pending: bool = Query(default=False, description="also return pending facts"),
     source: str | None = Query(
         default=None,
@@ -75,29 +96,52 @@ def get_graph(
     if include_pending:
         # pending = ungeprüfte LLM-Extraktion — nur Admin (schließt bisherigen Leak).
         require_admin(request)
-    node_q = select(GraphNode).where(GraphNode.kind.in_(KNOWLEDGE_KINDS))
+
+    conds: list[ColumnElement[bool]] = [GraphNode.kind.in_(KNOWLEDGE_KINDS)]
     if not include_pending:
-        node_q = node_q.where(GraphNode.status == "verified")
+        conds.append(GraphNode.status == "verified")
     if source:
         provenance = GraphNode.meta["provenance"]["source"].astext
-        node_q = node_q.where(provenance.is_(None) if source == "native" else provenance == source)
-    nodes = db.execute(node_q).scalars().all()
-    node_ids = {n.id for n in nodes}
+        conds.append(provenance.is_(None) if source == "native" else provenance == source)
 
-    edges = db.execute(select(GraphEdge)).scalars().all()
-    edges = [e for e in edges if e.source in node_ids and e.target in node_ids]
+    refs = [
+        NodeRef(row.id, row.kind, row.name)
+        for row in db.execute(select(GraphNode.id, GraphNode.kind, GraphNode.name).where(*conds))
+    ]
+
+    # Kanten *zwischen* den ausgewählten Knoten — als Unterabfrage statt als Liste
+    # von Tausenden Bind-Parametern, und ohne die ORM-Objekte zu materialisieren.
+    selected_ids = select(GraphNode.id).where(*conds).scalar_subquery()
+    edge_q = select(
+        GraphEdge.source, GraphEdge.target, GraphEdge.relation, GraphEdge.weight, GraphEdge.status
+    ).where(GraphEdge.source.in_(selected_ids), GraphEdge.target.in_(selected_ids))
     if not include_pending:
-        edges = [e for e in edges if e.status == "verified"]
+        edge_q = edge_q.where(GraphEdge.status == "verified")
+    edges = list(db.execute(edge_q))
 
+    # ``val`` zählt den vollen Vernetzungsgrad — vor dem Kappen. Sonst schrumpfte ein
+    # Knoten allein deshalb, weil seine Nachbarn nicht mit ausgeliefert werden.
     val: dict[str, float] = defaultdict(float)
     for e in edges:
         val[str(e.source)] += e.weight
         val[str(e.target)] += e.weight
 
-    if len(nodes) > limit:
-        nodes = _cap_by_kind(nodes, val, limit)
-        node_ids = {n.id for n in nodes}
-        edges = [e for e in edges if e.source in node_ids and e.target in node_ids]
+    if len(refs) > limit:
+        refs = _cap_by_kind(refs, val, limit)
+    kept_ids = {r.id for r in refs}
+    edges = [e for e in edges if e.source in kept_ids and e.target in kept_ids]
+
+    # Volle Zeilen (inkl. JSONB-``meta``) erst jetzt, für die tatsächliche Auswahl.
+    by_id = {
+        n.id: n for n in db.execute(select(GraphNode).where(GraphNode.id.in_(kept_ids))).scalars()
+    }
+    nodes = [by_id[r.id] for r in refs if r.id in by_id]
+
+    # Öffentliche Sicht ist für alle gleich und ändert sich im Wochentakt; die
+    # Review-Sicht enthält ungeprüfte Fakten und gehört in keinen Cache.
+    response.headers["Cache-Control"] = (
+        "private, no-store" if include_pending else f"public, max-age={PUBLIC_CACHE_SECONDS}"
+    )
 
     landmark_min = get_settings().citation_landmark_min
 
@@ -136,12 +180,14 @@ def get_graph(
     }
 
 
-@router.get("/graph/changelog")
+@router.get("/graph/changelog", dependencies=[Depends(rate_limit)])
 def changelog(
+    response: Response,
     days: int = Query(default=7, ge=1, le=365),
     db: Session = Depends(get_db),
 ) -> dict:
     """Verified knowledge-graph nodes first seen within the last `days` — "Neu"-Feed."""
+    response.headers["Cache-Control"] = f"public, max-age={PUBLIC_CACHE_SECONDS}"
     since = datetime.now(UTC) - timedelta(days=days)
     rows = (
         db.execute(

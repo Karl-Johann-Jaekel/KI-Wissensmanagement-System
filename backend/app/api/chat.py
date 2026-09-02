@@ -8,13 +8,14 @@ import logging
 from collections.abc import Iterator
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.security import (
     MAX_INPUT_CHARS,
+    client_key,
     estimate_tokens,
     get_budget,
     rate_limit,
@@ -51,10 +52,11 @@ def error_message(exc: httpx.HTTPError) -> str:
 
 
 @router.post("/chat", dependencies=[Depends(rate_limit)])
-def chat(req: ChatRequest, db: Session = Depends(get_db)) -> StreamingResponse:
+def chat(request: Request, req: ChatRequest, db: Session = Depends(get_db)) -> StreamingResponse:
     plan = prepare_answer(db, req.query, top_k=req.top_k, rerank=req.rerank)
     budget = get_budget()
-    budget.add(estimate_tokens(plan.messages[-1]["content"]))  # may raise 429
+    key = client_key(request)
+    budget.add(key, estimate_tokens(plan.messages[-1]["content"]))  # may raise 429
 
     def gen() -> Iterator[str]:
         parts: list[str] = []
@@ -68,15 +70,29 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)) -> StreamingResponse:
             # ihn danach regulaer mit [DONE] schliessen.
             log.warning("chat stream failed (%s): %s", plan.client.name, exc)
             yield sse({"type": "error", "message": error_message(exc)})
+        except Exception as exc:  # noqa: BLE001 — der Strom muss geordnet enden
+            # Alles Unerwartete (kaputtes JSON, ein Rahmen ohne choices, ein Fehler
+            # im Anbieter-Client) endete bisher hier ohne sources und ohne [DONE]:
+            # der Browser wartete danach endlos. GeneratorExit faellt nicht
+            # hierunter, ein abgebrochener Abruf bleibt also ein Abbruch.
+            log.error("chat stream failed unexpectedly (%s)", plan.client.name, exc_info=exc)
+            yield sse({"type": "error", "message": "Die Antwort konnte nicht erzeugt werden."})
+
         # answer already streamed; the cap is best-effort here
         with contextlib.suppress(HTTPException):
-            budget.add(estimate_tokens("".join(parts)))
+            budget.add(key, estimate_tokens("".join(parts)))
+
+        try:
+            sources = plan.sources()
+        except Exception:  # noqa: BLE001 — lieber ohne Quellen als ohne Abschluss
+            log.exception("sources could not be assembled")
+            sources = []
         yield sse(
             {
                 "type": "sources",
                 "model": plan.client.model,
                 "provider": plan.client.name,
-                "sources": plan.sources(),
+                "sources": sources,
             }
         )
         yield "data: [DONE]\n\n"

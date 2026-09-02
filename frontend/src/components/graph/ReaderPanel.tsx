@@ -14,6 +14,7 @@ import Button from '../ui/Button'
 import Spinner from '../ui/Spinner'
 import { LANDMARK_COLOR } from '../../types'
 import { TIER_LABELS, type SceneNode } from './scene'
+import { safeHref } from '../../lib/safeHref'
 
 interface Props {
   node: SceneNode
@@ -47,7 +48,8 @@ export default function ReaderPanel({ node, members, onSelectNode, onClose }: Pr
   }
   const docId = meta.source_document_ids?.[0]
   const arxivId = meta.arxiv ?? meta.arxiv_id
-  const sourceUrl = meta.uri ?? meta.url ?? (arxivId ? `https://arxiv.org/abs/${arxivId}` : null)
+  // Fremddaten: ungeprüft landete hier auch ein javascript:-URI im href.
+  const sourceUrl = safeHref(meta.uri ?? meta.url ?? (arxivId ? `https://arxiv.org/abs/${arxivId}` : null))
   const prov = meta.provenance
   // "none" ist im PwC-Dump der Platzhalter für "kein Framework erkannt".
   const usableFramework = meta.framework && meta.framework !== 'none' ? meta.framework : null

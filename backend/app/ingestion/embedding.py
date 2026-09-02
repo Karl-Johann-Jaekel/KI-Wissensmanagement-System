@@ -135,17 +135,45 @@ def index_embed_models(session) -> list[str]:  # type: ignore[no-untyped-def]
     return [m for m in session.execute(select(distinct(Chunk.embed_model))).scalars() if m]
 
 
+def index_vector_dim(session) -> int | None:  # type: ignore[no-untyped-def]
+    """Dimension der Spalte ``chunks.embedding``, wie sie in der Datenbank steht.
+
+    pgvector legt die Dimension als ``atttypmod`` ab. Die ORM-Konstante ``EMBED_DIM``
+    wird beim Import eingebacken und sagt nichts darüber, was die Tabelle wirklich
+    trägt.
+    """
+    from sqlalchemy import text as sa_text
+
+    return session.execute(
+        sa_text(
+            "SELECT atttypmod FROM pg_attribute "
+            "WHERE attrelid = 'chunks'::regclass AND attname = 'embedding'"
+        )
+    ).scalar_one_or_none()
+
+
 def assert_index_matches_settings(session) -> None:  # type: ignore[no-untyped-def]
     """Abbrechen, wenn Query- und Index-Modell auseinanderlaufen.
 
     Ein stiller Mismatch ist der teuerste Fehler dieses Systems: Die Suche liefert
     weiterhin Treffer, nur sind es die falschen. Deshalb lauter Abbruch.
+
+    Geprüft wird beides — Modellname **und** Vektordimension. Ein Wechsel auf ein
+    Modell gleichen Namens mit anderer Dimension kam sonst durch, und ein leerer
+    Index ist kein Fehler: so beginnt jede frische Installation.
     """
-    configured = get_settings().embed_model
+    settings = get_settings()
+    configured = settings.embed_model
     found = index_embed_models(session)
-    if not found or found == [configured]:
-        return
-    raise IndexModelMismatch(
-        f"Index enthält Embeddings von {found}, konfiguriert ist '{configured}'. "
-        "Entweder EMBED_MODEL zurückstellen oder mit scripts/reindex.py neu einbetten."
-    )
+    if found and found != [configured]:
+        raise IndexModelMismatch(
+            f"Index enthält Embeddings von {found}, konfiguriert ist '{configured}'. "
+            "Entweder EMBED_MODEL zurückstellen oder mit scripts/reindex.py neu einbetten."
+        )
+
+    dim = index_vector_dim(session)
+    if dim is not None and dim > 0 and dim != settings.embed_dim:
+        raise IndexModelMismatch(
+            f"Spalte chunks.embedding ist vector({dim}), konfiguriert ist "
+            f"EMBED_DIM={settings.embed_dim}. Eine Migration oder ein Reindex fehlt."
+        )

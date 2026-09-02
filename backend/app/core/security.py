@@ -2,10 +2,20 @@
 
 In-process (single-instance) implementations — no extra dependency. A per-IP sliding
 window limits request rate; a per-day counter caps token spend for the LLM endpoints.
+
+Beide Zaehler haengen am selben Schluessel: der Client-IP aus ``client_key``. Hinter
+einem Proxy ist das nur dann die Besucher-IP, wenn dessen Adresse in uvicorns
+``--forwarded-allow-ips`` steht (Default: nur 127.0.0.1) — sonst fallen alle Besucher
+auf die Proxy-IP zusammen und teilen sich ein Limit. Siehe docker-compose.prod.yml.
+
+Beide Zaehler sind Prozess-Globals: mit mehreren Workern vervielfacht sich das
+effektive Limit (ADR-0003). Zugriffe laufen unter einer Sperre, weil die Handler
+synchron sind und damit im Threadpool nebenlaeufig zaehlen.
 """
 
 from __future__ import annotations
 
+import threading
 import time
 from collections import defaultdict, deque
 
@@ -14,6 +24,9 @@ from fastapi import HTTPException, Request
 from app.core.config import get_settings
 
 MAX_INPUT_CHARS = 2000
+
+#: Aufraeumen nur alle N Pruefungen — sonst laeuft jede Anfrage ueber alle Schluessel.
+_CLEANUP_EVERY = 512
 
 _UNIT_SECONDS = {"second": 1, "minute": 60, "hour": 3600, "day": 86400}
 
@@ -27,32 +40,59 @@ class SlidingWindowLimiter:
     def __init__(self, rate: str) -> None:
         self.limit, self.window = _parse_rate(rate)
         self._hits: dict[str, deque[float]] = defaultdict(deque)
+        self._lock = threading.Lock()
+        self._since_cleanup = 0
 
     def check(self, key: str) -> None:
         now = time.monotonic()
-        dq = self._hits[key]
-        while dq and now - dq[0] > self.window:
-            dq.popleft()
-        if len(dq) >= self.limit:
-            raise HTTPException(status_code=429, detail="rate limit exceeded")
-        dq.append(now)
+        with self._lock:
+            dq = self._hits[key]
+            while dq and now - dq[0] > self.window:
+                dq.popleft()
+            if len(dq) >= self.limit:
+                raise HTTPException(status_code=429, detail="rate limit exceeded")
+            dq.append(now)
+
+            # Ohne das waechst der Zustand um einen Eintrag je gesehener IP und
+            # wird nie kleiner — auf einem oeffentlichen Server ein Leck.
+            self._since_cleanup += 1
+            if self._since_cleanup >= _CLEANUP_EVERY:
+                self._since_cleanup = 0
+                idle = [k for k, d in self._hits.items() if not d or now - d[-1] > self.window]
+                for stale in idle:
+                    del self._hits[stale]
 
 
 class TokenBudget:
-    """Best-effort daily token cap (resets at UTC midnight)."""
+    """Best-effort daily token cap **je Client** (resets at UTC midnight).
+
+    Vorher war das ein einziger globaler Zaehler: ein Besucher konnte das Tagesbudget
+    fuer alle anderen verbrauchen. Der Speicher ist durch den Tageswechsel begrenzt —
+    beim ersten Aufruf eines neuen Tages faellt die ganze Tabelle weg.
+    """
 
     def __init__(self, cap: int) -> None:
         self.cap = cap
         self._day: int | None = None
-        self.used = 0
+        self._used: dict[str, int] = {}
+        self._lock = threading.Lock()
 
-    def add(self, tokens: int) -> None:
+    def add(self, key: str, tokens: int) -> None:
         day = time.gmtime().tm_yday
-        if day != self._day:
-            self._day, self.used = day, 0
-        if self.used >= self.cap:
-            raise HTTPException(status_code=429, detail="daily token budget exhausted")
-        self.used += tokens
+        with self._lock:
+            if day != self._day:
+                self._day, self._used = day, {}
+            if self._used.get(key, 0) >= self.cap:
+                raise HTTPException(status_code=429, detail="daily token budget exhausted")
+            self._used[key] = self._used.get(key, 0) + tokens
+
+    def used_by(self, key: str) -> int:
+        return self._used.get(key, 0)
+
+    @property
+    def used(self) -> int:
+        """Summe ueber alle Clients — fuer Diagnose, nicht fuer die Grenze."""
+        return sum(self._used.values())
 
 
 _limiter: SlidingWindowLimiter | None = None
@@ -73,10 +113,21 @@ def get_budget() -> TokenBudget:
     return _budget
 
 
+def client_key(request: Request) -> str:
+    """Schluessel fuer Limit und Budget: die Client-IP, wie uvicorn sie sieht.
+
+    uvicorn ersetzt die Adresse nur, wenn der Absender in ``--forwarded-allow-ips``
+    steht; der Default deckt allein 127.0.0.1 ab. Steht der Proxy in einem eigenen
+    Container, steht hier folglich dessen IP und *alle* Besucher teilen sich einen
+    Eimer. Das ist keine theoretische Sorge: genau so lief es in Produktion, obwohl
+    der Caddyfile den X-Forwarded-For eigens durchreicht.
+    """
+    return request.client.host if request.client else "unknown"
+
+
 def rate_limit(request: Request) -> None:
     """FastAPI dependency: per-client-IP request rate limiting."""
-    client = request.client.host if request.client else "unknown"
-    _get_limiter().check(client)
+    _get_limiter().check(client_key(request))
 
 
 def is_admin(request: Request) -> bool:

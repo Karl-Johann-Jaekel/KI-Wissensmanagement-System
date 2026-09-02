@@ -7,7 +7,35 @@
 
 encode zstd gzip
 
+# Sicherheits-Kopfzeilen für jede Antwort.
+#
+# Die SPA laedt nichts von fremden Hosts: ein einziges externes Skript, ein
+# externes Stylesheet, beide gleicher Origin; die API liegt unter /api derselben
+# Domain. Deshalb reicht 'self' fast ueberall.
+#
+# style-src braucht 'unsafe-inline': index.html traegt einen Inline-<style>-Block
+# gegen das Weissblitzen vor dem ersten Render, und React setzt zur Laufzeit
+# style-Attribute. script-src kommt ohne aus — der Vite-Build erzeugt nur externe
+# Skripte, kein eval, keine Worker (nachgeprueft im Bundle).
+#
+# HSTS wirkt nur ueber HTTPS; bei SITE_ADDRESS=":80" ignorieren Browser die
+# Kopfzeile, sie stoert dort also nicht.
+header {
+	Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	X-Content-Type-Options "nosniff"
+	Referrer-Policy "strict-origin-when-cross-origin"
+	X-Frame-Options "DENY"
+	Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+	-Server
+}
+
 handle /api/* {
+	# Der Body wird vom Backend komplett in den Speicher gelesen, bevor
+	# irgendeine Laengenpruefung greift. Die Schranke hier deckelt das, bevor
+	# es den Anwendungsprozess ueberhaupt erreicht.
+	request_body {
+		max_size 1MB
+	}
 	uri strip_prefix /api
 	reverse_proxy backend:8000 {
 		# X-Forwarded-For unveraendert weiterreichen statt anzuhaengen.
@@ -19,6 +47,9 @@ handle /api/* {
 		# Folge: RATE_LIMIT zaehlt alle Besucher als einen einzigen, ein
 		# Nutzer sperrt alle anderen aus.
 		#
+		# Damit uvicorn diesen Header ueberhaupt auswertet, muss Caddys eigene
+		# Adresse in --forwarded-allow-ips stehen (docker-compose.prod.yml).
+		#
 		# Gegen Faelschung schuetzt der aeussere Proxy, indem er den Header
 		# mit der echten Gegenstelle ueberschreibt statt ihn zu ergaenzen.
 		header_up X-Forwarded-For {http.request.header.X-Forwarded-For}
@@ -27,6 +58,10 @@ handle /api/* {
 
 handle {
 	root * /srv
+	# Vite haengt einen Inhalts-Hash an jeden Asset-Namen — eine geaenderte Datei
+	# bekommt einen neuen Namen. Deshalb darf der Browser sie unbegrenzt behalten.
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
 	try_files {path} /index.html
 	file_server
 }

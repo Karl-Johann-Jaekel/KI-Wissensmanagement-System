@@ -5,9 +5,17 @@
 # - backend: kein --reload, keine Source-Bind-Mounts, kein Host-Port
 #   (nur intern via Caddy erreichbar); data/ bleibt gemountet (Uploads).
 # - postgres: kein Host-Port (nur Compose-Netz).
+# - backend vertraut dem X-Forwarded-For aus dem Compose-Netz. uvicorn wertet
+#   den Header zwar von sich aus aus, aber nur von 127.0.0.1 — Caddy ist ein
+#   eigener Container mit anderer IP, also verwarf uvicorn genau den Header,
+#   den der Caddyfile eigens durchreicht. Folge: RATE_LIMIT zaehlt alle
+#   Besucher als einen einzigen, ein Nutzer sperrt alle anderen aus.
+#   Nachgemessen: ohne die Liste bekam ein zweiter Besucher 429, mit ihr 200.
 services:
   backend:
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    command: >
+      uvicorn app.main:app --host 0.0.0.0 --port 8000
+      --proxy-headers --forwarded-allow-ips=${FORWARDED_ALLOW_IPS:-172.16.0.0/12}
     ports: []
     volumes:
       - ./data:/app/data

@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import time
+
 import pytest
 from fastapi import HTTPException
 
-from app.core.security import SlidingWindowLimiter, TokenBudget, estimate_tokens
+from app.core.security import (
+    _CLEANUP_EVERY,
+    SlidingWindowLimiter,
+    TokenBudget,
+    estimate_tokens,
+)
 from app.generation.prompts import NO_SOURCE, SYSTEM_PROMPT, build_messages
 from app.retrieval.search import SearchHit
 
@@ -57,10 +64,40 @@ def test_rate_limiter_is_per_key() -> None:
 
 def test_token_budget_exhausts() -> None:
     budget = TokenBudget(cap=10)
-    budget.add(9)
-    budget.add(1)  # now at 10
+    budget.add("ip1", 9)
+    budget.add("ip1", 1)  # now at 10
     with pytest.raises(HTTPException):
-        budget.add(1)
+        budget.add("ip1", 1)
+
+
+def test_token_budget_is_per_client() -> None:
+    """Ein Besucher darf das Tagesbudget nicht fuer alle anderen verbrauchen."""
+    budget = TokenBudget(cap=10)
+    budget.add("heavy", 10)
+    with pytest.raises(HTTPException):
+        budget.add("heavy", 1)
+    budget.add("someone-else", 1)  # unberuehrt
+    assert budget.used_by("heavy") == 10
+    assert budget.used_by("someone-else") == 1
+
+
+def test_rate_limiter_forgets_idle_clients(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Der Zustand darf nicht um einen Eintrag je gesehener IP wachsen."""
+    clock = {"t": 0.0}
+    monkeypatch.setattr(time, "monotonic", lambda: clock["t"])
+
+    lim = SlidingWindowLimiter("100/second")
+    for i in range(_CLEANUP_EVERY):  # fuellt bis zur Aufraeumschwelle
+        lim.check(f"old{i}")
+    assert len(lim._hits) == _CLEANUP_EVERY
+
+    clock["t"] = 10.0  # Fenster (1 s) laengst vorbei
+    for i in range(_CLEANUP_EVERY):  # loest das Aufraeumen aus
+        lim.check(f"new{i}")
+
+    keys = set(lim._hits)
+    assert not any(k.startswith("old") for k in keys)
+    assert len(keys) == _CLEANUP_EVERY
 
 
 def test_estimate_tokens() -> None:

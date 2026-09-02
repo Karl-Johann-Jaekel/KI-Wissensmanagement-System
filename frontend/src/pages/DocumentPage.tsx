@@ -6,6 +6,7 @@ import { ArrowLeft, ExternalLink } from 'lucide-react'
 import { fetchDocument, type DocumentDetail } from '../api'
 import Badge from '../components/ui/Badge'
 import Spinner from '../components/ui/Spinner'
+import { safeHref } from '../lib/safeHref'
 
 export default function DocumentPage() {
   const { docId } = useParams()
@@ -50,9 +51,9 @@ export default function DocumentPage() {
             <ArrowLeft className="h-4 w-4" />
           </button>
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold">{doc.title}</h1>
-          {doc.uri && doc.uri.startsWith('http') && (
+          {safeHref(doc.uri) && (
             <a
-              href={doc.uri}
+              href={safeHref(doc.uri)}
               target="_blank"
               rel="noreferrer"
               aria-label="Quelle öffnen"

@@ -36,6 +36,8 @@ export default function ChatPage() {
   const [topK, setTopK] = useState(DEFAULT_TOP_K)
   const [rerank, setRerank] = useState(false)
   const metaRef = useRef<ChatMeta | null>(null)
+  // Laufender Abruf, damit er beim Verlassen der Seite oder per Stop endet.
+  const abortRef = useRef<AbortController | null>(null)
 
 
   // Chat laden bzw. für „Neuer Chat" zurücksetzen.
@@ -63,11 +65,24 @@ export default function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId])
 
+  // Beim Verlassen der Seite den laufenden Abruf abbrechen: sonst erzeugt das
+  // Modell zu Ende, die Verbindung bleibt offen und setBusy trifft eine
+  // ausgehaengte Komponente.
+  useEffect(() => () => abortRef.current?.abort(), [])
+
+  const stop = () => {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setBusy(false)
+  }
+
   const send = async () => {
     const query = input.trim()
     if (!query || busy) return
     setInput('')
     setBusy(true)
+    const controller = new AbortController()
+    abortRef.current = controller
 
     let meta = metaRef.current
     if (!meta) {
@@ -126,7 +141,15 @@ export default function ChatPage() {
           persist()
         },
       },
+      controller.signal,
     )
+
+    // Abgebrochene Antworten trotzdem sichern: das bereits Gelesene bleibt
+    // sonst nur im Speicher und ist beim naechsten Aufruf weg.
+    if (controller.signal.aborted) {
+      persist()
+    }
+    if (abortRef.current === controller) abortRef.current = null
   }
 
   const title = chatId ? metaRef.current?.title : 'Neuer Chat'
@@ -155,6 +178,7 @@ export default function ChatPage() {
         onChange={setInput}
         onSend={send}
         busy={busy}
+        onStop={stop}
         topK={topK}
         onTopKChange={setTopK}
         rerank={rerank}

@@ -28,7 +28,11 @@ def run_checks(settings=None, session=None) -> list[tuple[str, bool, str]]:  # t
     from app.core.config import get_settings
     from app.db.models import Chunk, Document
     from app.db.session import SessionLocal
-    from app.ingestion.embedding import index_embed_models
+    from app.ingestion.embedding import (
+        IndexModelMismatch,
+        assert_index_matches_settings,
+        index_embed_models,
+    )
 
     settings = settings or get_settings()
     own_session = session is None
@@ -47,12 +51,21 @@ def run_checks(settings=None, session=None) -> list[tuple[str, bool, str]]:  # t
             )
         )
 
+        # Dieselbe Prüfung wie beim Start der App, statt sie hier nachzubauen —
+        # sonst laufen zwei Fassungen derselben Regel auseinander.
         index_models = index_embed_models(session)
+        try:
+            assert_index_matches_settings(session)
+            consistent, detail = True, f"Index={index_models or 'leer'}"
+        except IndexModelMismatch as exc:
+            consistent, detail = False, str(exc)
         checks.append(
             (
                 "DB: Embeddings passen zum konfigurierten Modell",
-                bool(index_models) and index_models == [settings.embed_model],
-                f"Index={index_models or 'leer'} vs. {settings.embed_model}",
+                # Ein leerer Index besteht die Konsistenzprüfung, taugt aber nicht
+                # für Produktion — dafür ist der Bestands-Check oben zuständig.
+                consistent and bool(index_models),
+                detail,
             )
         )
     finally:

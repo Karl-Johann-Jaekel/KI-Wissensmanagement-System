@@ -5,22 +5,26 @@ Wissens-Graph (Papers ↔ Konzepte ↔ Modelle ↔ Datasets) + rekursiver Update
 Vollständiger Plan in [PLAN.md](PLAN.md) — vor jeder Aufgabe lesen, aktuelle Phase
 dort abhaken. GitHub-Portfolio-Track wurde entfernt (ADR-0004).
 
-**Stand:** Phasen 0–9 fertig (56 Papers/6.950 Chunks; Hit@5 0,94; Graph mit 370
-Knoten inkl. Zitations-Hervorhebung; UI/UX-Redesign: Sidebar-App mit Chat-Verläufen,
-Suche, Inbox mit Sammelfreigabe, Wissen inkl. MD-Editor, Skills, Projekte, Landing-
-Page; hell/dunkel, mobile-friendly; Graph-Explorer mit 4 Layouts, ADR-0016).
-Phase 10: Deployment-Werkzeuge fertig
-(Caddy-Prod-Stack, Deploy-Gate, Smoke-Test, Backup + verifizierter Restore) —
-offen ist der Go-Live auf dem EU-VPS.
+**Stand:** Phasen 0–11 fertig bis auf 11.6. **Live unter
+https://wissen.jaekel.dev** (56 Papers/6.950 Chunks; Hit@5 0,94; Graph mit 13.271
+Knoten aus eigenem Korpus + Papers-with-Code, Serverkappung 2.000 je Antwort).
+UI: Sidebar-App mit Chat-Verläufen, Suche, Wissen, Skills, Projekte,
+Graph-Explorer mit 4 Layouts (ADR-0016); dunkel, mobile-friendly.
+Nicht mehr vorhanden: Review-Oberfläche, MD-Editor, Upload-Panel, Landing-Page,
+helles Thema (ADR-0023, ADR-0024).
+Offen: Uptime-Monitoring, Restore-Drill auf dem VPS, Multilingual-Embeddings (11.6).
 
 ## Regeln
 - Korpus ist vollständig öffentlich; die Zwei-Zonen-Idee wanderte in ein eigenes
-  Projekt (ADR-0015). Admin-Key schützt Upload, Löschen, Review und pending-Fakten.
+  Projekt (ADR-0015). Admin-Key schützt Review und pending-Fakten. Die Schreibwege
+  (Upload, Bearbeiten, Löschen) sind in Produktion abgeschaltet — `WRITES_ENABLED`
+  (ADR-0024); befüllt wird über `python -m app.ingest`.
 - Vor jedem Rollout: `scripts/check_prod_ready.py` (Deploy-Gate).
 - Paper-PDFs nie committen (arXiv-Lizenz); nur `demo-data/corpus.yaml` ist im Repo.
-- Extrahierte Graph-Fakten starten als `pending`; Promotion nur regelbasiert/Review;
-  Provenienz (`source_document_ids`) ist Pflicht; kein Silent-Overwrite
-  (Upserts: `app/db/graph.py` — Konflikt lässt `status`/`first_seen` unangetastet).
+- Extrahierte Graph-Fakten starten als `pending`; Promotion nur regelbasiert;
+  Provenienz ist Pflicht und wird in `entities_extracted` **gezählt** (ADR-0022),
+  nicht im JSONB-Feld; kein Silent-Overwrite (Upserts: `app/db/graph.py` — Konflikt
+  lässt `status`/`first_seen` unangetastet, vereinigt Quellen und senkt `weight` nie).
 - Ein Embedding-Modell für Index UND Query (ADR-0002). Aktuell `mistral-embed`
   (1024-dim, ADR-0014); Wechsel nur per `scripts/reindex.py`. Ein gemischter Index
   liefert still die falschen Treffer — `assert_index_matches_settings` bricht ab.
@@ -41,6 +45,11 @@ offen ist der Go-Live auf dem EU-VPS.
 - Profile: `local` (+ Ollama-Container statt Host), `full` (+ frontend, n8n).
 - Checks laufen **im Container**:
   `docker compose exec backend sh -c "ruff check . && ruff format --check . && mypy app && pytest"`.
+- **`--reload` greift hier nicht:** der Bind-Mount `./backend:/app` liefert unter
+  Docker Desktop/Windows keine inotify-Events, der laufende uvicorn behält den alten
+  Code. `docker compose exec ... python` startet dagegen einen neuen Prozess und
+  zeigt den neuen Stand — das täuscht. Vor jeder Prüfung gegen die laufende API:
+  `docker compose restart backend`.
 - Frontend: `cd frontend && npm run dev` (http://localhost:5173) bzw. `npm run build`.
 - Eval: `docker compose exec backend python eval/run_eval.py`.
 - Korpus: `python scripts/fetch_corpus.py` + `python -m app.ingest data/corpus`

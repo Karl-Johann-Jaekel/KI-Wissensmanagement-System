@@ -315,11 +315,13 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
       Dedupe vor Insert (`corpus/aliases.py`)
 - [x] Promotion-Regeln: auto-`verified` nur bei Konfidenz ≥ Schwelle **und** Stützung
       durch ≥ 2 unabhängige Quellen; sonst Review-Queue im Admin-Frontend
-      (verify/reject per Klick); Konflikte (reziprokes `IMPROVES_ON`) werden
+      (verify/reject per Klick) — **Oberfläche später entfernt, ADR-0023**; die
+      Endpunkte bestehen weiter. Konflikte (reziprokes `IMPROVES_ON`) werden
       markiert (`meta.disputed`), nie überschrieben
 - [x] Frontend „Neu"-Layer: Knoten mit `first_seen` < 7/30 Tage leuchten;
       Zeitfilter; Changelog-Feed „Neu (7 Tage)"; Wissens-Graph-Ansicht
-      (public sieht nur `verified`, Admin-Toggle für `pending`)
+      (public sieht nur `verified`; der Admin-Toggle für `pending` entfiel mit der
+      Review-Oberfläche, ADR-0023 — `include_pending` gibt es weiterhin per API)
 - [x] Selbstoptimierung **messbar**: nach jedem Lauf Golden-Eval (Report-Artefakt);
       `eval/tune.py` sweept Retrieval-Parameter (candidate_k, `RERANK_ENABLED`),
       schreibt beste Konfiguration als Report. Keine autonomen Codeänderungen.
@@ -345,9 +347,10 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
       `PUT /documents/{id}/content` (Re-Ingest) + `DELETE /documents/{id}`;
       `GET /models` + Chat-Modell-Override (nur Ollama, admin-gated) — ADR-0008;
       Fix: `include_pending` verlangt jetzt Admin
-- [x] **9d Feature-Seiten:** Wissen (Liste/Upload/Reader/MD-Editor + theme-aware Graph),
-      Bibliothek (confidential + Ollama-Modellwahl), Inbox (Review + Changelog),
-      Suche (`POST /search`-UI mit Score-Balken), Skills, Projekte
+- [x] **9d Feature-Seiten:** Wissen (Liste/Reader + Graph), Suche
+      (`POST /search`-UI mit Score-Balken), Skills, Projekte.
+      **Später entfernt:** Upload und MD-Editor (ADR-0024), Review-Oberfläche
+      (ADR-0023), Bibliothek/Zwei-Zonen (ADR-0015), Landing-Page, helles Thema
 - [x] **9d Qualität:** Frontend-CI-Job (vitest + build), 14 Frontend-Tests,
       76 Backend-Tests, Mobile-Pass (Drawer, Karten-Listen, Bottom-Sheet)
 - **DoD:** Alle Bereiche im Browser erreichbar (Desktop + Mobile), Checks grün. ✓
@@ -365,8 +368,9 @@ Graphen). `ON DELETE CASCADE`: Löschung greift bis in Vektor-Index und Graph du
       n8n-Alternative im `full`-Profil) — ADR-0009
 - [x] **Lokal:** README-Abschnitte „Privater Betrieb" (Bibliothek, Modellwahl) und
       „Öffentliches Deployment" (Schritt-für-Schritt)
-- [ ] **Go-Live EU-VPS:** Domain + `.env` produktiv, Stack hochfahren, Gate + Smoke
-      auf dem VPS grün, Uptime-Monitoring auf `/api/health`, Prod-Cron aktivieren,
+- [x] **Go-Live EU-VPS:** live unter https://wissen.jaekel.dev
+- [ ] **Betrieb nachziehen:** Uptime-Monitoring (auf `/api/health/db`, nicht auf dem
+      bewusst abhängigkeitsfreien `/api/health`), Prod-Cron aktivieren,
       Restore-Drill auf dem VPS wiederholen
 - **DoD:** Wissens-Graph und Chat live unter eigener Domain;
   Deploy-Gate grün; Backup-Restore verifiziert.

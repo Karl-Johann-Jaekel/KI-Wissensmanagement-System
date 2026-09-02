@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.models import Chunk, Document
+from app.retrieval.hybrid import keyword_search
 from app.retrieval.search import hybrid_search
 
 DIM = get_settings().embed_dim
@@ -73,3 +74,41 @@ def test_hybrid_search_ranks_expected_chunk(db_session: Session) -> None:
     # per-arm scores are populated for debugging
     assert hits[0].scores["vector"] is not None
     assert hits[0].scores["rrf"] is not None
+
+
+def test_german_chunks_are_lexically_reachable(db_session: Session) -> None:
+    """Ein deutsches Dokument muss über den lexikalischen Arm gefunden werden (R1).
+
+    ``content_tsv`` entsteht je Zeile mit der Sprache des Dokuments; die Suche
+    fragte aber fest mit ``english``. Eine deutsche tsvector trifft nie eine
+    englische tsquery — solche Dokumente kamen allein über den Vektorarm zurück,
+    der lexikalische war für sie leer.
+    """
+    doc = Document(
+        source_type="markdown",
+        title="Deutsches Dokument",
+        content_hash="de-lexical-test",
+        lang="german",
+    )
+    db_session.add(doc)
+    db_session.flush()
+    db_session.add(
+        Chunk(
+            document_id=doc.id,
+            chunk_index=0,
+            content=(
+                "Wissensgraphen verknüpfen Konzepte, Modelle und Datensätze "
+                "miteinander und machen Zusammenhänge sichtbar."
+            ),
+            lang="german",
+            embed_model=get_settings().embed_model,
+        )
+    )
+    db_session.commit()
+
+    hits = keyword_search(db_session, "Wissensgraphen Zusammenhänge", config="german")
+    assert hits, "deutscher Chunk wurde lexikalisch nicht gefunden"
+
+    # Gegenprobe: mit der englischen Konfiguration bleibt er unsichtbar — genau
+    # deshalb reicht eine feste Konfiguration nicht.
+    assert keyword_search(db_session, "Wissensgraphen Zusammenhänge", config="english") == []

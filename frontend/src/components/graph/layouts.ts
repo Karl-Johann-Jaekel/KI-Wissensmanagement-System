@@ -118,12 +118,29 @@ export function globeSectors(sizes: number[]): number[] {
   return raw.map((share) => (2 * Math.PI * share) / sum)
 }
 
-function globeTargets(nodes: SceneNode[], opts: LayoutOptions): Map<string, Target> {
-  const out = new Map<string, Target>()
+/** Ein Knoten auf der Kugel, unabhängig von der Drehung. */
+export interface GlobePoint {
+  id: string
+  /** Breitengrad in Radiant. */
+  lat: number
+  /** Längengrad ohne Drehung, in Radiant. */
+  lon: number
+  /** Abstand vom Mittelpunkt inkl. Streuung. */
+  r: number
+}
+
+/**
+ * Die drehungsunabhängige Hälfte des Globus.
+ *
+ * Sortieren, Gruppieren und die Trigonometrie der Breitengrade hängen allein an
+ * den Knoten und den beiden Reglern — nicht an der Drehung. Das einmal je Szene
+ * zu rechnen statt in jedem Bild ist der ganze Trick hinter `globeFrame`.
+ */
+export function globeBasis(nodes: SceneNode[], opts: LayoutOptions): GlobePoint[] {
   const groups = byGroup(nodes)
-  const rotation = opts.rotation ?? 0
   const radius = BASE * (0.55 + opts.clusterGap / 40)
   const widths = globeSectors([...groups.values()].map((list) => list.length))
+  const points: GlobePoint[] = []
 
   let lonStart = 0
   let index = 0
@@ -133,20 +150,50 @@ function globeTargets(nodes: SceneNode[], opts: LayoutOptions): Map<string, Targ
       const t = (i + 0.5) / list.length
       // Golden-Ratio-Folge streut die Breitengrade, ohne sie zu bündeln.
       const v = (i * 0.6180339887) % 1
-      const lat = Math.asin(2 * v - 1)
-      const lon = lonStart + lonWidth * t + rotation
-      const r = radius * (1 + jitter(node, i) * 0.03 * opts.spread)
-      const cosLat = Math.cos(lat)
-      out.set(node.id, {
-        x: r * cosLat * Math.sin(lon),
-        y: -r * Math.sin(lat),
-        depth: (cosLat * Math.cos(lon) + 1) / 2,
+      points.push({
+        id: node.id,
+        lat: Math.asin(2 * v - 1),
+        lon: lonStart + lonWidth * t,
+        r: radius * (1 + jitter(node, i) * 0.03 * opts.spread),
       })
     })
     lonStart += lonWidth
     index += 1
   }
+  return points
+}
+
+/**
+ * Die Kugel um `rotation` gedreht.
+ *
+ * Schreibt in `out`, wenn eine Map übergeben wird: in der Bildschleife spart das
+ * eine Map-Allokation je Bild.
+ */
+export function globeFrame(
+  basis: GlobePoint[],
+  rotation: number,
+  out: Map<string, Target> = new Map(),
+): Map<string, Target> {
+  for (const p of basis) {
+    const lon = p.lon + rotation
+    const cosLat = Math.cos(p.lat)
+    const existing = out.get(p.id)
+    const x = p.r * cosLat * Math.sin(lon)
+    const y = -p.r * Math.sin(p.lat)
+    const depth = (cosLat * Math.cos(lon) + 1) / 2
+    if (existing) {
+      existing.x = x
+      existing.y = y
+      existing.depth = depth
+    } else {
+      out.set(p.id, { x, y, depth })
+    }
+  }
   return out
+}
+
+function globeTargets(nodes: SceneNode[], opts: LayoutOptions): Map<string, Target> {
+  return globeFrame(globeBasis(nodes, opts), opts.rotation ?? 0)
 }
 
 /** Maße der Ringansicht — teilt sich der Canvas für die Hilfskreise. */

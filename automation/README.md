@@ -40,3 +40,17 @@ project, or replace it with a plain host cron:
 ```
 
 Each run writes a JSON report to `eval/reports/` (Hit-Rate@5 + counts) as an artifact.
+
+
+## Stand dieser Workflows
+
+`ingest-webhook.workflow.json` wurde entfernt: sein Ziel `POST /ingest` ist in
+Produktion abgeschaltet (ADR-0024), und der Aufruf trug noch den mit ADR-0015
+entfallenen `sensitivity`-Parameter.
+
+`living-knowledge-cron.workflow.json` ist ein **Beispiel, kein lauffähiger Stand**:
+der `executeCommand`-Knoten ruft `docker compose exec`, aber der n8n-Container
+mountet weder den Docker-Socket noch das Projektverzeichnis, und
+`KWMS_API_BASE`/`KWMS_ADMIN_KEY` werden ihm nicht übergeben. Produktionspfad ist der
+Host-Cron (ADR-0009) — mit `|| benachrichtigen`, denn `app.update` liefert seit
+Kurzem einen Exit-Code ungleich 0, wenn im Lauf etwas scheitert.

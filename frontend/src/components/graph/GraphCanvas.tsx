@@ -11,6 +11,8 @@ import ForceGraph2D from 'react-force-graph-2d'
 import { FALLBACK_COLOR, LANDMARK_COLOR } from '../../types'
 import {
   clusterCenters,
+  globeBasis,
+  globeFrame,
   layoutTargets,
   ringGeometry,
   tierLabelPositions,
@@ -150,6 +152,18 @@ export default function GraphCanvas({
     [scene.groups, settings.clusterGap, settings.spread],
   )
 
+  // Breiten- und Längengrade der Kugel hängen nicht an der Drehung. Sie in jedem
+  // Bild neu zu bestimmen hieß: die Knotenliste kopieren, mit vierteiligem
+  // Vergleich sortieren, zwei Maps anlegen und für jeden Knoten asin/sin/cos
+  // rechnen — bei 2000 Knoten und 60 Bildern je Sekunde, auf der Einstiegsansicht.
+  // Zuletzt angewandte Drehung — daran hängt, ob ein Bild überhaupt Arbeit macht.
+  const appliedRotationRef = useRef(Number.NaN)
+
+  const globe = useMemo(
+    () => (settings.layout === 'globe' ? globeBasis(scene.nodes, layoutOpts) : null),
+    [settings.layout, scene.nodes, layoutOpts],
+  )
+
   const neighbours = useMemo(() => {
     const map = new Map<string, Set<string>>()
     for (const n of scene.nodes) map.set(n.id, new Set())
@@ -164,6 +178,7 @@ export default function GraphCanvas({
 
   // Feste Ziele einmal je Layout/Slider berechnen; der Globus dreht sich pro Frame.
   useEffect(() => {
+    appliedRotationRef.current = Number.NaN
     targetsRef.current =
       settings.layout === 'globe'
         ? new Map()
@@ -260,15 +275,19 @@ export default function GraphCanvas({
       return
     }
 
-    if (settings.layout === 'globe') {
+    if (settings.layout === 'globe' && globe) {
       if (animate) rotationRef.current += dt * 0.00012
       // Manuelles Drehen (Minimap-Ziehen) wirkt immer, auch bei angehaltener
       // Automatik — sonst ließe sich ein pausierter Globus nicht erkunden.
       const manual = rotationOffsetRef?.current ?? 0
-      targetsRef.current = layoutTargets('globe', scene.nodes, {
-        ...layoutOpts,
-        rotation: rotationRef.current + manual,
-      })
+      const rotation = rotationRef.current + manual
+      // Steht der Globus still, gibt es nichts neu zu setzen. Vorher lief die
+      // volle Berechnung auch dann in jedem Bild weiter.
+      if (rotation !== appliedRotationRef.current) {
+        appliedRotationRef.current = rotation
+        // Schreibt in die vorhandene Map: eine Allokation je Bild weniger.
+        globeFrame(globe, rotation, targetsRef.current)
+      }
     }
 
     for (const n of scene.nodes) {
@@ -287,7 +306,7 @@ export default function GraphCanvas({
       n.fy = n.y
       n.depth = target.depth
     }
-  }, [scene, settings.layout, settings.motion, paused, layoutOpts, rotationOffsetRef])
+  }, [scene, settings.layout, settings.motion, paused, globe, rotationOffsetRef])
 
   // ----------------------------------------------------------- Zeichnen
 

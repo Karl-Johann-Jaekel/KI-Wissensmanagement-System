@@ -15,6 +15,7 @@ unverändert und die Anzeige fällt auf „keine Angabe" zurück.
 from __future__ import annotations
 
 import argparse
+import logging
 from datetime import UTC, datetime
 
 import httpx
@@ -24,6 +25,8 @@ from sqlalchemy.orm import Session, attributes
 from app.core.config import get_settings
 from app.db.models import Document, GraphNode
 from app.db.session import SessionLocal
+
+log = logging.getLogger(__name__)
 
 S2_BATCH_URL = "https://api.semanticscholar.org/graph/v1/paper/batch"
 S2_FIELDS = "citationCount,influentialCitationCount,year,venue,title"
@@ -67,7 +70,7 @@ def fetch_citation_metrics(
                 resp.raise_for_status()
                 payload = resp.json()
             except (httpx.HTTPError, ValueError) as exc:
-                print(f"  ! Zitationsabruf fehlgeschlagen: {exc}")
+                log.warning("citation lookup failed: %s", exc)
                 continue
             if not isinstance(payload, list):
                 continue

@@ -12,6 +12,7 @@ concepts/models/datasets and the edges asserting them are ``pending``.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -29,6 +30,8 @@ from app.corpus.aliases import (
 from app.db.graph import upsert_edge, upsert_node
 from app.db.models import Chunk, Document, GraphNode
 from app.db.provenance import Claim, record_authors, record_extraction
+
+log = logging.getLogger(__name__)
 
 Chat = Callable[[list[dict]], str]
 
@@ -120,16 +123,35 @@ class ExtractStats:
     edges: int = 0
     skipped: int = 0
     failed: int = 0
+    #: Titel der gescheiterten Papers — sonst weiss niemand, welche nachzuholen sind.
+    failed_titles: list[str] = field(default_factory=list)
+    #: Geschaetzte Tokens beider Richtungen. Grobe Schaetzung (ADR-0003), aber die
+    #: einzige Zahl, die den Aufwand eines Laufs ueberhaupt sichtbar macht.
+    tokens: int = 0
+
+
+class ExtractionParseError(ValueError):
+    """Die Antwort des Modells enthielt kein verwertbares JSON."""
 
 
 def parse_extraction(text: str) -> ExtractedFacts:
+    """Fakten aus der Modellantwort lesen — oder scheitern.
+
+    Vorher gab diese Funktion bei Regex-Miss oder kaputtem JSON stumm ein leeres
+    ``ExtractedFacts()`` zurueck. Der Aufrufer setzte danach trotzdem
+    ``facts_extracted``, das Paper wurde nie wieder angefasst, und der Report
+    zeigte nichts. Nur ``--force`` holte es zurueck. Ein Fehler muss als Fehler
+    ankommen.
+    """
     match = _JSON_RE.search(text)
     if not match:
-        return ExtractedFacts()
+        raise ExtractionParseError(f"kein JSON-Objekt in der Antwort ({len(text)} Zeichen)")
     try:
         data = json.loads(match.group(0))
-    except (json.JSONDecodeError, ValueError):
-        return ExtractedFacts()
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise ExtractionParseError(f"JSON nicht lesbar: {exc}") from exc
+    if not isinstance(data, dict):
+        raise ExtractionParseError(f"JSON ist kein Objekt, sondern {type(data).__name__}")
 
     def _strs(key: str) -> list[str]:
         return [
@@ -159,6 +181,14 @@ def build_messages(
             ),
         },
     ]
+
+
+def _is_rejected(session: Session, node_id: str) -> bool:
+    """Wurde dieser Knoten im Review verworfen?"""
+    status = session.execute(
+        select(GraphNode.status).where(GraphNode.id == node_id)
+    ).scalar_one_or_none()
+    return status == "rejected"
 
 
 def store_facts(
@@ -207,11 +237,18 @@ def store_facts(
         cache_key = (kind, key)
         if cache_key not in node_ids:
             node_id = upsert_node(session, kind, name, status="pending")
+            # Ein im Review verworfener Knoten behaelt seinen Status (so soll es
+            # sein), wird von der Promotion aber fuer immer uebersprungen. Haengte
+            # jeder Lauf weitere pending-Kanten daran, wuechse ein Rest, der sich
+            # nie aufloesen kann.
+            if _is_rejected(session, node_id):
+                node_ids[cache_key] = ""
+                return None
             node_ids[cache_key] = node_id
             record_extraction(
                 session, Claim(node_id=node_id), extractor=EXTRACTOR, document_id=doc_id
             )
-        return node_ids[cache_key]
+        return node_ids[cache_key] or None
 
     def link(src: str, tgt: str, relation: str, confidence: float) -> None:
         nonlocal n_edges
@@ -281,6 +318,44 @@ def _paper_text(session: Session, doc: Document) -> str:
     return chunk or ""
 
 
+#: Nachfassen, wenn die erste Antwort kein JSON war. Modelle leiten ihre Ausgabe
+#: gern mit Prosa ein; ein knapper Hinweis reicht meist.
+_RETRY_HINT = {
+    "role": "user",
+    "content": "Antworte ausschliesslich mit dem JSON-Objekt. Kein Text davor oder danach.",
+}
+
+
+def _extract_with_retry(chat: Chat, messages: list[dict], title: str) -> tuple[ExtractedFacts, int]:
+    """Einmal nachfassen, bevor ein Paper als gescheitert gilt.
+
+    Ein Lauf kostet Tokens; ein verlorenes Paper kostet einen ganzen Extraktionszyklus,
+    weil es ohne ``--force`` nie wiederkommt. Gibt die Fakten und die geschaetzten
+    Tokens **beider Richtungen** zurueck — Ausgabe eingeschlossen, denn bezahlt wird
+    sie ebenso.
+    """
+    spent = _tokens_of(messages)
+    answer = chat(messages)
+    spent += estimate_tokens(answer)
+    try:
+        return parse_extraction(answer), spent
+    except ExtractionParseError as first:
+        log.info("no JSON from the model for %r, retrying once: %s", title[:80], first)
+        retry = [*messages, _RETRY_HINT]
+        spent += _tokens_of(retry)
+        answer = chat(retry)
+        spent += estimate_tokens(answer)
+        return parse_extraction(answer), spent
+
+
+def _tokens_of(messages: list[dict]) -> int:
+    """Alle Nachrichten, nicht nur die letzte.
+
+    Der System-Prompt und der Vokabularblock gingen vorher gar nicht ins Budget ein.
+    """
+    return sum(estimate_tokens(str(m.get("content", ""))) for m in messages)
+
+
 def extract_corpus(
     session: Session,
     *,
@@ -308,15 +383,22 @@ def extract_corpus(
             stats.skipped += 1
             continue
         messages = build_messages(doc.title, abstract, vocab)
-        used_tokens += estimate_tokens(messages[-1]["content"])
-        if used_tokens > token_budget:
-            print(f"  token budget {token_budget} reached — stopping")
+        # Vor dem Aufruf pruefen, nicht danach: sonst wird das Budget immer um
+        # genau einen Aufruf ueberschritten.
+        if used_tokens + _tokens_of(messages) > token_budget:
+            log.warning(
+                "token budget %s reached after ~%s tokens — stopping", token_budget, used_tokens
+            )
             break
         try:
-            facts = parse_extraction(chat(messages))
+            facts, spent = _extract_with_retry(chat, messages, doc.title)
+            used_tokens += spent
         except Exception as exc:  # noqa: BLE001 — one bad paper must not abort the run
-            print(f"  ! {doc.title[:50]}: {exc}")
+            # Kein facts_extracted setzen: das Paper bleibt fuer den naechsten Lauf
+            # offen, statt still als erledigt zu gelten.
+            log.warning("extraction failed for %r: %s", doc.title[:80], exc)
             stats.failed += 1
+            stats.failed_titles.append(doc.title[:120])
             continue
         n_nodes, n_edges = store_facts(session, doc, facts, vocab)
         doc.meta = {**(doc.meta or {}), "facts_extracted": True}
@@ -325,6 +407,7 @@ def extract_corpus(
         stats.papers += 1
         stats.nodes += n_nodes
         stats.edges += n_edges
+        stats.tokens = used_tokens
         print(f"  ✓ {doc.title[:50]}: +{n_nodes} nodes, +{n_edges} edges")
 
     return stats

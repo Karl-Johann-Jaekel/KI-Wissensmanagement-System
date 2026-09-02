@@ -63,6 +63,27 @@ class OllamaChatClient:
         return "".join(self.chat_stream(messages))
 
 
+def _delta_from(payload: str) -> str | None:
+    """Inhalt eines SSE-Rahmens — oder None, wenn keiner drinsteht.
+
+    Anbieter schicken zwischen den Token Rahmen ohne ``choices``: Fehlerobjekte,
+    reine Usage-Angaben, Keep-Alives. Der direkte Zugriff
+    ``["choices"][0]["delta"]`` warf dort KeyError oder IndexError. Der flog aus
+    dem Generator, ``chat.py`` fing nur ``httpx.HTTPError`` — und der Strom endete
+    ohne ``sources`` und ohne ``[DONE]``. Der Browser wartete dann endlos auf Token,
+    die nie kamen.
+    """
+    try:
+        choices = json.loads(payload).get("choices") or []
+        if not choices:
+            return None
+        content = (choices[0].get("delta") or {}).get("content")
+    except (json.JSONDecodeError, AttributeError, TypeError, IndexError) as exc:
+        log.debug("unparsable SSE frame skipped: %s", exc)
+        return None
+    return content if isinstance(content, str) else None
+
+
 class _OpenAICompatChatClient:
     """Gemeinsame Basis für Anbieter mit OpenAI-kompatiblem SSE-Chat."""
 
@@ -90,7 +111,7 @@ class _OpenAICompatChatClient:
                 payload = line[len("data:") :].strip()
                 if payload == "[DONE]":
                     break
-                delta = json.loads(payload)["choices"][0]["delta"].get("content")
+                delta = _delta_from(payload)
                 if delta:
                     yield delta
 
