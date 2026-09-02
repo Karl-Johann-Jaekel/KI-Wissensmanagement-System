@@ -44,5 +44,4 @@ def test_document_chunks_can_use_the_index(db_session: Session) -> None:
             "WHERE document_id = '00000000-0000-0000-0000-000000000000'"
         )
     ).scalars()
-    assert "idx_chunks_document_id" in "
-".join(plan)
+    assert "idx_chunks_document_id" in "\n".join(plan)
