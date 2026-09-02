@@ -1,6 +1,6 @@
 # ADR-0009: Deployment-Topologie (öffentlicher Betrieb)
 
-Datum: 2026-08-03 · Status: akzeptiert
+Datum: 2026-08-03 · Status: akzeptiert · Der tatsächliche Aufbau weicht ab, siehe Nachtrag
 
 ## Kontext
 
@@ -38,3 +38,27 @@ Alternative für das `full`-Profil dokumentiert.
   ACME nativ und ist bereits im Stack-Plan (PLAN §4).
 - **Separater Frontend- und Proxy-Container:** mehr bewegliche Teile ohne
   Nutzen bei dieser Größe.
+
+## Nachtrag (2026-09-02): der Aufbau auf dem mainserver
+
+Dieser ADR beschreibt einen Stack, der TLS selbst übernimmt. So läuft er dort nicht:
+
+* Vor dem Caddy dieses Projekts steht ein **gemeinsamer Caddy** (`~/caddy`), der
+  Port 80/443 hält, TLS beendet und mehrere Domains bedient. Der innere Caddy
+  liefert nur noch die SPA aus und proxied `/api`.
+* Verdrahtet wird das von `docker-compose.mainserver.yml`, die **bewusst nicht im
+  Repo liegt** — ein frischer Klon soll eigenständig lauffähig bleiben. Sie hängt
+  den inneren Caddy ins gemeinsame Netz, vergibt den Alias `kwms-web` und entfernt
+  die Host-Ports.
+* Der äußere Proxy überschreibt `X-Forwarded-For` mit der echten Gegenstelle. Das
+  ist die Voraussetzung dafür, dass die Ratenbegrenzung je Besucher zählt — und der
+  Grund, warum sich diese Trennung von außen nicht prüfen lässt.
+
+Wer ohne diese dritte Datei ausrollt, verliert den Alias und nimmt die Seite offline.
+Die Reihenfolge steht in [../runbooks/rollout.md](../runbooks/rollout.md).
+
+Ebenfalls hier festgehalten, weil es diesen ADR betrifft: `docker-compose.prod.yml`
+härtete lange nicht, was es versprach. Compose führt Listen zusammen, `ports: []`
+entfernt also nichts — Host-Ports und Quellcode-Mount blieben bestehen. `!reset`
+leert, `!override` ersetzt; für `volumes` gehört `!override` dorthin.
+

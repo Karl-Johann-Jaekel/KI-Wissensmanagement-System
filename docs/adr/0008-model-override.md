@@ -1,6 +1,6 @@
 # ADR-0008: Per-Request-Modellwahl (Ollama) & Modell-Liste
 
-Datum: 2026-08-03 · Status: akzeptiert
+Datum: 2026-08-03 · Status: überholt — die Zwei-Zonen-Idee entfiel mit ADR-0015, der `/models`-Endpunkt besteht nicht mehr
 
 ## Kontext
 

@@ -1,7 +1,6 @@
 # ADR-0024: Schreibrouten in Produktion abgeschaltet
 
-Status: akzeptiert
-Datum: 2026-09-01
+Datum: 2026-09-01 · Status: akzeptiert · Überholt die Bearbeitung aus ADR-0007 · Ergänzt ADR-0009
 
 ## Kontext
 

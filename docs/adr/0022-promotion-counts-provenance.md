@@ -1,7 +1,6 @@
 # ADR-0022: Promotion zählt Belege, nicht das JSONB-Feld
 
-Status: akzeptiert
-Datum: 2026-09-01
+Datum: 2026-09-01 · Status: akzeptiert · Setzt ADR-0020 in Kraft · Löst die Zählung aus ADR-0010 ab
 
 ## Kontext
 

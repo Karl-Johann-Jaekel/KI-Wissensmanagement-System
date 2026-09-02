@@ -1,7 +1,6 @@
 # ADR-0023: Review-Oberfläche entfernt — die Regel trägt allein
 
-Status: akzeptiert
-Datum: 2026-09-01
+Datum: 2026-09-01 · Status: akzeptiert · Überholt die Oberfläche aus ADR-0010 · Setzt ADR-0022 voraus
 
 ## Kontext
 

@@ -1,6 +1,6 @@
 # ADR-0010: Durchsatz der Fakten-Freigabe erhöhen
 
-Datum: 2026-08-03 · Status: akzeptiert
+Datum: 2026-08-03 · Status: teilweise überholt — die konfigurierbaren Schwellen gelten, die Oberfläche entfiel mit ADR-0023, gezählt wird seit ADR-0022 in `entities_extracted`
 
 ## Kontext
 

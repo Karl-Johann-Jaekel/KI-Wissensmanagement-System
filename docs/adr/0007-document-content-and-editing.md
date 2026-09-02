@@ -1,6 +1,6 @@
 # ADR-0007: Dokument-Content-Speicherung & Markdown-Editing
 
-Datum: 2026-08-03 · Status: akzeptiert
+Datum: 2026-08-03 · Status: teilweise überholt — die Speicherung in `content_md` gilt, die Bearbeitung entfiel mit ADR-0024
 
 ## Kontext
 
