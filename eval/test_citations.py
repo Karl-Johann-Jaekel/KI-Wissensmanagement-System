@@ -37,7 +37,7 @@ def test_invented_source_is_caught() -> None:
 
 
 def test_answer_without_citations_is_not_penalised() -> None:
-    """"Dazu liegt keine Quelle vor." ist eine korrekte Antwort ohne Beleg."""
+    """'Dazu liegt keine Quelle vor.' ist eine korrekte Antwort ohne Beleg."""
     check = check_citations("Dazu liegt keine Quelle vor.", ["Irgendein Paper"])
     assert check.total == 0
     assert check.rate == 1.0
