@@ -124,9 +124,7 @@ def test_edge_evidence_survives_the_merge(db_session: Session) -> None:
     record_extraction(db_session, Claim(node_id=loser), extractor="t", document_id=d1)
 
     upsert_edge(db_session, paper, loser, "USES")
-    record_extraction(
-        db_session, Claim(edge=(paper, loser, "USES")), extractor="t", document_id=d1
-    )
+    record_extraction(db_session, Claim(edge=(paper, loser, "USES")), extractor="t", document_id=d1)
     db_session.commit()
 
     plan = next(p for p in merge.plan_merges(db_session) if p.winner.name == "BERT")
