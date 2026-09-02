@@ -64,15 +64,8 @@ def evaluate_citations(session, golden: list[dict], *, top_k: int) -> dict:
     Schiedsrichter — das findet keine inhaltlich falschen Aussagen, aber
     erfundene Quellen, und das ist der Fehler, der am teuersten ist.
     """
+    from app.generation.citation_check import check_citations
     from app.generation.generate import prepare_answer
-
-    # Zwei Aufrufwege, zwei Sichten auf den Pfad: `python -m app.update` sieht
-    # `eval` als Paket, `python eval/run_eval.py` legt stattdessen eval/ selbst
-    # in den Pfad. Beides muss tragen.
-    try:
-        from eval.citations import check_citations
-    except ModuleNotFoundError:  # pragma: no cover — nur beim direkten Skriptaufruf
-        from citations import check_citations  # type: ignore[no-redef]
 
     zitate = gedeckt = 0
     erfunden: list[str] = []

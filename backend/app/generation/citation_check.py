@@ -1,5 +1,9 @@
 """Belegtreue einer Antwort — prüft, ob Zitate auf gelieferte Quellen zeigen.
 
+Liegt im Paket, nicht unter ``eval/``: die Prüfung gehört zur Erzeugung von
+Antworten, und nur so ist sie von überall importierbar. Unter ``eval/`` war sie
+aus ``backend/`` heraus unerreichbar — die CI führt pytest von dort aus.
+
 Die Golden-Eval misst bisher nur Hit-Rate@k: kommt das erwartete Paper unter die
 Treffer. Ob die *Antwort* die Treffer dann korrekt belegt, misst nichts — obwohl
 PLAN §11 Halluzination als Risiko führt und der System-Prompt jede Aussage mit

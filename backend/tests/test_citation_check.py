@@ -1,11 +1,8 @@
-"""Belegtreue-Prüfung der Eval (R3). Reine Logik, keine Datenbank, kein Modell.
-
-Liegt bei den Backend-Tests, weil pytest nur dort sucht (testpaths).
-"""
+"""Belegtreue-Prüfung (R3). Reine Logik, keine Datenbank, kein Modell."""
 
 from __future__ import annotations
 
-from eval.citations import check_citations
+from app.generation.citation_check import check_citations
 
 
 def test_citation_matching_source_counts_as_grounded() -> None:
