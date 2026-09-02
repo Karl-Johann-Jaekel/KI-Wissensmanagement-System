@@ -3,11 +3,33 @@
 Für ein System, das bereits öffentlich läuft. Jeder Schritt trifft Bestandsdaten und
 echte Besucher — die Reihenfolge ist nicht beliebig.
 
+## Topologie — erst lesen, dann tippen
+
+Auf dem mainserver stehen **zwei Caddy-Instanzen** hintereinander:
+
+```
+Besucher --> caddy (~/caddy, Ports 80/443, TLS, mehrere Domains)
+             +-> kwms-caddy-1  (SPA + /api-Proxy, Alias "kwms-web" im Netz "web")
+                 +-> kwms-backend-1  (kein Host-Port)
+```
+
+Der äußere Proxy setzt `header_up X-Forwarded-For {remote_host}` — er **überschreibt**,
+was der Besucher mitschickt. Deshalb ist der Limit-Schlüssel nicht fälschbar, und
+deshalb lässt sich die Trennung von außen nicht prüfen (Schritt 7).
+
+Dazu liegt auf dem Server eine dritte Compose-Datei, die **nicht im Repo** ist:
+`docker-compose.mainserver.yml`. Sie hängt `kwms-caddy-1` ins gemeinsame Netz `web`,
+vergibt den Alias `kwms-web` und entfernt die Host-Ports. **Ohne sie verliert der
+Deploy den Alias und die Seite ist offline.**
+
 Alle Befehle laufen auf dem VPS im Projektverzeichnis. `PROD` steht für:
 
 ```bash
-PROD="docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile public"
+PROD="docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.mainserver.yml --profile public"
 ```
+
+Der im README genannte Befehl **ohne** die dritte Datei gilt für einen frischen Klon,
+nicht für diesen Server.
 
 ---
 
@@ -35,42 +57,34 @@ git merge --ff-only origin/main
 
 ---
 
-## 2. Caddy-Konfiguration abgleichen
+## 2. Caddy-Konfiguration
 
-Die Datei im Repo wurde ergänzt (HSTS, CSP, X-Frame-Options, `request_body max_size`,
-Asset-Caching). Sie enthält auch `Referrer-Policy` und `X-Content-Type-Options`, die
-live gesetzt waren, aber im Repo fehlten.
+Der innere Caddyfile wird beim Bauen ins Image kopiert — er kommt aus dem Repo, dort
+ist nichts abzugleichen.
 
-```bash
-git diff HEAD@{1} -- frontend/deploy/Caddyfile
-```
-
-**Prüfen, ob auf dem VPS Anpassungen liegen, die das Repo nicht kennt.** Von außen
-war nur sichtbar, welche Header ankommen — nicht, was sonst in der Datei steht.
-
-**Abbruch, wenn** der Diff etwas entfernt, das dort gebraucht wird.
+Der **äußere** Proxy (`~/caddy/Caddyfile`) ist davon unberührt und setzt für
+`wissen.jaekel.dev` bereits `X-Content-Type-Options` und `Referrer-Policy`. Der innere
+setzt dieselben plus HSTS, CSP und `X-Frame-Options`. Caddys `header` ersetzt, statt
+anzuhängen — doppelte Kopfzeilen entstehen nicht. In Schritt 8 gegenprüfen.
 
 ---
 
 ## 3. Vertrauensliste für X-Forwarded-For
 
 uvicorn wertet den Header nur von Adressen aus `--forwarded-allow-ips` aus; der
-Default deckt allein `127.0.0.1` ab. Caddy ist ein eigener Container — deshalb zählte
-das Rate-Limit bisher alle Besucher als einen.
+Default deckt allein `127.0.0.1` ab.
+
+**Auf dem mainserver ist das bereits erledigt:** `docker-compose.mainserver.yml` setzt
+`--proxy-headers --forwarded-allow-ips=*`. Das `*` ist hier vertretbar, weil das
+Backend keinen Host-Port hat und der äußere Proxy den Header ohnehin überschreibt.
+
+Nur auf einem Server **ohne** diese Datei greift der Wert aus
+`docker-compose.prod.yml` (`FORWARDED_ALLOW_IPS`, voreingestellt `172.16.0.0/12`).
+Subnetz prüfen mit:
 
 ```bash
-docker network inspect $(basename $PWD)_default \
-  --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}'
+docker network inspect $(basename $PWD)_default --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}'
 ```
-
-Liegt das Subnetz **nicht** in `172.16.0.0/12`, in die `.env` eintragen:
-
-```
-FORWARDED_ALLOW_IPS=<subnetz>
-```
-
-Kein `*`: sobald Port 8000 doch einmal veröffentlicht wird, wäre der Limit-Schlüssel
-frei fälschbar.
 
 ---
 
@@ -106,8 +120,17 @@ Erwartet: `0006_hot_path_indexes (head)`. Die Indizes entstehen mit
 
 ## 6. Deploy
 
+Achtung: `./backend:/app` ist auch in Produktion gemountet (Compose führt
+volumes-Listen zusammen; erst `!reset` entfernt sie — im Repo mit diesem Rollout
+korrigiert). Der neue Code liegt nach `git merge` also bereits im Container, der
+laufende uvicorn hält aber den alten. **Ein `restart` des Backends ist deshalb
+nötig; das Backend-Image neu zu bauen dagegen nur bei geänderten Abhängigkeiten** —
+es ist rund 10 GB groß.
+
 ```bash
-$PROD up -d --build
+$PROD build caddy          # traegt Frontend-Aenderungen und den Caddyfile
+$PROD up -d --no-build caddy backend
+$PROD restart backend      # laedt den neuen Code aus dem Mount
 $PROD ps
 $PROD logs backend --tail 30
 ```
@@ -129,12 +152,12 @@ nicht, und Schritt 4 hätte das gemeldet.
 BASE_URL=https://<domain>/api ./scripts/smoke_prod.sh
 ```
 
-Neu darin: eine Prüfung, ob zwei Besucher getrennte Rate-Limit-Eimer bekommen. Sie
-schickt Anfragen mit unterschiedlichem `X-Forwarded-For` und erwartet, dass der
-zweite Besucher **nicht** mitgesperrt wird. Schlägt sie fehl, stimmt Schritt 3 nicht.
-
-Fällt der Test „unbestimmt" aus (kein 429 nach 40 Anfragen), ist `RATE_LIMIT` höher
-als 40 — dann von Hand mit mehr Anfragen prüfen.
+Die Prüfung der Rate-Limit-Trennung läuft **nicht** mit: von außen ist sie hier nicht
+messbar, weil der äußere Proxy `X-Forwarded-For` überschreibt. Sie steht hinter
+`CHECK_XFF=1` und gehört von innen ausgeführt — einen curl-Container ins Compose-Netz
+hängen, den inneren Caddy (`http://caddy:80/api/documents`) mit zwei verschiedenen
+`X-Forwarded-For`-Werten befragen. Erwartet: der erste Besucher läuft in 429, der
+zweite bekommt **200**.
 
 ---
 
