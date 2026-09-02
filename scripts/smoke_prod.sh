@@ -34,14 +34,34 @@ NODES=$(curl -fsS --max-time 15 "$BASE_URL/graph" | python3 -c 'import json,sys;
 if [ "$NODES" -gt 0 ]; then ok=0; else ok=1; fi
 check "/graph" $ok "($NODES Knoten)"
 
-# 3. Rate-Limit trennt Besucher voneinander.
-# Steht die Proxy-IP nicht in --forwarded-allow-ips (Default: nur 127.0.0.1),
-# verwirft uvicorn den X-Forwarded-For und alle Besucher landen im selben Eimer —
-# ein Nutzer sperrt dann alle anderen aus. Genau das lief unbemerkt in Produktion;
-# der Fehler ist von aussen nur an diesem Verhalten zu erkennen.
-if [ "${SKIP_XFF:-0}" != "1" ]; then
+
+# 3. Ein public-Chat streamt bis [DONE]
+if curl -fsS --max-time 120 -X POST "$BASE_URL/chat" \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "Was ist Retrieval-Augmented Generation?"}' | grep -q '\[DONE\]'; then ok=0; else ok=1; fi
+check "/chat (public, bis [DONE])" $ok
+
+# 4. Golden-Eval als Qualitäts-Smoke (läuft im Backend-Container)
+if [ "${SKIP_EVAL:-0}" != "1" ]; then
+  if docker compose exec -T backend python eval/run_eval.py; then ok=0; else ok=1; fi
+  check "Golden-Eval" $ok
+fi
+
+
+# Rate-Limit trennt Besucher voneinander — nur sinnvoll direkt gegen den inneren
+# Proxy. Steht ein weiterer Caddy davor, überschreibt der X-Forwarded-For mit der
+# echten Gegenstelle (so soll es sein, sonst wäre der Limit-Schlüssel fälschbar) —
+# von außen injizierte Werte kommen dann nie an und die Prüfung liefe ins Leere.
+#
+# Von innen dagegen messbar: einen curl-Container ins Compose-Netz haengen und
+# den inneren Caddy mit zwei verschiedenen X-Forwarded-For-Werten befragen —
+# der zweite Besucher darf nicht mitgesperrt werden.
+#
+# Verbraucht 40 Anfragen und sperrt den eigenen Absender für eine Minute — deshalb
+# ganz am Ende und nur mit CHECK_XFF=1.
+if [ "${CHECK_XFF:-0}" = "1" ]; then
   probe() {  # Statuscode fuer /documents als angegebener Besucher
-    curl -s -o /dev/null -w '%{http_code}' --max-time 10       -H "X-Forwarded-For: $1" "$BASE_URL/documents" || echo 000
+    curl -s -o /dev/null -w '%{http_code}' --max-time 10 -H "X-Forwarded-For: $1"       "$BASE_URL/documents" || echo 000
   }
   hit429=0
   for _ in $(seq 1 40); do
@@ -54,18 +74,6 @@ if [ "${SKIP_XFF:-0}" != "1" ]; then
   else
     echo "  ~ Rate-Limit trennt Besucher — unbestimmt (kein 429 nach 40 Anfragen)"
   fi
-fi
-
-# 4. Ein public-Chat streamt bis [DONE]
-if curl -fsS --max-time 120 -X POST "$BASE_URL/chat" \
-  -H 'Content-Type: application/json' \
-  -d '{"query": "Was ist Retrieval-Augmented Generation?"}' | grep -q '\[DONE\]'; then ok=0; else ok=1; fi
-check "/chat (public, bis [DONE])" $ok
-
-# 5. Golden-Eval als Qualitäts-Smoke (läuft im Backend-Container)
-if [ "${SKIP_EVAL:-0}" != "1" ]; then
-  if docker compose exec -T backend python eval/run_eval.py; then ok=0; else ok=1; fi
-  check "Golden-Eval" $ok
 fi
 
 echo
