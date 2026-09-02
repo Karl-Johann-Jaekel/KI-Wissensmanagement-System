@@ -19,12 +19,12 @@ import Modal from '../components/ui/Modal'
 import { cn } from '../lib/cn'
 import { deleteChat, renameChat, useChatIndex, type ChatMeta } from '../lib/storage'
 
-// Wissen zuerst: dort landet der Einstieg (siehe Route "/"), und der Graph ist
-// das, was das System in einem Bild zeigt. Suche und Inbox folgen darauf.
+// Inbox zuerst: sie erklaert, was das System tut, und zeigt im Changelog, was
+// zuletzt dazugekommen ist. Sie ist zugleich der Einstieg (siehe Route "/").
 const NAV_ITEMS = [
+  { to: '/inbox', label: 'Inbox', icon: Inbox },
   { to: '/wissen', label: 'Wissen', icon: BookOpen },
   { to: '/suche', label: 'Suche', icon: Search },
-  { to: '/inbox', label: 'Inbox', icon: Inbox },
   { to: '/skills', label: 'Skills', icon: Sparkles },
   { to: '/projekte', label: 'Projekte', icon: FolderKanban },
 ]
@@ -79,7 +79,7 @@ export default function Sidebar({
         <NavLink
           to="/"
           onClick={onNavigate}
-          title="Zur Wissenskarte"
+          title="Zur Startseite"
           className={cn('flex min-w-0 items-center gap-2', collapsed && 'justify-center')}
         >
           <span className="shrink-0 rounded-lg bg-primary-600 p-1.5 text-white">

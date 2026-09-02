@@ -28,10 +28,10 @@ const router = createBrowserRouter([
     ),
     element: <AppShell />,
     children: [
-      // Die Wissenskarte ist der Einstieg: sie zeigt in einem Bild, was das
-      // System enthaelt. Eine vorgeschaltete Startseite kostete einen Klick,
-      // bevor ueberhaupt etwas vom Inhalt zu sehen war.
-      { path: '/', element: <Navigate to="/wissen?tab=graph" replace /> },
+      // Die Inbox ist der Einstieg: sie ordnet ein, was das System tut, und der
+      // Changelog zeigt, was zuletzt dazugekommen ist. Zuvor fuehrte "/" direkt
+      // auf die Wissenskarte — ein Bild ohne Erklaerung.
+      { path: '/', element: <Navigate to="/inbox" replace /> },
       { path: '/chat', element: <ChatPage /> },
       { path: '/chat/:chatId', element: <ChatPage /> },
       { path: '/suche', element: <SearchPage /> },

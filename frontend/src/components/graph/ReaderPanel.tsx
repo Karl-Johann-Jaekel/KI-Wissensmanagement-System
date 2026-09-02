@@ -13,6 +13,8 @@ import Badge from '../ui/Badge'
 import Button from '../ui/Button'
 import Spinner from '../ui/Spinner'
 import { LANDMARK_COLOR } from '../../types'
+import NodeChat from './NodeChat'
+import NodeExplainer from './NodeExplainer'
 import { TIER_LABELS, type SceneNode } from './scene'
 import { safeHref } from '../../lib/safeHref'
 
@@ -147,6 +149,9 @@ export default function ReaderPanel({ node, members, onSelectNode, onClose }: Pr
         )}
 
         {meta.note && <p className="mb-3 text-sm text-muted">{meta.note}</p>}
+        <NodeExplainer node={node} />
+        <NodeChat node={node} />
+
         {meta.abstract && <p className="mb-3 text-sm text-muted">{meta.abstract}</p>}
         {typeof meta.confidence === 'number' && (
           <div className="mb-3 text-xs text-muted">Konfidenz: {meta.confidence}</div>
