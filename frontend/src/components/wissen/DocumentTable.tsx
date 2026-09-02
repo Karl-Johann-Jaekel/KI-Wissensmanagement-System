@@ -3,6 +3,7 @@ import { FileText } from 'lucide-react'
 import type { DocumentRow } from '../../api'
 import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
+import { cn } from '../../lib/cn'
 
 interface DocumentTableProps {
   docs: DocumentRow[]
@@ -42,7 +43,21 @@ export default function DocumentTable({ docs, emptyHint }: DocumentTableProps) {
             <tr
               key={d.id}
               onClick={() => open(d.id)}
-              className="cursor-pointer border-b border-edge/60 hover:bg-sunken"
+              // Mit der Maus war die Zeile anklickbar, mit der Tastatur nicht
+              // erreichbar. Die mobile Variante darunter macht es richtig.
+              tabIndex={0}
+              role="link"
+              aria-label={`Dokument öffnen: ${d.title}`}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  open(d.id)
+                }
+              }}
+              className={cn(
+                'cursor-pointer border-b border-edge/60 hover:bg-sunken',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500/40',
+              )}
             >
               <td className="max-w-md truncate py-2.5 pr-3 font-medium text-ink">{d.title}</td>
               <td className="py-2.5 pr-3">

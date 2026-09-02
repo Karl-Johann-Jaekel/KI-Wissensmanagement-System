@@ -30,7 +30,14 @@ export default function MessageList({ messages, busy, emptyHint }: MessageListPr
                 {msg.text}
               </div>
             ) : (
-              <div className="rounded-2xl rounded-bl-sm border border-edge bg-surface px-4 py-3">
+              // aria-live: die Antwort entsteht Zeichen fuer Zeichen. Ohne
+              // Ansage merken Screenreader-Nutzer nicht, dass etwas kommt.
+              // "polite", damit es laufende Ausgaben nicht unterbricht.
+              <div
+                aria-live="polite"
+                aria-busy={busy && i === messages.length - 1}
+                className="rounded-2xl rounded-bl-sm border border-edge bg-surface px-4 py-3"
+              >
                 {msg.text ? (
                   <div className="prose-md">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>

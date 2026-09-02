@@ -524,6 +524,14 @@ export default function GraphCanvas({
   )
 
   return (
+    // Ein <canvas> ist fuer Screenreader eine leere Flaeche. Die Karte ist die
+    // Einstiegsansicht des Graphen — ohne Beschreibung stuende dort nichts.
+    // Der Inhalt selbst bleibt visuell; wer ihn lesen will, nutzt die Liste
+    // daneben und die Suche im Menue.
+    <div
+      role="img"
+      aria-label={`Wissenskarte: ${scene.nodes.length} Knoten, ${scene.links.length} Verbindungen. Auswahl und Suche über das Menü.`}
+    >
     <ForceGraph2D
       ref={fgRef}
       graphData={scene}
@@ -566,5 +574,6 @@ export default function GraphCanvas({
       minZoom={0.05}
       maxZoom={12}
     />
+    </div>
   )
 }
