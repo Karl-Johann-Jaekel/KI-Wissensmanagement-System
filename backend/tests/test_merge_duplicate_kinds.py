@@ -138,9 +138,7 @@ def test_edge_evidence_survives_the_merge(db_session: Session) -> None:
     assert (str(edge.source), str(edge.target), edge.relation) == (paper, winner, "USES")
     # … und ihr Beleg ist mitgewandert, statt per Cascade verlorenzugehen.
     belege = (
-        db_session.execute(
-            select(EntityExtraction).where(EntityExtraction.edge_relation == "USES")
-        )
+        db_session.execute(select(EntityExtraction).where(EntityExtraction.edge_relation == "USES"))
         .scalars()
         .all()
     )
