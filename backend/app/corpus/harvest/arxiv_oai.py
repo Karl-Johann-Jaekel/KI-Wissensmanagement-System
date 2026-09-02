@@ -18,7 +18,7 @@ Dublin-Core-Felder und verliert die Struktur.
 
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from collections.abc import Callable, Iterator
 from datetime import UTC, date, datetime
 

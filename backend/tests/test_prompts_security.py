@@ -103,3 +103,37 @@ def test_rate_limiter_forgets_idle_clients(monkeypatch: pytest.MonkeyPatch) -> N
 def test_estimate_tokens() -> None:
     assert estimate_tokens("") == 1
     assert estimate_tokens("a" * 40) == 10
+
+
+def test_admin_key_comparison_is_constant_time() -> None:
+    """Der Vergleich darf nicht beim ersten abweichenden Zeichen abbrechen.
+
+    Ein frueh abbrechender Vergleich verraet ueber die Laufzeit, wie viele
+    Zeichen stimmten — ueber viele Versuche laesst sich ein Schluessel so
+    zeichenweise erraten.
+    """
+    import inspect
+
+    from app.core import security as sec
+
+    quelle = inspect.getsource(sec.is_admin)
+    assert "compare_digest" in quelle
+    assert "==" not in quelle.split('"""')[-1], "kein direkter Vergleich mehr"
+
+
+def test_admin_key_rejects_missing_and_wrong(monkeypatch: pytest.MonkeyPatch) -> None:
+    from starlette.datastructures import Headers
+
+    from app.core.config import get_settings
+    from app.core.security import is_admin
+
+    monkeypatch.setattr(get_settings(), "admin_api_key", "s3cret-key-value", raising=False)
+
+    class _Req:
+        def __init__(self, headers: dict[str, str]) -> None:
+            self.headers = Headers(headers)
+
+    assert is_admin(_Req({"X-API-Key": "s3cret-key-value"})) is True
+    assert is_admin(_Req({"X-API-Key": "s3cret-key-valuX"})) is False
+    assert is_admin(_Req({"X-API-Key": ""})) is False
+    assert is_admin(_Req({})) is False

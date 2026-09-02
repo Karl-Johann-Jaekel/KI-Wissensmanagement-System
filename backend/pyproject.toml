@@ -17,6 +17,10 @@ dependencies = [
     # Fremdquellen-Dumps liegen als Parquet vor (Papers with Code auf
     # Hugging Face, ADR-0017) — ohne Reader kein Import.
     "pyarrow>=17.0",
+    # XML aus dem Netz (arXiv-Atom, OAI-PMH, GROBID-TEI). Die Stdlib ist gegen
+    # Entity-Expansion nicht gehärtet: eine kleine Antwort kann den Parser zu
+    # Gigabytes aufblähen. Gleiche Schnittstelle, deshalb nur der Import wechselt.
+    "defusedxml>=0.7",
 ]
 
 [project.optional-dependencies]

@@ -16,7 +16,7 @@ Zwei Eigenheiten des Protokolls, die man kennen muss:
 from __future__ import annotations
 
 import time
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from collections.abc import Callable, Iterator
 
 import httpx

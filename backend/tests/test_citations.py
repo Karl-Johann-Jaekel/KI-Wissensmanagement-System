@@ -88,3 +88,46 @@ def test_refresh_stores_metrics_on_document(db_session: Session) -> None:
     assert f"arXiv:{arxiv_id}" in asked
     doc = db_session.execute(select(Document).where(Document.title == "Cited Paper")).scalar_one()
     assert doc.meta["citations"]["citations"] == 42
+
+
+def test_refresh_reads_paper_nodes_in_one_query(db_session: Session, monkeypatch) -> None:
+    """Vorher lief je Dokument ein SELECT auf graph_nodes.name — ohne Index.
+
+    Der Test zaehlt die Abfragen auf graph_nodes: mehr als eine bedeutet, dass
+    das N+1 zurueck ist.
+    """
+    from sqlalchemy import event
+
+    from app.corpus.citations import refresh_citations
+    from app.db.graph import upsert_node
+    from app.db.models import Document
+
+    for i in range(3):
+        doc = Document(
+            source_type="arxiv_pdf",
+            title=f"Zitationspaper {i}",
+            content_hash=f"cit-n1-{i}",
+            meta={"id": f"2601.0000{i}"},
+        )
+        db_session.add(doc)
+        upsert_node(db_session, "paper", f"Zitationspaper {i}")
+    db_session.commit()
+
+    monkeypatch.setattr(
+        "app.corpus.citations.fetch_citation_metrics",
+        lambda ids, client=None: {i: {"citations": 5} for i in ids},
+    )
+
+    abfragen: list[str] = []
+
+    def _zaehlen(conn, cursor, statement, params, context, executemany):  # noqa: ANN001
+        if "graph_nodes" in statement and statement.lstrip().upper().startswith("SELECT"):
+            abfragen.append(statement)
+
+    event.listen(db_session.get_bind(), "before_cursor_execute", _zaehlen)
+    try:
+        refresh_citations(db_session)
+    finally:
+        event.remove(db_session.get_bind(), "before_cursor_execute", _zaehlen)
+
+    assert len(abfragen) == 1, f"{len(abfragen)} Abfragen auf graph_nodes statt einer"

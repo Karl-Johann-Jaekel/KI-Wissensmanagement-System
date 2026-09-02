@@ -110,6 +110,17 @@ def refresh_citations(
         return 0, 0
 
     metrics = fetch_citation_metrics([a for _d, a in pairs], client=client)
+
+    # Paper-Knoten in *einer* Abfrage holen. Vorher lief je Dokument ein eigenes
+    # SELECT auf ``graph_nodes.name`` — ein Praedikat ohne Index, mal 56 Dokumente.
+    titles = [d.title for d, _a in pairs]
+    nodes_by_title = {
+        n.name: n
+        for n in session.execute(
+            select(GraphNode).where(GraphNode.kind == "paper", GraphNode.name.in_(titles))
+        ).scalars()
+    }
+
     updated = 0
     for doc, arxiv_id in pairs:
         m = metrics.get(arxiv_id)
@@ -118,9 +129,7 @@ def refresh_citations(
         doc.meta = {**(doc.meta or {}), "citations": dict(m)}
         attributes.flag_modified(doc, "meta")
         # Auf den Paper-Knoten spiegeln, damit /graph die Zahl ohne Join ausliefert.
-        node = session.execute(
-            select(GraphNode).where(GraphNode.kind == "paper", GraphNode.name == doc.title)
-        ).scalar_one_or_none()
+        node = nodes_by_title.get(doc.title)
         if node is not None:
             node.meta = {**(node.meta or {}), "citations": dict(m)}
             attributes.flag_modified(node, "meta")

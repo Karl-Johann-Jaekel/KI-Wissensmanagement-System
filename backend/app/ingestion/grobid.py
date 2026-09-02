@@ -20,7 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path

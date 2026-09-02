@@ -22,7 +22,12 @@ class Settings(BaseSettings):
     # Comma-separated allowed CORS origins (frontend dev servers).
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
-    # Database
+    # Database. Der Pool muss zu Starlettes Threadpool passen (siehe db/session.py):
+    # 40 Threads gegen 15 Verbindungen hiess, dass gleichzeitige Chats aufeinander
+    # warten, ohne dass es irgendwo auffaellt.
+    db_pool_size: int = 20
+    db_max_overflow: int = 20
+    db_pool_timeout_s: float = 10.0
     postgres_user: str = "kwms"
     postgres_password: str = "kwms"
     postgres_db: str = "kwms"

@@ -15,6 +15,7 @@ synchron sind und damit im Threadpool nebenlaeufig zaehlen.
 
 from __future__ import annotations
 
+import secrets
 import threading
 import time
 from collections import defaultdict, deque
@@ -131,8 +132,18 @@ def rate_limit(request: Request) -> None:
 
 
 def is_admin(request: Request) -> bool:
-    """True if the request carries the admin API key (X-API-Key header)."""
-    return request.headers.get("X-API-Key") == get_settings().admin_api_key
+    """True if the request carries the admin API key (X-API-Key header).
+
+    ``compare_digest`` statt ``==``: ein Vergleich, der beim ersten
+    abweichenden Zeichen abbricht, verrät über die Laufzeit, wie viele Zeichen
+    stimmten. Über viele Versuche lässt sich ein Schlüssel so zeichenweise
+    erraten. Der Unterschied ist winzig und über das Netz schwer messbar — aber
+    er kostet nichts.
+    """
+    provided = request.headers.get("X-API-Key")
+    if not provided:
+        return False
+    return secrets.compare_digest(provided, get_settings().admin_api_key)
 
 
 def require_admin(request: Request) -> None:

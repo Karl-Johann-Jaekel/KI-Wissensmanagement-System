@@ -13,7 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from datetime import date, datetime
 from pathlib import Path
 
