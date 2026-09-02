@@ -72,7 +72,7 @@ def evaluate_citations(session, golden: list[dict], *, top_k: int) -> dict:
     try:
         from eval.citations import check_citations
     except ModuleNotFoundError:  # pragma: no cover — nur beim direkten Skriptaufruf
-        from citations import check_citations
+        from citations import check_citations  # type: ignore[no-redef]
 
     zitate = gedeckt = 0
     erfunden: list[str] = []
