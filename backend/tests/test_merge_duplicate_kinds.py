@@ -103,3 +103,46 @@ def test_papers_are_never_merged(db_session: Session) -> None:
     upsert_node(db_session, "concept", "Attention Is All You Need")
     db_session.commit()
     assert merge.plan_merges(db_session) == []
+
+
+def test_edge_evidence_survives_the_merge(db_session: Session) -> None:
+    """Belege am Kanten-Tripel blockieren das Umschreiben der Kante.
+
+    ``fk_entities_extracted_edge`` verweist auf (source, target, relation) und hat
+    kein ON UPDATE CASCADE. Ein direktes UPDATE der Kante scheitert deshalb, sobald
+    ein Beleg daran haengt — genau so ist das Skript beim ersten Lauf gegen die
+    Produktionsdaten abgebrochen. Der lokale Test hatte nur Knoten-Belege und lief
+    durch.
+    """
+    _reset(db_session)
+    d1, d2 = _doc(db_session, "e1"), _doc(db_session, "e2")
+    paper = upsert_node(db_session, "paper", "Ein Paper")
+    winner = upsert_node(db_session, "model", "BERT")
+    loser = upsert_node(db_session, "concept", "BERT")
+    record_extraction(db_session, Claim(node_id=winner), extractor="t", document_id=d1)
+    record_extraction(db_session, Claim(node_id=winner), extractor="t", document_id=d2)
+    record_extraction(db_session, Claim(node_id=loser), extractor="t", document_id=d1)
+
+    upsert_edge(db_session, paper, loser, "USES")
+    record_extraction(
+        db_session, Claim(edge=(paper, loser, "USES")), extractor="t", document_id=d1
+    )
+    db_session.commit()
+
+    plan = next(p for p in merge.plan_merges(db_session) if p.winner.name == "BERT")
+    merge.apply_merge(db_session, plan)
+    db_session.commit()
+
+    # Die Kante zeigt auf den Zielknoten …
+    edge = db_session.execute(select(GraphEdge)).scalars().one()
+    assert (str(edge.source), str(edge.target), edge.relation) == (paper, winner, "USES")
+    # … und ihr Beleg ist mitgewandert, statt per Cascade verlorenzugehen.
+    belege = (
+        db_session.execute(
+            select(EntityExtraction).where(EntityExtraction.edge_relation == "USES")
+        )
+        .scalars()
+        .all()
+    )
+    assert len(belege) == 1
+    assert str(belege[0].edge_target) == winner

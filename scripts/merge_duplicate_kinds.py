@@ -33,6 +33,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, attributes
 
 from app.corpus.aliases import canonical_key
+from app.db.graph import upsert_edge
 from app.db.models import EntityExtraction, GraphEdge, GraphNode
 from app.db.session import SessionLocal
 
@@ -100,14 +101,6 @@ def apply_merge(session: Session, plan: MergePlan) -> tuple[int, int]:
     moved_edges = moved_evidence = 0
 
     for loser in plan.losers:
-        existing = {
-            (str(e.source), str(e.target), e.relation)
-            for e in session.execute(
-                select(GraphEdge).where(
-                    (GraphEdge.source == winner_id) | (GraphEdge.target == winner_id)
-                )
-            ).scalars()
-        }
         incident = (
             session.execute(
                 select(GraphEdge).where(
@@ -120,19 +113,62 @@ def apply_merge(session: Session, plan: MergePlan) -> tuple[int, int]:
         for edge in incident:
             new_source = winner_id if edge.source == loser.id else edge.source
             new_target = winner_id if edge.target == loser.id else edge.target
-            # Schleife auf sich selbst oder bereits vorhandene Kante: die alte faellt
-            # weg, statt den Primaerschluessel zu verletzen.
-            key = (str(new_source), str(new_target), edge.relation)
-            if new_source == new_target or key in existing:
+            if new_source == new_target:
+                # Eine Kante auf sich selbst sagt nichts; ihre Belege gehen per
+                # ON DELETE CASCADE mit.
                 session.delete(edge)
                 continue
-            edge.source, edge.target = new_source, new_target
-            existing.add(key)
+
+            # `entities_extracted` verweist per Fremdschlüssel auf das Tripel
+            # (source, target, relation) — ohne ON UPDATE CASCADE. Die Kante
+            # umzuschreiben ist deshalb gesperrt, solange Belege daran hängen.
+            # Reihenfolge: Zielkante anlegen, Belege umhängen, alte Kante löschen.
+            upsert_edge(
+                session,
+                new_source,
+                new_target,
+                edge.relation,
+                weight=edge.weight,
+                meta=edge.meta or {},
+                status=edge.status,
+            )
+            session.flush()
+
+            old_claim = (edge.source, edge.target, edge.relation)
+            new_claim = (new_source, new_target, edge.relation)
+            existing = {
+                (r.document_id, r.source_id, r.extractor)
+                for r in session.execute(
+                    select(EntityExtraction).where(
+                        EntityExtraction.edge_source == new_source,
+                        EntityExtraction.edge_target == new_target,
+                        EntityExtraction.edge_relation == edge.relation,
+                    )
+                ).scalars()
+            }
+            for row in (
+                session.execute(
+                    select(EntityExtraction).where(
+                        EntityExtraction.edge_source == old_claim[0],
+                        EntityExtraction.edge_target == old_claim[1],
+                        EntityExtraction.edge_relation == old_claim[2],
+                    )
+                )
+                .scalars()
+                .all()
+            ):
+                key = (row.document_id, row.source_id, row.extractor)
+                if key in existing:
+                    session.delete(row)
+                    continue
+                row.edge_source, row.edge_target, row.edge_relation = new_claim
+                existing.add(key)
+                moved_evidence += 1
+            session.flush()
+            session.delete(edge)
+            session.flush()
             moved_edges += 1
 
-        # Belege des Zielknotens vorab erfassen: ``uq_entities_extracted_claim``
-        # verbietet zwei identische Belege. Ein Beleg, den der Zielknoten schon
-        # traegt, wird nicht umgehaengt, sondern faellt weg — er sagt nichts Neues.
         winner_claims = {
             (r.document_id, r.source_id, r.extractor)
             for r in session.execute(
@@ -155,6 +191,7 @@ def apply_merge(session: Session, plan: MergePlan) -> tuple[int, int]:
         loser.meta = {**(loser.meta or {}), "merged_into": str(winner_id)}
         attributes.flag_modified(loser, "meta")
         loser.status = "rejected"
+        session.flush()
 
     return moved_edges, moved_evidence
 
