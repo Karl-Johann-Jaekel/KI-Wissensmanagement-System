@@ -21,10 +21,18 @@ SYSTEM_PROMPT = (
 
 
 def build_context(hits: list[SearchHit]) -> str:
+    """Kontextblöcke, beschriftet **im geforderten Zitierformat**.
+
+    Vorher stand über jedem Block ``[Quelle 1] Titel — Abschnitt``, während der
+    System-Prompt ``[Titel, Abschnitt]`` verlangte. Modelle zitieren, was sie
+    sehen: die Belegtreue-Messung fand als häufigsten "erfundenen" Beleg schlicht
+    ``[Quelle 1]``. Steht die Beschriftung im Zielformat, ist Abschreiben bereits
+    die richtige Antwort.
+    """
     blocks = []
     for i, h in enumerate(hits, start=1):
-        section = h.heading or f"Chunk {i}"
-        blocks.append(f"[Quelle {i}] {h.title} — {section}\n{h.content}")
+        section = h.heading or f"Abschnitt {i}"
+        blocks.append(f"[{h.title}, {section}]\n{h.content}")
     return "\n\n".join(blocks)
 
 
