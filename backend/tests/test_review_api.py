@@ -139,3 +139,28 @@ def test_bulk_reject_and_unknown_ids(db_session: Session, client: TestClient) ->
 def test_bulk_requires_admin(client: TestClient) -> None:
     resp = client.post("/review/bulk", json={"ids": [], "action": "verify"})
     assert resp.status_code == 401
+
+
+def test_pending_list_is_paginated(db_session: Session, client: TestClient) -> None:
+    """Ohne Grenze lieferte die Ansicht jede pending-Zeile und lud dazu *alle*
+    Kanten — bei 25.000 Kanten je Aufruf, um ein paar Dutzend Zeilen zu zeigen."""
+    from app.db.graph import upsert_node
+
+    db_session.execute(text("DELETE FROM graph_nodes"))
+    for i in range(7):
+        upsert_node(db_session, "concept", f"Wartend {i:02d}", status="pending")
+    db_session.commit()
+
+    app.dependency_overrides[get_db] = _override(db_session)
+    try:
+        kopf = {"X-API-Key": ADMIN_KEY}
+        erste = client.get("/review", params={"limit": 3}, headers=kopf).json()
+        zweite = client.get("/review", params={"limit": 3, "offset": 3}, headers=kopf).json()
+    finally:
+        app.dependency_overrides.clear()
+
+    assert len(erste["pending"]) == 3
+    assert erste["count"] == 3
+    assert erste["total"] == 7
+    # Zweite Seite zeigt andere Knoten.
+    assert {n["id"] for n in erste["pending"]}.isdisjoint({n["id"] for n in zweite["pending"]})

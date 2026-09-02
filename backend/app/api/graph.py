@@ -184,6 +184,7 @@ def get_graph(
 def changelog(
     response: Response,
     days: int = Query(default=7, ge=1, le=365),
+    limit: int = Query(default=200, ge=1, le=1000),
     db: Session = Depends(get_db),
 ) -> dict:
     """Verified knowledge-graph nodes first seen within the last `days` — "Neu"-Feed."""
@@ -198,6 +199,9 @@ def changelog(
                 GraphNode.first_seen >= since,
             )
             .order_by(GraphNode.first_seen.desc())
+            # 365 Tage mal ein PwC-Import sind Zehntausende Knoten — ungebremst
+            # wäre der "Neu"-Feed die teuerste Antwort der API.
+            .limit(limit)
         )
         .scalars()
         .all()

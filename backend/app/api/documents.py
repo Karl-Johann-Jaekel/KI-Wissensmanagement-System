@@ -36,9 +36,19 @@ UPLOAD_DIR = Path("data/uploads")
 MAX_MARKDOWN_BYTES = 2 * 1024 * 1024  # 2 MB
 
 
+#: Voreinstellung der Seitengröße. Großzügig, weil die Oberfläche die Liste am
+#: Stück zeigt — aber endlich, damit ein wachsender Korpus die Antwort nicht
+#: unbemerkt aufbläht.
+DEFAULT_PAGE = 200
+
+
 @router.get("/documents", dependencies=[Depends(rate_limit)])
-def list_documents(db: Session = Depends(get_db)) -> list[dict]:
-    """Alle Dokumente mit Chunk-Zahl. Öffentlich lesbar, aber gedrosselt."""
+def list_documents(
+    limit: int = Query(default=DEFAULT_PAGE, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    """Dokumente mit Chunk-Zahl, neueste zuerst. Öffentlich lesbar, gedrosselt."""
     stmt = (
         select(
             Document.id,
@@ -51,6 +61,8 @@ def list_documents(db: Session = Depends(get_db)) -> list[dict]:
         .join(Chunk, Chunk.document_id == Document.id, isouter=True)
         .group_by(Document.id)
         .order_by(Document.created_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
     return [
         {

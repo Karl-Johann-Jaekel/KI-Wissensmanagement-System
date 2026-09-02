@@ -11,9 +11,9 @@ from collections import defaultdict
 from datetime import UTC, datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, attributes
 
 from app.core.security import require_admin
@@ -26,10 +26,39 @@ MAX_BULK = 500
 
 
 @router.get("/review")
-def list_pending(db: Session = Depends(get_db)) -> dict:
+def list_pending(
+    limit: int = Query(default=200, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+) -> dict:
     """Pending entity nodes with their supporting-source count + confidence."""
-    nodes = db.execute(select(GraphNode).where(GraphNode.status == "pending")).scalars().all()
-    edges = db.execute(select(GraphEdge)).scalars().all()
+    nodes = (
+        db.execute(
+            select(GraphNode)
+            .where(GraphNode.status == "pending")
+            .order_by(GraphNode.first_seen.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        .scalars()
+        .all()
+    )
+    node_ids = [n.id for n in nodes]
+
+    # Nur die Kanten der angezeigten Knoten. Vorher lud diese Ansicht die
+    # komplette Kantentabelle — bei 25.000 Kanten je Aufruf, um ein paar
+    # Dutzend Zeilen zu zeigen.
+    edges = (
+        db.execute(
+            select(GraphEdge).where(
+                (GraphEdge.source.in_(node_ids)) | (GraphEdge.target.in_(node_ids))
+            )
+        )
+        .scalars()
+        .all()
+        if node_ids
+        else []
+    )
 
     incident: dict = defaultdict(list)
     for e in edges:
@@ -55,7 +84,12 @@ def list_pending(db: Session = Depends(get_db)) -> dict:
             }
         )
     items.sort(key=lambda i: (i["sources"], i["confidence"]), reverse=True)
-    return {"pending": items, "count": len(items)}
+    gesamt = db.execute(
+        select(func.count()).select_from(GraphNode).where(GraphNode.status == "pending")
+    ).scalar_one()
+    # ``count`` bleibt die Zahl der gelieferten Zeilen (unveränderter Vertrag),
+    # ``total`` sagt, wie viele es insgesamt gibt.
+    return {"pending": items, "count": len(items), "total": gesamt}
 
 
 def _verify_nodes(db: Session, nodes: list[GraphNode]) -> int:
