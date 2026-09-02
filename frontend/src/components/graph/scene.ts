@@ -9,6 +9,7 @@
 import type { Project } from '../../lib/storage'
 import type { Theme } from '../../lib/theme'
 import { endpointId, KIND_COLORS, type GraphData, type GraphNode, type NodeKind } from '../../types'
+import type { ForceGraphMethods, LinkObject, NodeObject } from 'react-force-graph-2d'
 
 export type SceneKind = NodeKind | 'system' | 'project' | 'service'
 export type GroupMode = 'kind' | 'cluster'
@@ -128,6 +129,15 @@ export interface SceneNode {
   /** Phasenversatz, damit Knoten nicht im Gleichtakt driften. */
   phase?: number
 }
+
+/**
+ * Die imperative force-graph-Instanz.
+ *
+ * ``react-force-graph-2d`` bringt den Typ selbst mit; er stand hier zweimal als
+ * ``any`` in einer sonst strikt typisierten Codebasis. Als Alias an einer Stelle
+ * bleibt er beim Bibliothekswechsel nachziehbar.
+ */
+export type ForceGraphHandle = ForceGraphMethods<NodeObject<SceneNode>, LinkObject<SceneNode>>
 
 export interface SceneLink {
   source: string | SceneNode

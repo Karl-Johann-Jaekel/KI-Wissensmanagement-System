@@ -81,6 +81,9 @@ jobs:
       - name: Tests (vitest)
         run: npm test
 
+      - name: eslint
+        run: npm run lint
+
       - name: Typecheck + build
         run: npm run build
 

@@ -26,6 +26,7 @@ import {
   type SceneLink,
   type SceneNode,
   type Theme,
+  type ForceGraphHandle,
 } from './scene'
 import type { GraphSettings } from './settings'
 import { boundsOf, fitTransform } from './viewport'
@@ -49,7 +50,7 @@ interface Props {
   onNodeClick: (node: SceneNode) => void
   onBackgroundClick: () => void
   onHover?: (node: SceneNode | null) => void
-  onInstance?: (fg: unknown | null) => void
+  onInstance?: (fg: ForceGraphHandle | null) => void
   /** Rotation und Drift anhalten (z. B. während ein Knoten ausgewählt ist). */
   paused?: boolean
   /**
@@ -130,7 +131,7 @@ export default function GraphCanvas({
   paused = false,
   rotationOffsetRef,
 }: Props) {
-  const fgRef = useRef<any>(null)
+  const fgRef = useRef<ForceGraphHandle | undefined>(undefined)
   const hoverRef = useRef<string | null>(null)
   const targetsRef = useRef<Map<string, Target>>(new Map())
   const rotationRef = useRef(0)
@@ -241,7 +242,7 @@ export default function GraphCanvas({
   }, [focus, scene])
 
   useEffect(() => {
-    onInstance?.(fgRef.current)
+    onInstance?.(fgRef.current ?? null)
     return () => onInstance?.(null)
   }, [onInstance])
 

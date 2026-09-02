@@ -5,12 +5,12 @@
  */
 import { useCallback, useEffect, useRef, type MutableRefObject } from 'react'
 import { FALLBACK_COLOR } from '../../types'
-import type { Scene, Theme } from './scene'
+import type { ForceGraphHandle, Scene, Theme } from './scene'
 
 interface Props {
   scene: Scene
   /** force-graph-Instanz (screen2GraphCoords, centerAt). */
-  fg: any
+  fg: ForceGraphHandle | null
   /** Größe des Graph-Canvas — für die Ausschnitt-Berechnung. */
   graphWidth: number
   graphHeight: number

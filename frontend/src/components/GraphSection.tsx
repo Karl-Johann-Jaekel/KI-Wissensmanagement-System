@@ -20,6 +20,7 @@ import {
   EMPTY_SCENE,
   searchMatches,
   type SceneNode,
+  type ForceGraphHandle,
 } from './graph/scene'
 import { loadPrefs, savePrefs, type GraphPrefs, type GraphSettings } from './graph/settings'
 
@@ -42,7 +43,7 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [query, setQuery] = useState('')
   const [focus, setFocus] = useState<{ id: string; nonce: number } | null>(null)
-  const [fg, setFg] = useState<unknown>(null)
+  const [fg, setFg] = useState<ForceGraphHandle | null>(null)
   const { ref, width, height } = useElementSize<HTMLDivElement>()
   // Das Menü liegt als Überlagerung auf dem Canvas. Steht es rechts — der
   // Standard, und dort bleibt es, solange niemand es wegzieht —, muss die

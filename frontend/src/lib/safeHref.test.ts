@@ -8,7 +8,6 @@ describe('safeHref', () => {
   })
 
   it('blockt ausführbare Schemata aus Fremddaten', () => {
-    // eslint-disable-next-line no-script-url
     expect(safeHref('javascript:alert(1)')).toBeUndefined()
     expect(safeHref('JavaScript:alert(1)')).toBeUndefined()
     expect(safeHref('data:text/html,<script>alert(1)</script>')).toBeUndefined()
