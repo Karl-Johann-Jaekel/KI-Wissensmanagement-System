@@ -51,9 +51,7 @@ def entfernen(session: Session, nodes: list[GraphNode]) -> tuple[int, int]:
         return 0, 0
     kanten = (
         session.execute(
-            select(GraphEdge).where(
-                (GraphEdge.source.in_(ids)) | (GraphEdge.target.in_(ids))
-            )
+            select(GraphEdge).where((GraphEdge.source.in_(ids)) | (GraphEdge.target.in_(ids)))
         )
         .scalars()
         .all()
@@ -85,9 +83,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     with SessionLocal() as session:
-        alle = session.execute(
-            select(GraphNode).where(GraphNode.kind == "repo")
-        ).scalars().all()
+        alle = session.execute(select(GraphNode).where(GraphNode.kind == "repo")).scalars().all()
         ohne_zahl = sum(1 for n in alle if (n.meta or {}).get("stars") is None)
         treffer = auswahl(session, min_stars=args.min_stars, drop_unknown=args.drop_unknown)
         bleiben = len(alle) - len(treffer)

@@ -99,12 +99,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     with SessionLocal() as session:
-        nodes = (
-            session.execute(select(GraphNode).where(GraphNode.kind == "repo")).scalars().all()
-        )
-        offen = [
-            n for n in nodes if args.refresh or META_STARS not in (n.meta or {})
-        ]
+        nodes = session.execute(select(GraphNode).where(GraphNode.kind == "repo")).scalars().all()
+        offen = [n for n in nodes if args.refresh or META_STARS not in (n.meta or {})]
         if args.limit:
             offen = offen[: args.limit]
         print(f"{len(offen)} von {len(nodes)} Repos abzufragen")
