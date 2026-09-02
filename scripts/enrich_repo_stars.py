@@ -29,7 +29,7 @@ from urllib.parse import urlparse
 
 import httpx
 from sqlalchemy import select
-from sqlalchemy.orm import Session, attributes
+from sqlalchemy.orm import attributes
 
 from app.db.models import GraphNode
 from app.db.session import SessionLocal
@@ -140,7 +140,8 @@ def main(argv: list[str] | None = None) -> int:
                     else:
                         gefunden += 1
                 session.commit()
-                print(f"  {start + len(stapel):>5}/{len(offen)}  gefunden {gefunden}, ohne Antwort {fehlend}")
+                fortschritt = f"{start + len(stapel):>5}/{len(offen)}"
+                print(f"  {fortschritt}  gefunden {gefunden}, ohne Antwort {fehlend}")
         finally:
             client.close()
 
