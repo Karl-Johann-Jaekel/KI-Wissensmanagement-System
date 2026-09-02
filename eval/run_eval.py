@@ -1,9 +1,14 @@
 """Golden-set retrieval eval (PLAN §7 Phase 4 DoD: Hit-Rate@5 >= 0.8, latency < 2s).
 
     python eval/run_eval.py [--golden eval/golden.yaml] [--top-k 5] [--with-rerank]
+    python eval/run_eval.py --with-citations     # zusaetzlich Belegtreue messen
 
 Reports Hit-Rate@k and latency percentiles, with and (optionally) without the
 reranker. A hit = the expected paper's arXiv id appears among the top-k results.
+
+``--with-citations`` misst zusaetzlich, ob die *erzeugten Antworten* ihre Quellen
+korrekt belegen (R3). Das kostet je Frage einen Modellaufruf und ist deshalb
+zuschaltbar — der woechentliche Update-Lauf bleibt beim reinen Retrieval.
 """
 
 from __future__ import annotations
@@ -19,6 +24,7 @@ from sqlalchemy import select
 from app.db.models import Document
 from app.db.session import SessionLocal
 from app.retrieval.search import hybrid_search
+from eval.citations import check_citations
 
 
 def _arxiv_map(session) -> dict[str, str | None]:
@@ -51,6 +57,34 @@ def evaluate(session, golden: list[dict], *, top_k: int, rerank: bool) -> dict:
     }
 
 
+def evaluate_citations(session, golden: list[dict], *, top_k: int) -> dict:
+    """Belegtreue der erzeugten Antworten (R3).
+
+    Erzeugt je Golden-Frage eine Antwort und prueft mechanisch, ob deren Zitate
+    auf die Quellen zeigen, die im Kontext lagen. Kein zweites Modell als
+    Schiedsrichter — das findet keine inhaltlich falschen Aussagen, aber
+    erfundene Quellen, und das ist der Fehler, der am teuersten ist.
+    """
+    from app.generation.generate import prepare_answer
+
+    zitate = gedeckt = 0
+    erfunden: list[str] = []
+    for item in golden:
+        plan = prepare_answer(session, item["question"], top_k=top_k, rerank=False)
+        antwort = plan.client.chat(plan.messages)
+        pruefung = check_citations(antwort, [h.title for h in plan.hits])
+        zitate += pruefung.total
+        gedeckt += pruefung.grounded
+        erfunden.extend(pruefung.invented)
+
+    return {
+        "citations": zitate,
+        "grounded": gedeckt,
+        "citation_rate": gedeckt / zitate if zitate else 1.0,
+        "invented": sorted(set(erfunden))[:10],
+    }
+
+
 def _print(label: str, r: dict) -> None:
     print(f"\n[{label}]  Hit-Rate@k = {r['hit_rate']:.2f}  ({r['hits']}/{r['n']})")
     print(f"  latency  p50={r['latency_p50'] * 1000:.0f}ms  p95={r['latency_p95'] * 1000:.0f}ms")
@@ -63,6 +97,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--golden", default="eval/golden.yaml")
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--with-rerank", action="store_true")
+    parser.add_argument(
+        "--with-citations",
+        action="store_true",
+        help="Belegtreue der Antworten messen (ein Modellaufruf je Frage)",
+    )
     args = parser.parse_args(argv)
 
     golden = yaml.safe_load(Path(args.golden).read_text(encoding="utf-8"))
@@ -72,6 +111,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.with_rerank:
             reranked = evaluate(session, golden, top_k=args.top_k, rerank=True)
             _print("with rerank", reranked)
+        if args.with_citations:
+            cit = evaluate_citations(session, golden, top_k=args.top_k)
+            zeile = (
+                f"\n[Belegtreue]  {cit['citation_rate']:.2f}  "
+                f"({cit['grounded']}/{cit['citations']} Zitate gedeckt)"
+            )
+            print(zeile)
+            for quelle in cit["invented"]:
+                print(f"  erfunden: {quelle}")
 
     ok = base["hit_rate"] >= 0.8
     print(f"\nDoD Hit-Rate@{args.top_k} >= 0.80: {'PASS' if ok else 'FAIL'}")
