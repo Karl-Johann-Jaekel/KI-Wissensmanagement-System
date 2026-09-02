@@ -1,19 +1,22 @@
-import React from 'react'
+import React, { lazy, Suspense } from 'react'
 import ReactDOM from 'react-dom/client'
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
 import AppShell from './app/AppShell'
 import ErrorBoundary from './components/ErrorBoundary'
 import { ToastProvider } from './components/ui/Toast'
 import { applyTheme } from './lib/theme'
-import ChatPage from './pages/ChatPage'
-import DocumentPage from './pages/DocumentPage'
 import InboxPage from './pages/InboxPage'
-import ProjektDetailPage from './pages/ProjektDetailPage'
-import ProjektePage from './pages/ProjektePage'
 import SearchPage from './pages/SearchPage'
 import SkillsPage from './pages/SkillsPage'
-import WissenPage from './pages/WissenPage'
 import './index.css'
+
+// Faul geladen: diese Seiten ziehen die Graph-Engine bzw. den Markdown-Renderer
+// nach. Der Einstieg ist die Inbox — wer dort bleibt, lädt beides nie.
+const ChatPage = lazy(() => import('./pages/ChatPage'))
+const WissenPage = lazy(() => import('./pages/WissenPage'))
+const DocumentPage = lazy(() => import('./pages/DocumentPage'))
+const ProjektePage = lazy(() => import('./pages/ProjektePage'))
+const ProjektDetailPage = lazy(() => import('./pages/ProjektDetailPage'))
 
 applyTheme()
 
@@ -49,7 +52,9 @@ const router = createBrowserRouter([
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ToastProvider>
-      <RouterProvider router={router} />
+      <Suspense fallback={<div className="p-6 text-sm text-muted">Lade …</div>}>
+        <RouterProvider router={router} />
+      </Suspense>
     </ToastProvider>
   </React.StrictMode>,
 )

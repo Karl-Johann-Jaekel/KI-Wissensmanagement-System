@@ -7,6 +7,21 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: { host: true, port: 5173 },
+  build: {
+    rollupOptions: {
+      output: {
+        // Die Graph-Engine (react-force-graph + d3) und der Markdown-Renderer
+        // machen den Großteil des Bündels aus, werden aber nur auf je einer
+        // Seite gebraucht. Als eigene Chunks lädt sie, wer sie braucht — und
+        // sie bleiben über Deploys hinweg im Browser-Cache, weil sie sich
+        // seltener ändern als der Anwendungscode.
+        manualChunks: {
+          graph: ['react-force-graph-2d'],
+          markdown: ['react-markdown', 'remark-gfm'],
+        },
+      },
+    },
+  },
   test: {
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
