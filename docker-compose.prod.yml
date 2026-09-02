@@ -5,12 +5,16 @@
 # - backend: kein --reload, keine Source-Bind-Mounts, kein Host-Port
 #   (nur intern via Caddy erreichbar); data/ bleibt gemountet.
 #
-# ACHTUNG `!reset`: Compose führt Listen aus mehreren Dateien **zusammen**. Eine
-# leere Liste entfernt deshalb nichts — `ports: []` und ein gekürzter
-# volumes-Block ließen die Host-Ports und den Quellcode-Mount aus
-# docker-compose.yml unangetastet. Nachgemessen mit Compose 5.1.4: ohne `!reset`
-# stand in der aufgelösten Konfiguration weiterhin `published: "8000"` und
-# `target: /app`. Diese Datei härtete also nicht, was sie zu härten versprach.
+# ACHTUNG, zwei verschiedene Tags: Compose führt Listen aus mehreren Dateien
+# **zusammen**. Eine leere Liste entfernt deshalb nichts — `ports: []` und ein
+# gekürzter volumes-Block ließen die Host-Ports und den Quellcode-Mount aus
+# docker-compose.yml unangetastet (nachgemessen mit Compose 5.1.4: dort stand
+# weiterhin `published: "8000"` und `target: /app`).
+#
+# `!reset` leert einen Wert — richtig für `ports`, aber **falsch für eine Liste,
+# die man ersetzen will**: `volumes: !reset [...]` verwirft auch die eigenen
+# Einträge. Das ist in Produktion passiert, der Container lief danach ganz ohne
+# Mounts. Zum Ersetzen gehört `!override`.
 # - postgres: kein Host-Port (nur Compose-Netz).
 # - backend vertraut dem X-Forwarded-For aus dem Compose-Netz. uvicorn wertet
 #   den Header zwar von sich aus aus, aber nur von 127.0.0.1 — Caddy ist ein
@@ -24,7 +28,7 @@ services:
       uvicorn app.main:app --host 0.0.0.0 --port 8000
       --proxy-headers --forwarded-allow-ips=${FORWARDED_ALLOW_IPS:-172.16.0.0/12}
     ports: !reset []
-    volumes: !reset
+    volumes: !override
       - ./data:/app/data
       - ./demo-data:/app/demo-data:ro
       - ./scripts:/app/scripts:ro
