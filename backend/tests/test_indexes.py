@@ -28,12 +28,21 @@ def test_hot_path_index_exists(db_session: Session, index: str, table: str) -> N
     assert found == table, f"Index {index} auf {table} fehlt — Migration 0006 gelaufen?"
 
 
-def test_document_chunks_use_the_index(db_session: Session) -> None:
-    """Der Cascade beim Löschen eines Dokuments hing an genau dieser Abfrage."""
+def test_document_chunks_can_use_the_index(db_session: Session) -> None:
+    """Der Index muss für dieses Prädikat *benutzbar* sein.
+
+    Der Cascade beim Löschen eines Dokuments hängt an genau dieser Abfrage. Ob
+    der Planer den Index auch wählt, entscheidet die Tabellengröße — auf einer
+    leeren Testdatenbank gewinnt der Seq Scan, auf dem Bestand der Index. Der
+    Test darf deshalb nicht die Kostenschätzung prüfen, sondern nur, dass der
+    Index den Zugriff tragen kann.
+    """
+    db_session.execute(text("SET LOCAL enable_seqscan = off"))
     plan = db_session.execute(
         text(
             "EXPLAIN SELECT count(*) FROM chunks "
             "WHERE document_id = '00000000-0000-0000-0000-000000000000'"
         )
     ).scalars()
-    assert "idx_chunks_document_id" in "\n".join(plan)
+    assert "idx_chunks_document_id" in "
+".join(plan)
