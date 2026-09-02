@@ -120,20 +120,25 @@ Erwartet: `0006_hot_path_indexes (head)`. Die Indizes entstehen mit
 
 ## 6. Deploy
 
-Achtung: `./backend:/app` ist auch in Produktion gemountet (Compose führt
-volumes-Listen zusammen; erst `!reset` entfernt sie — im Repo mit diesem Rollout
-korrigiert). Der neue Code liegt nach `git merge` also bereits im Container, der
-laufende uvicorn hält aber den alten. **Ein `restart` des Backends ist deshalb
-nötig; das Backend-Image neu zu bauen dagegen nur bei geänderten Abhängigkeiten** —
-es ist rund 10 GB groß.
+Produktion läuft aus dem **Image**, nicht aus einem Quellcode-Mount. Beide
+Images gehören also gebaut, und der Container muss neu erstellt werden — ein
+`restart` allein lädt den neuen Code nicht.
+
+Das war zeitweise anders: `docker-compose.prod.yml` entfernte den Mount aus
+`docker-compose.yml` nicht (Compose führt Listen zusammen), und der
+versehentlich gebliebene Mount trug den Code. Dabei veraltete das Image
+unbemerkt — als der Mount korrekt entfiel, fiel Produktion auf einen Stand vom
+Vortag zurück. Seitdem gilt: bauen, nicht nur neu starten.
 
 ```bash
-$PROD build caddy          # traegt Frontend-Aenderungen und den Caddyfile
-$PROD up -d --no-build caddy backend
-$PROD restart backend      # laedt den neuen Code aus dem Mount
+$PROD build backend caddy
+$PROD up -d --no-build backend caddy
 $PROD ps
 $PROD logs backend --tail 30
 ```
+
+Der Backend-Build ist trotz ~10 GB Image schnell, solange sich die
+Abhängigkeiten nicht ändern — nur die letzte `COPY`-Schicht wird neu gelegt.
 
 Im Log muss die Startzeile stehen:
 
@@ -143,6 +148,21 @@ INFO  app.main: kwms <version> gestartet (env=production, embed=mistral/..., wri
 
 **Abbruch, wenn** stattdessen `IndexModelMismatch` erscheint — dann passt der Index
 nicht, und Schritt 4 hätte das gemeldet.
+
+---
+
+## 6b. Tests gegen eine Kopie (optional, empfohlen bei Backend-Änderungen)
+
+Nie gegen die Produktionsdatenbank testen. Eine Wegwerf-Datenbank kostet nichts:
+
+```bash
+$PROD exec -T postgres psql -U kwms -d postgres -c 'CREATE DATABASE kwms_ci;'
+$PROD exec -T -e POSTGRES_DB=kwms_ci backend sh -c   'alembic upgrade head && ruff check . && ruff format --check . && mypy app && pytest -q'
+$PROD exec -T postgres psql -U kwms -d postgres -c 'DROP DATABASE kwms_ci;'
+```
+
+`POSTGRES_DB` umzubiegen genügt — die Zugangsdaten kommen wie sonst aus der
+Umgebung, es braucht kein Passwort in der Befehlszeile.
 
 ---
 
