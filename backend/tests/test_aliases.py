@@ -84,3 +84,57 @@ def test_single_entity_survives_splitting() -> None:
     assert split_entities("Retrieval-Augmented Generation") == ["Retrieval-Augmented Generation"]
     # Bindestriche und Schrägstriche gehören zum Begriff, nicht zur Aufzählung.
     assert split_entities("encoder/decoder") == ["encoder/decoder"]
+
+
+# ------------------------------------------------- Mengenangaben filtern (C)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "PAPER",  # Platzhalter aus dem Extraktionsprompt
+        "concept",  # Feldname daneben
+        "four benchmark datasets",
+        "six common datasets",
+        "seven public benchmarks",
+        "standard retrieval benchmarks",
+        "compositional benchmarks",
+        "reasoning benchmarks",
+        "multi-hop benchmarks",
+        "single-hop datasets",
+        "future research directions",
+        "quality of the generation",
+        "evaluation of RAG pipelines",
+    ],
+)
+def test_quantity_phrases_are_not_entities(name: str) -> None:
+    """Aus "wir evaluieren auf vier Benchmark-Datensaetzen" wurde ein Knoten.
+
+    Solche Knoten tragen nichts, verbinden nichts und standen trotzdem im
+    oeffentlichen Graphen. Sie wurden dort einmal geloescht — ohne diesen Filter
+    waechst dieselbe Sorte beim naechsten Lauf nach.
+    """
+    assert not is_plausible_entity(name)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "STS Benchmark",
+        "MFN Dataset",
+        "PSG Dataset",
+        "Standard DR-AGG",
+        "generalization gap",
+        "BERT",
+        "Retrieval-Augmented Generation",
+        "Dense Passage Retrieval",
+        "HotpotQA",
+        "ImageNet",
+        "Natural Questions",
+        "Open Images Dataset",
+    ],
+)
+def test_real_names_survive_the_filter(name: str) -> None:
+    """Zurueckhaltung ist Absicht: lieber eine Mengenangabe durchlassen als einen
+    Eigennamen verwerfen. Diese Namen stehen so im echten Graphen."""
+    assert is_plausible_entity(name)

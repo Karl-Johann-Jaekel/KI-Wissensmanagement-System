@@ -150,8 +150,56 @@ def split_entities(raw: str) -> list[str]:
     return [p for p in parts if p]
 
 
+#: Gattungswörter, die allein nie ein Begriff sind — "PAPER" ist der Platzhalter
+#: aus dem Extraktionsprompt, "concept" das Feld daneben.
+_BARE_CATEGORIES = {
+    "paper",
+    "concept",
+    "model",
+    "dataset",
+    "task",
+    "method",
+    "approach",
+    "framework",
+    "benchmark",
+    "baseline",
+}
+
+#: Endungen, an denen Mengenangaben erkennbar sind: "… datasets", "… benchmarks".
+_CATEGORY_PLURALS = (
+    "benchmarks",
+    "datasets",
+    "tasks",
+    "models",
+    "methods",
+    "baselines",
+    "approaches",
+    "frameworks",
+)
+
+#: Zahlwörter und vage Mengenangaben am Satzanfang.
+_QUANTIFIERS = {
+    "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+    "several", "multiple", "various", "numerous", "many", "all", "both", "other",
+}
+
+#: Themenfloskeln aus Abstracts — beschreiben den Aufsatz, nicht die Sache.
+_TOPIC_PHRASES = ("future research", "quality of", "evaluation of", "related work")
+
+
 def is_plausible_entity(name: str) -> bool:
-    """Filtert Satzfragmente heraus, die keine Begriffe sind."""
+    """Filtert heraus, was kein Begriff ist: Satzfragmente und Mengenangaben.
+
+    Mengenangaben sind der zweithäufigste Müll nach den Prosa-Fragmenten: aus
+    "wir evaluieren auf vier Benchmark-Datensätzen" wurde ein Knoten
+    "four benchmark datasets". Solche Knoten tragen nichts, verbinden nichts und
+    tauchten trotzdem im öffentlichen Graphen auf.
+
+    Bewusst zurückhaltend: lieber eine Mengenangabe durchlassen als einen echten
+    Eigennamen verwerfen. "STS Benchmark", "MFN Dataset" und "Standard DR-AGG"
+    müssen überleben — deshalb greift die Kleinschreibungs-Regel nur, wenn im
+    ganzen Namen kein Großbuchstabe steht.
+    """
     cleaned = _flatten(name)
     if not cleaned or len(cleaned) < 2:
         return False
@@ -160,7 +208,25 @@ def is_plausible_entity(name: str) -> bool:
     words = cleaned.split(" ")
     if len(words) > MAX_ENTITY_WORDS:
         return False
-    return not _PROSE_MARKERS.intersection(words)
+    if _PROSE_MARKERS.intersection(words):
+        return False
+
+    lowered = cleaned.lower()
+    if lowered in _BARE_CATEGORIES:
+        return False
+    if any(lowered.startswith(phrase) for phrase in _TOPIC_PHRASES):
+        return False
+
+    ends_in_category = lowered.endswith(_CATEGORY_PLURALS)
+    if ends_in_category:
+        # "four benchmark datasets", "several public benchmarks"
+        if words[0].lower() in _QUANTIFIERS:
+            return False
+        # "reasoning benchmarks", "single-hop datasets" — durchgehend klein
+        # geschrieben, also kein Eigenname.
+        if name == name.lower():
+            return False
+    return True
 
 
 def canonical_key(name: str) -> str:
