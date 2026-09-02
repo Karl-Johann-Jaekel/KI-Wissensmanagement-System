@@ -166,11 +166,15 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
     [toggleGroup],
   )
 
+  // Nachschlagewerk über *alle* Knoten, nicht nur die sichtbaren: die
+  // Kurzerklärung nennt auch Gegenüber, die durch Detailtiefe oder Kappung
+  // gerade nicht gezeichnet werden.
+  const nodesById = useMemo(() => new Map(base.nodes.map((n) => [n.id, n])), [base])
+
   const members = useMemo(() => {
     if (!selected?.members) return []
-    const byId = new Map(base.nodes.map((n) => [n.id, n]))
-    return selected.members.map((id) => byId.get(id)).filter((n): n is SceneNode => !!n)
-  }, [selected, base])
+    return selected.members.map((id) => nodesById.get(id)).filter((n): n is SceneNode => !!n)
+  }, [selected, nodesById])
 
   return (
     <div className="flex h-full min-h-0">
@@ -266,6 +270,8 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
         <ReaderPanel
           node={selected}
           members={members}
+          links={scene.links}
+          nodesById={nodesById}
           onSelectNode={(n) => setSelected(n)}
           onClose={() => setSelected(null)}
         />

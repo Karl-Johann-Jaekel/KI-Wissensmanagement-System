@@ -15,13 +15,17 @@ import Spinner from '../ui/Spinner'
 import { LANDMARK_COLOR } from '../../types'
 import NodeChat from './NodeChat'
 import NodeExplainer from './NodeExplainer'
-import { TIER_LABELS, type SceneNode } from './scene'
+import { TIER_LABELS, type SceneLink, type SceneNode } from './scene'
 import { safeHref } from '../../lib/safeHref'
 
 interface Props {
   node: SceneNode
   /** Aufgelöste Mitglieder, wenn der Knoten ein kollabierter Hub ist. */
   members: SceneNode[]
+  /** Kanten der Szene — daraus entstehen die Beziehungen in der Kurzerklärung. */
+  links: SceneLink[]
+  /** Nachschlagewerk für die Gegenüber der Kanten. */
+  nodesById: Map<string, SceneNode>
   onSelectNode: (node: SceneNode) => void
   onClose: () => void
 }
@@ -29,7 +33,14 @@ interface Props {
 /** Lange Dokumente werden im Panel gekürzt — der Rest liegt eine Seite weiter. */
 const PREVIEW_CHARS = 6000
 
-export default function ReaderPanel({ node, members, onSelectNode, onClose }: Props) {
+export default function ReaderPanel({
+  node,
+  members,
+  links,
+  nodesById,
+  onSelectNode,
+  onClose,
+}: Props) {
   const { theme } = useTheme()
   const meta = node.meta as {
     abstract?: string
@@ -149,7 +160,12 @@ export default function ReaderPanel({ node, members, onSelectNode, onClose }: Pr
         )}
 
         {meta.note && <p className="mb-3 text-sm text-muted">{meta.note}</p>}
-        <NodeExplainer node={node} />
+        <NodeExplainer
+          node={node}
+          links={links}
+          nodesById={nodesById}
+          onSelectNode={onSelectNode}
+        />
         <NodeChat node={node} />
 
         {meta.abstract && <p className="mb-3 text-sm text-muted">{meta.abstract}</p>}
