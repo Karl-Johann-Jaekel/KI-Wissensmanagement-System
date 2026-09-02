@@ -20,11 +20,11 @@ from __future__ import annotations
 import argparse
 import json
 import time
-import defusedxml.ElementTree as ET
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+import defusedxml.ElementTree as ET
 import httpx
 
 from app.core.config import get_settings

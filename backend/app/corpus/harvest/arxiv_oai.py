@@ -18,10 +18,10 @@ Dublin-Core-Felder und verliert die Struktur.
 
 from __future__ import annotations
 
-import defusedxml.ElementTree as ET
 from collections.abc import Callable, Iterator
 from datetime import UTC, date, datetime
 
+import defusedxml.ElementTree as ET
 import httpx
 
 from app.corpus.harvest.base import (
