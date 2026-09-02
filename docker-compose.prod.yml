@@ -3,7 +3,14 @@
 #
 # Härtungen gegenüber dem Dev-Setup:
 # - backend: kein --reload, keine Source-Bind-Mounts, kein Host-Port
-#   (nur intern via Caddy erreichbar); data/ bleibt gemountet (Uploads).
+#   (nur intern via Caddy erreichbar); data/ bleibt gemountet.
+#
+# ACHTUNG `!reset`: Compose führt Listen aus mehreren Dateien **zusammen**. Eine
+# leere Liste entfernt deshalb nichts — `ports: []` und ein gekürzter
+# volumes-Block ließen die Host-Ports und den Quellcode-Mount aus
+# docker-compose.yml unangetastet. Nachgemessen mit Compose 5.1.4: ohne `!reset`
+# stand in der aufgelösten Konfiguration weiterhin `published: "8000"` und
+# `target: /app`. Diese Datei härtete also nicht, was sie zu härten versprach.
 # - postgres: kein Host-Port (nur Compose-Netz).
 # - backend vertraut dem X-Forwarded-For aus dem Compose-Netz. uvicorn wertet
 #   den Header zwar von sich aus aus, aber nur von 127.0.0.1 — Caddy ist ein
@@ -16,12 +23,12 @@ services:
     command: >
       uvicorn app.main:app --host 0.0.0.0 --port 8000
       --proxy-headers --forwarded-allow-ips=${FORWARDED_ALLOW_IPS:-172.16.0.0/12}
-    ports: []
-    volumes:
+    ports: !reset []
+    volumes: !reset
       - ./data:/app/data
       - ./demo-data:/app/demo-data:ro
       - ./scripts:/app/scripts:ro
       - ./eval:/app/eval
 
   postgres:
-    ports: []
+    ports: !reset []

@@ -4,7 +4,7 @@ RAG-System über KI-Forschungsliteratur mit Zitationspflicht, dazu ein Wissens-G
 mit belegter Herkunft je Aussage und ein wiederkehrender Lauf, der beides aktuell hält.
 
 56 arXiv-Papers · 6.950 Chunks · 13.271 Graph-Knoten / 24.920 Kanten · 38.026 Belege
-· Hit-Rate@5 **0,94** · 239 Tests · 20 ADRs
+· Hit-Rate@5 **0,94** · 309 Tests · 24 ADRs
 
 ```
 Frage ──▶ Hybrid-Retrieval ──▶ Kontext ──▶ LLM ──▶ Antwort mit Quellenangabe
@@ -24,7 +24,7 @@ Frage ──▶ Hybrid-Retrieval ──▶ Kontext ──▶ LLM ──▶ Antwo
 | **Retrieval** | Hit-Rate@5 0,94 (15 von 16 Golden-Fragen, deutsch und englisch), p95 221 ms |
 | **Stack** | FastAPI · Postgres 16 + pgvector · SQLAlchemy/Alembic · Docling · GROBID · Mistral EU-API · React 18 + TypeScript + Tailwind · Docker · GitHub Actions |
 | **Datenschutz** | EU-Verarbeitung; Konversationen liegen im Browser, nicht auf dem Server; keine Paper-PDFs im Repo; Autorentabelle ohne Kontaktfelder (per CHECK erzwungen) |
-| **Betrieb** | Lokal und im Prod-Stack lauffähig, Deploy-Gate und Restore erprobt. Der Go-Live auf dem EU-VPS steht aus. |
+| **Betrieb** | Live unter [wissen.jaekel.dev](https://wissen.jaekel.dev). Deploy-Gate und Restore erprobt; offen sind Uptime-Monitoring und ein Restore-Drill auf dem VPS. |
 
 ## Kernstücke
 
@@ -170,8 +170,8 @@ Eine React-SPA mit Sidebar-Navigation, hellem und dunklem Theme, mobiltauglich:
 |---|---|
 | **Chat** | Streamende Antworten mit Quellenkarten. Verläufe bleiben im Browser (localStorage), nicht auf dem Server. |
 | **Suche** | Hybrid-Retrieval mit aufklappbaren Scores je Verfahren — sichtbar, warum ein Treffer oben steht. |
-| **Wissen** | Dokumente hochladen (PDF und Markdown), lesen, Markdown direkt im Browser bearbeiten (Speichern indexiert neu). Dazu der Graph-Explorer. |
-| **Inbox** | Review-Queue der unbestätigten Fakten mit Filtern und Sammelfreigabe. |
+| **Wissen** | Dokumente lesen, dazu der Graph-Explorer. Hochladen und Bearbeiten sind in Produktion abgeschaltet (ADR-0024); befüllt wird über `python -m app.ingest`. |
+| **Inbox** | Erklärseite und Changelog-Feed. Die Review-Oberfläche wurde entfernt (ADR-0023) — die Endpunkte bestehen weiter, admin-gated. |
 | **Skills** | Wiederverwendbare Prompt-Vorlagen, per „/" in den Chat einsetzbar. |
 | **Projekte** | Arbeitsbereiche, die Chats und Dokumente bündeln. |
 
@@ -228,9 +228,9 @@ Freigabe in der Review-Queue; Widersprüche werden als `disputed` markiert statt
 überschrieben. Entitätsnamen werden kanonisiert, damit „Cross-Encoder", „cross
 encoder" und „Cross Encoders" ein Knoten bleiben.
 
-**Quellen.** Korpus und Graph füllen heute drei Wege: `scripts/fetch_corpus.py`
-(arXiv-PDFs → Chunks), der Papers-with-Code-Import (Graph-Knoten) und eigene Uploads
-über die Oberfläche. Die Harvester für arXiv-OAI-PMH und OpenReview erzeugen
+**Quellen.** Korpus und Graph füllen heute zwei Wege: `scripts/fetch_corpus.py`
+(arXiv-PDFs → Chunks) und der Papers-with-Code-Import (Graph-Knoten). Der Upload über
+die Oberfläche ist in Produktion abgeschaltet (ADR-0024). Die Harvester für arXiv-OAI-PMH und OpenReview erzeugen
 normalisierte Datensätze und Quellenzeilen; sie an `documents` zu hängen und die PDFs
 nachzuladen ist noch nicht verdrahtet.
 
@@ -243,9 +243,10 @@ im Graphen, und dedupliziert wird nur innerhalb einer Art (ADR-0020).
 
 ## Qualitätssicherung
 
-- **239 Tests**: 172 im Backend (Retrieval, Extraktion, Promotion, Provenienz-Schema,
-  Harvester, GROBID-Parser, API, Deploy-Gate) und 67 im Frontend (Speicherschicht,
-  Graph-Layouts, Clusterbildung, SSE-Parsing). DB-Tests laufen in Transaktionen mit
+- **309 Tests**: 216 im Backend (Retrieval, Extraktion, Promotion, Provenienz-Schema,
+  Harvester, GROBID-Parser, API, Deploy-Gate, Fehlerbehandlung, Indizes) und 93 im
+  Frontend (Speicherschicht, Graph-Layouts, Clusterbildung, SSE-Parsing, Abbruch,
+  URL-Prüfung). DB-Tests laufen in Transaktionen mit
   Rollback; LLM und HTTP sind gemockt, kein Test geht ins Netz.
 - **CI**: `ruff`, `mypy` und `gitleaks` in GitHub Actions, dazu ein Frontend-Job mit
   Typprüfung, Vitest und Produktionsbuild.
@@ -328,6 +329,10 @@ Caddy übernimmt TLS, liefert die SPA aus und proxied `/api` — ein Container f
 alles drei. Backups laufen nächtlich per `pg_dump`, das Restore-Verfahren ist
 erprobt.
 
+Für ein Update des laufenden Systems gilt eine feste Reihenfolge (Backup, Caddy-Diff,
+Vertrauensliste, Gate **vor** dem Neustart, Migration, Deploy, Smoke, CSP-Kontrolle):
+[docs/runbooks/rollout.md](docs/runbooks/rollout.md).
+
 ---
 
 ## Projektstruktur
@@ -347,7 +352,7 @@ mcp_server/      MCP-Werkzeuge für Claude Desktop
 eval/            Golden-Set, Hit-Rate-Messung, Parameter-Tuning
 scripts/         Korpus-Fetch · PwC-Dump · Reindex · Provenienz-Backfill ·
                  Deploy-Gate · Smoke-Test · Backup
-docs/            20 ADRs in adr/, Betriebsanleitungen in runbooks/
+docs/            24 ADRs in adr/, Betriebsanleitungen in runbooks/
 ```
 
 ## Lizenz
