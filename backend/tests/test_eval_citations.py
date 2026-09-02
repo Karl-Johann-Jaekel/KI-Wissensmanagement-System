@@ -1,4 +1,7 @@
-"""Belegtreue-Prüfung (R3). Reine Logik, keine Datenbank, kein Modell."""
+"""Belegtreue-Prüfung der Eval (R3). Reine Logik, keine Datenbank, kein Modell.
+
+Liegt bei den Backend-Tests, weil pytest nur dort sucht (testpaths).
+"""
 
 from __future__ import annotations
 
