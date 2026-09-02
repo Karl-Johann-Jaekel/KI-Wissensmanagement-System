@@ -179,8 +179,23 @@ _CATEGORY_PLURALS = (
 
 #: Zahlwörter und vage Mengenangaben am Satzanfang.
 _QUANTIFIERS = {
-    "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
-    "several", "multiple", "various", "numerous", "many", "all", "both", "other",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "several",
+    "multiple",
+    "various",
+    "numerous",
+    "many",
+    "all",
+    "both",
+    "other",
 }
 
 #: Themenfloskeln aus Abstracts — beschreiben den Aufsatz, nicht die Sache.
