@@ -24,7 +24,6 @@ from sqlalchemy import select
 from app.db.models import Document
 from app.db.session import SessionLocal
 from app.retrieval.search import hybrid_search
-from eval.citations import check_citations
 
 
 def _arxiv_map(session) -> dict[str, str | None]:
@@ -66,6 +65,14 @@ def evaluate_citations(session, golden: list[dict], *, top_k: int) -> dict:
     erfundene Quellen, und das ist der Fehler, der am teuersten ist.
     """
     from app.generation.generate import prepare_answer
+
+    # Zwei Aufrufwege, zwei Sichten auf den Pfad: `python -m app.update` sieht
+    # `eval` als Paket, `python eval/run_eval.py` legt stattdessen eval/ selbst
+    # in den Pfad. Beides muss tragen.
+    try:
+        from eval.citations import check_citations
+    except ModuleNotFoundError:  # pragma: no cover — nur beim direkten Skriptaufruf
+        from citations import check_citations
 
     zitate = gedeckt = 0
     erfunden: list[str] = []
