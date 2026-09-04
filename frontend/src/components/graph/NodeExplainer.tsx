@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { kindText } from './nodeFacts'
 import { describeRelations, NAMES_PER_GROUP, relationCount } from './relations'
 import type { SceneLink, SceneNode } from './scene'
 
@@ -6,26 +7,13 @@ import type { SceneLink, SceneNode } from './scene'
  * Kurzerklärung zu einem Datenpunkt — was er ist, wie gut er belegt ist und
  * woran er hängt.
  *
- * Bewusst aus dem, was ohnehin in der Szene steht: kein Modellaufruf beim
- * Öffnen. Bei 13.000 Knoten verbrennt eine erzeugte Erklärung je Klick Budget
- * für eine Auskunft, die die Daten schon hergeben. Wer mehr will, fragt darunter
- * im Chat nach.
+ * Bewusst aus dem, was ohnehin in der Szene steht — die Begründung und der
+ * Wortlaut je Knotenart stehen in `nodeFacts.ts`.
  *
  * Die Beziehungen sind der eigentliche Inhalt: dass "Self-Attention" ein Konzept
  * ist, sagt wenig — dass es von "Attention Is All You Need" eingeführt wurde,
  * ist die Auskunft.
  */
-const KIND_TEXT: Record<string, string> = {
-  paper: 'Forschungsarbeit. Die verbundenen Begriffe stammen aus ihrem Abstract.',
-  concept: 'Begriff oder Verfahren aus der KI-Forschung, gefunden in den Abstracts des Korpus.',
-  model: 'Benanntes Modell oder eine Architektur.',
-  dataset: 'Datensatz oder Benchmark, auf dem Arbeiten gemessen werden.',
-  task: 'Aufgabenstellung, auf die Arbeiten, Modelle und Datensätze einzahlen.',
-  repo: 'Code-Veröffentlichung zu einer Arbeit.',
-  system: 'Baustein dieses Systems selbst — kein Fund aus der Literatur.',
-  project: 'Arbeitsbereich, der Chats und Dokumente bündelt.',
-  service: 'Dienst, den dieses System benutzt.',
-}
 
 function jahr(node: SceneNode): string | null {
   const meta = node.meta as { date?: string; arxiv?: string; arxiv_id?: string }
@@ -75,7 +63,7 @@ export default function NodeExplainer({ node, links, nodesById, onSelectNode }: 
   return (
     <div className="mb-4 rounded-lg bg-sunken px-3 py-2.5">
       <p className="text-sm text-ink">
-        {KIND_TEXT[node.kind] ?? 'Ein Datenpunkt dieses Wissensgraphen.'}
+        {kindText(node.kind)}
       </p>
       {facts.length > 0 && <p className="mt-1 text-xs text-muted">{facts.join(' · ')}</p>}
 

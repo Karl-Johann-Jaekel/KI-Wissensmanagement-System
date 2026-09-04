@@ -31,6 +31,8 @@ Offen: Uptime-Monitoring, Restore-Drill auf dem VPS, Multilingual-Embeddings (11
   liefert still die falschen Treffer — `assert_index_matches_settings` bricht ab.
 - `data/` und `.env` sind tabu für Commits, Logs und Tests. Gitleaks muss grün sein.
 - Agent-Tools nur als feste, parametrisierte Funktionen — kein LLM-generiertes SQL.
+- Der Chat am Knoten (`POST /chat/node`) bekommt sein Thema aus `graph_nodes`,
+  nie aus der Anfrage; ohne Fund im Korpus wird kein Modell gerufen (ADR-0026).
 - Stack: FastAPI, Postgres+pgvector, Docling, Ollama, Mistral-API, fastmcp,
   React+TS+Vite+Tailwind, n8n.
 

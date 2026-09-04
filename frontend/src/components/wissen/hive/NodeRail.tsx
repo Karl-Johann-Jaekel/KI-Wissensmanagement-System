@@ -10,6 +10,8 @@ import { ArrowUpRight, FileText, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { cn } from '../../../lib/cn'
 import { safeHref } from '../../../lib/safeHref'
+import NodeChat from '../../graph/NodeChat'
+import { kindText } from '../../graph/nodeFacts'
 import Badge from '../../ui/Badge'
 import { nodeMeta, relationsOf, type Hive, type HiveNode, type Sector } from './hive'
 
@@ -49,6 +51,24 @@ export default function NodeRail({
   const groups = relationsOf(node.id, hive.links, hive.nodesById)
   const color = sector?.color ?? '#2dd4bf'
   const prov = meta.provenance
+
+  /**
+   * Kurzerklärung aus dem, was ohnehin geladen ist — kein Modellaufruf beim
+   * Öffnen (siehe `nodeFacts.ts`). Die Art kommt aus dem Sektor, nicht aus
+   * `node.kind`: Die Dienste der Infrastruktur-Wabe tragen als Platzhalter die
+   * Art `concept` und wären sonst als Fachbegriff beschrieben.
+   */
+  const facts: string[] = []
+  if (node.year !== null) facts.push(String(node.year))
+  const belege = meta.source_document_ids?.length
+  if (belege) facts.push(`${belege} ${belege === 1 ? 'Beleg' : 'Belege'}`)
+  if (typeof node.citations === 'number') {
+    facts.push(
+      `${node.citations.toLocaleString('de-DE')} Zitationen${node.landmark ? ' · vielzitiert' : ''}`,
+    )
+  }
+  if (node.degree) facts.push(`${node.degree} Verbindungen`)
+  if (node.status !== 'verified') facts.push(node.status)
 
   return (
     <aside
@@ -92,6 +112,13 @@ export default function NodeRail({
         )}
       >
         <div className={cn('space-y-3', embedded && 'min-w-0')}>
+        <div className="rounded-lg bg-sunken px-3 py-2.5">
+          <p className="text-[11px] leading-relaxed text-ink">
+            {kindText(sector?.id ?? node.kind)}
+          </p>
+          {facts.length > 0 && <p className="mt-1 text-[10px] text-muted">{facts.join(' · ')}</p>}
+        </div>
+
         <div className="flex flex-wrap gap-1.5">
           <Badge
             style={{ borderColor: `${color}66`, color }}
@@ -161,6 +188,8 @@ export default function NodeRail({
             </a>
           )}
         </div>
+
+        <NodeChat node={node} />
         </div>
 
         {groups.length > 0 && (

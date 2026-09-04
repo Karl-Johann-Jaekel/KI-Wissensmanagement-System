@@ -35,5 +35,6 @@ stehen: der Verlauf ist die Auskunft.
 | [0023](0023-review-ui-removed.md) | Review-Oberfläche entfernt, die Regel trägt allein | akzeptiert |
 | [0024](0024-disable-write-routes-in-production.md) | Schreibrouten in Produktion abgeschaltet | akzeptiert |
 | [0025](0025-wissensbasis-hive-view.md) | Wabenansicht als Einstieg in die Wissensbasis | akzeptiert |
+| [0026](0026-node-scoped-chat.md) | Chat am Knoten bindet das Thema serverseitig | akzeptiert |
 
 Betriebsanleitungen liegen daneben in [../runbooks/](../runbooks/).

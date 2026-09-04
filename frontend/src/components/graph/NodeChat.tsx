@@ -3,19 +3,30 @@ import { ArrowUp, Square } from 'lucide-react'
 import { streamChat, type ChatSource } from '../../api'
 import { cn } from '../../lib/cn'
 import SourceCard from '../chat/SourceCard'
-import type { SceneNode } from './scene'
+import { isGraphNodeId } from './nodeFacts'
 
 /**
  * Kleiner Chat direkt am Datenpunkt.
  *
- * Nutzt denselben RAG-Weg wie die Chat-Seite, nur ohne Verlauf: eine Frage, eine
- * belegte Antwort. Der Knotenname wird der Frage vorangestellt, damit das
- * Retrieval beim Thema bleibt — der Nutzer sieht das Präfix, es passiert nichts
- * hinter seinem Rücken.
+ * Eine Frage, eine belegte Antwort, kein Verlauf. Der Weg dorthin ist
+ * `POST /chat/node`, nicht `/chat`: Dort hängt der Themenrahmen an der
+ * Knoten-Id, und *worüber* geantwortet werden darf, entscheidet der Server
+ * anhand der Datenbank. Vorher stellte diese Komponente den Knotennamen der
+ * Frage voran — ein Hinweis ans Retrieval, aber keine Schranke; wer wollte,
+ * chattete hier über alles. Die Begründung steht in
+ * `backend/app/generation/node_chat.py`.
+ *
+ * Nimmt bewusst nur `id` und `name`: So passen Szenen- und Wabenknoten
+ * gleichermaßen hinein, ohne dass eine Ansicht die Typen der anderen kennt.
  */
-const MAX_CHARS = 500
+const MAX_CHARS = 300
 
-export default function NodeChat({ node }: { node: SceneNode }) {
+interface ChatNode {
+  id: string
+  name: string
+}
+
+export default function NodeChat({ node }: { node: ChatNode }) {
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState('')
   const [sources, setSources] = useState<ChatSource[]>([])
@@ -54,8 +65,8 @@ export default function NodeChat({ node }: { node: SceneNode }) {
     abortRef.current = controller
 
     await streamChat(
-      '/chat',
-      { query: `${node.name}: ${q}`, top_k: 5 },
+      '/chat/node',
+      { node_id: node.id, question: q, top_k: 5 },
       {
         onToken: (t) => setAnswer((a) => a + t),
         onSources: (s) => setSources(s),
@@ -69,6 +80,10 @@ export default function NodeChat({ node }: { node: SceneNode }) {
     )
     if (abortRef.current === controller) abortRef.current = null
   }
+
+  // Kern, Dienste und Projekte sind in der Szene erfunden; zu ihnen gibt es
+  // keinen Datenbankeintrag und damit auch keine belegbare Antwort.
+  if (!isGraphNodeId(node.id)) return null
 
   return (
     <div className="mb-4 border-t border-edge pt-3">
