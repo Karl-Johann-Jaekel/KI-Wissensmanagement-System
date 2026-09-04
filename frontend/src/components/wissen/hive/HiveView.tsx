@@ -189,7 +189,6 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
           sectors={hive.sectors}
           focus={focus}
           onFocus={setFocus}
-          hovered={hovered}
           onHover={setHovered}
           source={source}
           onSource={setSource}

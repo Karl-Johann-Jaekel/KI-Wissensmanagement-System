@@ -1,5 +1,5 @@
 /**
- * Linke Spalte der Wabenansicht: Ansicht, Legende, Filter, Mini-Karte.
+ * Linke Spalte der Wabenansicht: Ansicht, Legende, Filter.
  *
  * Die Filter greifen bewusst an zwei verschiedenen Stellen an. „Quelle" fragt
  * den Server neu (`/graph?source=`), die übrigen rechnen auf der bereits
@@ -10,7 +10,7 @@ import { Clock, Hexagon, Network } from 'lucide-react'
 import { cn } from '../../../lib/cn'
 import { GRAPH_SOURCES, type GraphSource } from '../../../types'
 import Select from '../../ui/Select'
-import { hexPath, hiveLayout, type HiveFilter, type Sector } from './hive'
+import type { HiveFilter, Sector } from './hive'
 
 export type HiveMode = 'comb' | 'time'
 
@@ -20,7 +20,6 @@ interface Props {
   sectors: Sector[]
   focus: string | null
   onFocus: (sectorId: string | null) => void
-  hovered: string | null
   onHover: (sectorId: string | null) => void
   source: GraphSource
   onSource: (source: GraphSource) => void
@@ -49,58 +48,12 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
   )
 }
 
-/** Verkleinerte Wabe als Orientierung — Füllung nach Bestandsanteil. */
-function MiniMap({
-  sectors,
-  hovered,
-  focus,
-  onHover,
-  onFocus,
-}: Pick<Props, 'sectors' | 'hovered' | 'focus' | 'onHover' | 'onFocus'>) {
-  const layout = hiveLayout(sectors.length)
-  const max = Math.max(...sectors.map((s) => s.count), 1)
-
-  return (
-    <svg
-      viewBox={layout.viewBox}
-      className="mx-auto h-auto max-h-44 w-full"
-      role="img"
-      aria-label="Übersicht der Bereiche"
-    >
-      <path d={hexPath(0, 0, layout.center.r)} fill="rgb(var(--c-sunken))" opacity={0.7} />
-      {sectors.map((sector, i) => {
-        const place = layout.tiles[i]
-        const active = hovered === sector.id || focus === sector.id
-        return (
-          <path
-            key={sector.id}
-            d={hexPath(place.cx, place.cy, place.r * 0.94)}
-            fill={sector.color}
-            stroke={sector.color}
-            strokeWidth={active ? 10 : 4}
-            // Fläche nach Bestandsanteil: die Mini-Karte zeigt das Gewicht,
-            // nicht nur die Anordnung.
-            opacity={active ? 0.95 : 0.2 + 0.55 * (sector.count / max)}
-            className="cursor-pointer transition-opacity"
-            onMouseEnter={() => onHover(sector.id)}
-            onMouseLeave={() => onHover(null)}
-            onClick={() => onFocus(focus === sector.id ? null : sector.id)}
-          >
-            <title>{`${sector.label}: ${sector.count.toLocaleString('de-DE')} Knoten`}</title>
-          </path>
-        )
-      })}
-    </svg>
-  )
-}
-
 export default function HiveSidebar({
   mode,
   onMode,
   sectors,
   focus,
   onFocus,
-  hovered,
   onHover,
   source,
   onSource,
@@ -241,18 +194,6 @@ export default function HiveSidebar({
             „Vielzitiert" nutzt das Landmark-Kennzeichen aus den Zitationsdaten (ADR-0013).
           </p>
         </div>
-      </Group>
-
-      <Group title="Mini-Karte">
-        {/* Höhe gedeckelt: sonst schiebt die Karte bei sieben Sektoren die
-            Filter aus dem sichtbaren Bereich der Spalte. */}
-        <MiniMap
-          sectors={sectors}
-          hovered={hovered}
-          focus={focus}
-          onHover={onHover}
-          onFocus={onFocus}
-        />
       </Group>
     </div>
   )
