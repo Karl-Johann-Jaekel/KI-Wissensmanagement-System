@@ -1,7 +1,13 @@
 """Lightweight API hardening (PLAN §7 Phase 5): rate limit, daily token cap, input cap.
 
-In-process (single-instance) implementations — no extra dependency. A per-IP sliding
-window limits request rate; a per-day counter caps token spend for the LLM endpoints.
+In-process (single-instance) implementations — no extra dependency. Zwei per-IP
+Gleitfenster begrenzen den Takt, ein Tageszaehler die Token-Ausgaben.
+
+Zwei Fenster, weil die Endpunkte nicht dasselbe kosten: ``/documents`` und
+``/graph`` sind zwischenspeicherbare Datenbankabfragen, ``/chat`` und ``/search``
+kosten einen fremden Anbieter. Frueher teilten sie sich einen Zaehler — wer ihn
+eng stellte, um den Anbieter zu schuetzen, drosselte damit das Blaettern in der
+Oberflaeche, und der Reiter "Dokumente" endete in 429.
 
 Beide Zaehler haengen am selben Schluessel: der Client-IP aus ``client_key``. Hinter
 einem Proxy ist das nur dann die Besucher-IP, wenn dessen Adresse in uvicorns
@@ -15,6 +21,7 @@ synchron sind und damit im Threadpool nebenlaeufig zaehlen.
 
 from __future__ import annotations
 
+import math
 import secrets
 import threading
 import time
@@ -51,7 +58,15 @@ class SlidingWindowLimiter:
             while dq and now - dq[0] > self.window:
                 dq.popleft()
             if len(dq) >= self.limit:
-                raise HTTPException(status_code=429, detail="rate limit exceeded")
+                # Ohne ``Retry-After`` weiß der Aufrufer nicht, ob er in einer
+                # Sekunde oder in einer Stunde wiederkommen soll — und die
+                # Oberfläche kann es ihm nicht sagen.
+                wait = max(1, math.ceil(self.window - (now - dq[0])))
+                raise HTTPException(
+                    status_code=429,
+                    detail="rate limit exceeded",
+                    headers={"Retry-After": str(wait)},
+                )
             dq.append(now)
 
             # Ohne das waechst der Zustand um einen Eintrag je gesehener IP und
@@ -97,6 +112,7 @@ class TokenBudget:
 
 
 _limiter: SlidingWindowLimiter | None = None
+_llm_limiter: SlidingWindowLimiter | None = None
 _budget: TokenBudget | None = None
 
 
@@ -105,6 +121,13 @@ def _get_limiter() -> SlidingWindowLimiter:
     if _limiter is None:
         _limiter = SlidingWindowLimiter(get_settings().rate_limit)
     return _limiter
+
+
+def _get_llm_limiter() -> SlidingWindowLimiter:
+    global _llm_limiter
+    if _llm_limiter is None:
+        _llm_limiter = SlidingWindowLimiter(get_settings().rate_limit_llm)
+    return _llm_limiter
 
 
 def get_budget() -> TokenBudget:
@@ -127,8 +150,25 @@ def client_key(request: Request) -> str:
 
 
 def rate_limit(request: Request) -> None:
-    """FastAPI dependency: per-client-IP request rate limiting."""
+    """Takt für die öffentlichen Lese-Endpunkte (Dokumente, Graph).
+
+    Diese Antworten sind zwischenspeicherbar und kosten eine Datenbankabfrage.
+    Sie teilten sich früher einen Zähler mit den Modell-Endpunkten: Wer das
+    Limit eng stellte, um den LLM-Anbieter zu schonen, drosselte damit auch das
+    Blättern in der Dokumentliste — drei Seitenaufrufe, und der vierte kam als
+    ``429`` zurück. Deshalb zwei Zähler.
+    """
     _get_limiter().check(client_key(request))
+
+
+def rate_limit_llm(request: Request) -> None:
+    """Takt für alles, was einen Anbieter kostet (Chat, Suche).
+
+    Hier gilt der engere Wert: Eine RAG-Antwort kostet grob 2.000 bis 4.000
+    Token, und Groqs freier Tarif ist auf 8.000 je Minute getaktet. Der Schutz
+    gehört an diese Endpunkte — und nur an sie.
+    """
+    _get_llm_limiter().check(client_key(request))
 
 
 def is_admin(request: Request) -> bool:

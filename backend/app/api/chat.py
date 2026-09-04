@@ -23,7 +23,7 @@ from app.core.security import (
     client_key,
     estimate_tokens,
     get_budget,
-    rate_limit,
+    rate_limit_llm,
 )
 from app.db.session import get_db
 from app.generation.generate import AnswerPlan, prepare_answer
@@ -141,7 +141,7 @@ def stream_plan(plan: AnswerPlan, key: str) -> StreamingResponse:
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
-@router.post("/chat", dependencies=[Depends(rate_limit)])
+@router.post("/chat", dependencies=[Depends(rate_limit_llm)])
 def chat(request: Request, req: ChatRequest, db: Session = Depends(get_db)) -> StreamingResponse:
     plan = prepare_answer(db, req.query, top_k=req.top_k, rerank=req.rerank)
     key = client_key(request)
@@ -149,7 +149,7 @@ def chat(request: Request, req: ChatRequest, db: Session = Depends(get_db)) -> S
     return stream_plan(plan, key)
 
 
-@router.post("/chat/node", dependencies=[Depends(rate_limit)])
+@router.post("/chat/node", dependencies=[Depends(rate_limit_llm)])
 def chat_node(
     request: Request, req: NodeChatRequest, db: Session = Depends(get_db)
 ) -> StreamingResponse:

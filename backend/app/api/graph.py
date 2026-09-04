@@ -23,6 +23,7 @@ from sqlalchemy import ColumnElement, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.http import no_store, public_cache
 from app.core.security import rate_limit, require_admin
 from app.db.models import GraphEdge, GraphNode
 from app.db.session import get_db
@@ -35,11 +36,6 @@ KNOWLEDGE_KINDS = ("paper", "concept", "model", "dataset", "task", "repo")
 #: Obergrenze der ausgelieferten Knoten. Der PwC-Dump kann den Graphen auf
 #: Zehntausende Knoten heben; ungebremst friert das die Force-Simulation ein.
 DEFAULT_NODE_LIMIT = 2000
-
-#: Der Graph waechst im Wochentakt (Update-Loop), nicht im Sekundentakt. Fuenf
-#: Minuten Caching nehmen den Wiederholungsverkehr auf der Einstiegsseite weg,
-#: ohne dass eine Aenderung sichtbar spaet ankommt.
-PUBLIC_CACHE_SECONDS = 300
 
 
 class NodeRef(NamedTuple):
@@ -139,9 +135,10 @@ def get_graph(
 
     # Öffentliche Sicht ist für alle gleich und ändert sich im Wochentakt; die
     # Review-Sicht enthält ungeprüfte Fakten und gehört in keinen Cache.
-    response.headers["Cache-Control"] = (
-        "private, no-store" if include_pending else f"public, max-age={PUBLIC_CACHE_SECONDS}"
-    )
+    if include_pending:
+        no_store(response)
+    else:
+        public_cache(response)
 
     landmark_min = get_settings().citation_landmark_min
 
@@ -188,7 +185,7 @@ def changelog(
     db: Session = Depends(get_db),
 ) -> dict:
     """Verified knowledge-graph nodes first seen within the last `days` — "Neu"-Feed."""
-    response.headers["Cache-Control"] = f"public, max-age={PUBLIC_CACHE_SECONDS}"
+    public_cache(response)
     since = datetime.now(UTC) - timedelta(days=days)
     rows = (
         db.execute(

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { graphQuery, handleSseEvent, streamChat, type StreamHandlers } from './api'
+import { apiError, graphQuery, handleSseEvent, streamChat, type StreamHandlers } from './api'
 
 function makeHandlers(): StreamHandlers & {
   tokens: string[]
@@ -136,5 +136,38 @@ describe('streamChat: Abbruch', () => {
     const { seen, h } = handlers()
     await streamChat('/chat', { query: 'x' }, h, new AbortController().signal)
     expect(seen.errors).toEqual(['Failed to fetch'])
+  })
+})
+
+
+describe('apiError', () => {
+  const res = (status: number, headers: Record<string, string> = {}) =>
+    new Response(null, { status, headers })
+
+  it('macht aus 429 eine Auskunft samt Wartezeit', () => {
+    // Vorher stand hier woertlich "documents: HTTP 429".
+    const err = apiError(res(429, { 'Retry-After': '12' }), 'Die Dokumentliste')
+    expect(err.message).toContain('Zu viele Anfragen')
+    expect(err.message).toContain('12 Sekunden')
+    expect(err.message).not.toContain('429')
+  })
+
+  it('kommt ohne Retry-After aus', () => {
+    const err = apiError(res(429), 'Die Dokumentliste')
+    expect(err.message).toContain('Zu viele Anfragen')
+    expect(err.message).toContain('Moment')
+  })
+
+  it('setzt die Einzahl richtig', () => {
+    expect(apiError(res(429, { 'Retry-After': '1' }), 'x').message).toContain('1 Sekunde ')
+  })
+
+  it('benennt den Gegenstand bei 404', () => {
+    expect(apiError(res(404), 'Das Dokument').message).toBe('Das Dokument wurde nicht gefunden.')
+  })
+
+  it('trennt Serverfehler von Anfragefehlern', () => {
+    expect(apiError(res(503), 'Die Suche').message).toContain('antwortet gerade nicht')
+    expect(apiError(res(400), 'Die Suche').message).toContain('konnte nicht geladen werden')
   })
 })

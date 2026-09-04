@@ -2,6 +2,29 @@ import type { GraphData, GraphSource } from './types'
 
 const BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? 'http://localhost:8000'
 
+/**
+ * Fehlgeschlagene Antwort → Satz, mit dem ein Besucher etwas anfangen kann.
+ *
+ * Vorher stand in der Oberfläche wörtlich `documents: HTTP 429` — ein Code, der
+ * weder sagt, was los ist, noch was zu tun wäre. Bei 429 schickt der Server ein
+ * `Retry-After` mit; das wird hier zur Wartezeit im Klartext.
+ */
+export function apiError(res: Response, was: string): Error {
+  if (res.status === 429) {
+    const wait = Number(res.headers.get('Retry-After'))
+    const wann =
+      Number.isFinite(wait) && wait > 0
+        ? `Bitte in ${wait} Sekunde${wait === 1 ? '' : 'n'} noch einmal versuchen.`
+        : 'Bitte einen Moment warten und es noch einmal versuchen.'
+    return new Error(`Zu viele Anfragen in kurzer Zeit. ${wann}`)
+  }
+  if (res.status === 404) return new Error(`${was} wurde nicht gefunden.`)
+  if (res.status >= 500) {
+    return new Error(`${was} — der Server antwortet gerade nicht (HTTP ${res.status}).`)
+  }
+  return new Error(`${was} konnte nicht geladen werden (HTTP ${res.status}).`)
+}
+
 /** Query string für `GET /graph` — `source: 'all'` bleibt weg, das ist der Default. */
 export function graphQuery(includePending: boolean, source: GraphSource = 'all'): string {
   const params = new URLSearchParams({ include_pending: String(includePending) })
@@ -15,7 +38,7 @@ export async function fetchGraph(
   source: GraphSource = 'all',
 ): Promise<GraphData> {
   const res = await fetch(`${BASE}/graph?${graphQuery(includePending, source)}`)
-  if (!res.ok) throw new Error(`graph: HTTP ${res.status}`)
+  if (!res.ok) throw apiError(res, 'Der Wissens-Graph')
   return (await res.json()) as GraphData
 }
 
@@ -98,7 +121,7 @@ export async function streamChat(
   if (!res.ok || !res.body) {
     // Body verwerfen, sonst bleibt die Verbindung bis zum Timeout offen.
     await res.body?.cancel().catch(() => {})
-    handlers.onError(`HTTP ${res.status}`)
+    handlers.onError(apiError(res, 'Die Antwort').message)
     return
   }
   const reader = res.body.getReader()
@@ -142,7 +165,7 @@ export interface DocumentRow {
 
 export async function fetchDocuments(): Promise<DocumentRow[]> {
   const res = await fetch(`${BASE}/documents`)
-  if (!res.ok) throw new Error(`documents: HTTP ${res.status}`)
+  if (!res.ok) throw apiError(res, 'Die Dokumentliste')
   return (await res.json()) as DocumentRow[]
 }
 
@@ -162,7 +185,7 @@ export interface DocumentDetail {
 
 export async function fetchDocument(id: string): Promise<DocumentDetail> {
   const res = await fetch(`${BASE}/documents/${id}`)
-  if (!res.ok) throw new Error(`document: HTTP ${res.status}`)
+  if (!res.ok) throw apiError(res, 'Das Dokument')
   return (await res.json()) as DocumentDetail
 }
 
@@ -190,7 +213,7 @@ export async function postSearch(
       rerank: options.rerank ?? null,
     }),
   })
-  if (!res.ok) throw new Error(`search: HTTP ${res.status}`)
+  if (!res.ok) throw apiError(res, 'Die Suche')
   return ((await res.json()) as { hits: SearchHitRow[] }).hits
 }
 
@@ -205,7 +228,7 @@ export interface ChangelogItem {
 
 export async function fetchChangelog(days = 7): Promise<ChangelogItem[]> {
   const res = await fetch(`${BASE}/graph/changelog?days=${days}`)
-  if (!res.ok) throw new Error(`changelog: HTTP ${res.status}`)
+  if (!res.ok) throw apiError(res, 'Die Neuigkeiten')
   return (await res.json()).items as ChangelogItem[]
 }
 

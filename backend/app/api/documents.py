@@ -20,6 +20,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
+from app.core.http import no_store, public_cache
 from app.core.security import rate_limit, require_admin, require_writes_enabled
 from app.db.models import Chunk, Document
 from app.db.session import get_db
@@ -42,13 +44,31 @@ MAX_MARKDOWN_BYTES = 2 * 1024 * 1024  # 2 MB
 DEFAULT_PAGE = 200
 
 
+def _cache(response: Response) -> None:
+    """Lesewege zwischenspeicherbar machen — außer die Instanz darf schreiben."""
+    if get_settings().writes_enabled:
+        no_store(response)
+    else:
+        public_cache(response)
+
+
 @router.get("/documents", dependencies=[Depends(rate_limit)])
 def list_documents(
+    response: Response,
     limit: int = Query(default=DEFAULT_PAGE, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> list[dict]:
-    """Dokumente mit Chunk-Zahl, neueste zuerst. Öffentlich lesbar, gedrosselt."""
+    """Dokumente mit Chunk-Zahl, neueste zuerst. Öffentlich lesbar, gedrosselt.
+
+    Zwischenspeicherbar wie ``/graph`` — der Bestand ändert sich mit dem
+    Ingest, nicht mit dem Seitenaufruf. Ohne die Kopfzeile holte der Browser
+    die Liste bei jedem Reiterwechsel neu, und jede dieser Anfragen zählte
+    gegen das Rate-Limit; der Reiter „Dokumente" endete dadurch in ``429``.
+    Auf einer Instanz mit offenen Schreibwegen entfällt das Caching, sonst
+    stünde dort nach dem Bearbeiten der alte Stand.
+    """
+    _cache(response)
     stmt = (
         select(
             Document.id,
@@ -103,8 +123,9 @@ def _reassembled_content(db: Session, doc_id: uuid.UUID) -> str:
 
 
 @router.get("/documents/{doc_id}", dependencies=[Depends(rate_limit)])
-def get_document(doc_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
+def get_document(doc_id: uuid.UUID, response: Response, db: Session = Depends(get_db)) -> dict:
     """Document detail incl. full content for the reader."""
+    _cache(response)
     doc = _get_document(db, doc_id)
     n_chunks = db.execute(
         select(func.count(Chunk.id)).where(Chunk.document_id == doc.id)

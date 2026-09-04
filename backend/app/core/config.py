@@ -96,6 +96,11 @@ class Settings(BaseSettings):
     admin_api_key: str = "change-me"
     daily_token_cap: int = 200_000
     rate_limit: str = Field(default="30/minute")
+    #: Eigener, engerer Takt für alles, was ein Sprachmodell oder den
+    #: Embedding-Anbieter kostet (``/chat``, ``/chat/node``, ``/search``).
+    #: Getrennt vom Lesetakt, weil sonst drei Seitenaufrufe das Kontingent
+    #: verbrauchen, das den Anbieter schützen sollte.
+    rate_limit_llm: str = Field(default="10/minute")
 
     # Schreibwege (Upload, Bearbeiten, Loeschen). Standard aus: die Oberflaeche bietet
     # sie seit dem Redesign nicht mehr an, offen waeren sie nur Angriffsflaeche auf
