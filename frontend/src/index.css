@@ -81,3 +81,47 @@ body {
 .prose-md hr {
   @apply my-4 border-edge;
 }
+
+/* Wabenansicht (components/wissen/hive). Die Bewegung sitzt hier statt in den
+   Komponenten: eine Wabe skaliert bei Hover, ihre Punkte reagieren einzeln, und
+   die Speichen zum Kern laufen langsam nach außen. */
+.hive-tile {
+  cursor: pointer;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hive-tile:focus-visible {
+  outline: none;
+}
+.hive-tile:focus-visible > path:nth-of-type(2) {
+  stroke-width: 3;
+}
+.hive-dot {
+  cursor: pointer;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+.hive-dot:hover {
+  transform: scale(1.45);
+  opacity: 1;
+}
+.hive-spoke {
+  animation: hive-flow 2.4s linear infinite;
+}
+@keyframes hive-flow {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hive-tile,
+  .hive-dot {
+    transition: none;
+  }
+  .hive-spoke {
+    animation: none;
+  }
+}

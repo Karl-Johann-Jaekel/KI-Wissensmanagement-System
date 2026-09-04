@@ -9,7 +9,8 @@ dort abhaken. GitHub-Portfolio-Track wurde entfernt (ADR-0004).
 https://wissen.jaekel.dev** (56 Papers/6.950 Chunks; Hit@5 0,94; Graph mit 13.271
 Knoten aus eigenem Korpus + Papers-with-Code, Serverkappung 2.000 je Antwort).
 UI: Sidebar-App mit Chat-Verläufen, Suche, Wissen, Skills, Projekte,
-Graph-Explorer mit 4 Layouts (ADR-0016); dunkel, mobile-friendly.
+Wabenansicht als Einstieg in `/wissen` (ADR-0025) und Graph-Explorer mit 4 Layouts
+(ADR-0016); dunkel, mobile-friendly.
 Nicht mehr vorhanden: Review-Oberfläche, MD-Editor, Upload-Panel, Landing-Page,
 helles Thema (ADR-0023, ADR-0024).
 Offen: Uptime-Monitoring, Restore-Drill auf dem VPS, Multilingual-Embeddings (11.6).

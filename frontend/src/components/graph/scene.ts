@@ -69,7 +69,7 @@ const REST_COLOR: Record<Theme, string> = { dark: '#5eead4' }
 const REST_SPLIT_MIN = 120
 
 /** Farbkreis für Themen-Cluster (Gruppenmodus „Themen"). */
-const CLUSTER_PALETTE: Record<Theme, string[]> = {
+export const CLUSTER_PALETTE: Record<Theme, string[]> = {
   dark: [
     '#60a5fa', '#fbbf24', '#f87171', '#a78bfa', '#34d399',
     '#f472b6', '#22d3ee', '#a3e635', '#c084fc', '#fb7185',
@@ -173,7 +173,7 @@ const LABEL_CHARS = 30
  * als Themen ("Retrieval-Augmented Generation"), Papertitel nicht. Aufgaben
  * ("Question Answering") taugen ebenfalls als Themenname, Modelle nur notfalls.
  */
-function clusterLabel(list: SceneNode[]): string {
+export function clusterLabel(list: SceneNode[]): string {
   const RANK: Partial<Record<SceneKind, number>> = { concept: 3, task: 2, model: 1 }
   const rank = (n: SceneNode) => RANK[n.kind] ?? 0
   const lead = [...list].sort(

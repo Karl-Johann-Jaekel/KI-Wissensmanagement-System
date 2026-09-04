@@ -36,7 +36,13 @@ export interface RelationGroup {
 /** Wie viele Gegenüber je Gruppe genannt werden, bevor gezählt wird. */
 export const NAMES_PER_GROUP = 4
 
-function labelFor(relation: string, outgoing: boolean): string {
+/**
+ * Relation → deutsche Formulierung; `outgoing=false` dreht die Richtung um.
+ *
+ * Auch von der Wabenansicht genutzt, damit dieselbe Kante dort nicht anders
+ * heißt als in der Leseansicht.
+ */
+export function relationLabel(relation: string, outgoing = true): string {
   const pair = RELATION_LABELS[relation]
   if (pair) return pair[outgoing ? 0 : 1]
   // Unbekannte Relation: den Rohwert lesbar machen, statt sie zu verschweigen.
@@ -65,7 +71,7 @@ export function describeRelations(
     // Selbstbezug und Kanten ins Leere (gekappte Knotenmenge) übergehen.
     if (!other || other.id === nodeId) continue
 
-    const label = labelFor(link.relation, outgoing)
+    const label = relationLabel(link.relation, outgoing)
     const list = groups.get(label)
     if (list) {
       if (!list.some((n) => n.id === other.id)) list.push(other)

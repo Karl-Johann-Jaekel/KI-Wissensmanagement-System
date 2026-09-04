@@ -9,12 +9,19 @@ interface ModalProps {
   title?: string
   children: ReactNode
   className?: string
+  /**
+   * Eigene Kopfzeile statt Titel + Schließen-Knopf.
+   *
+   * Wer sie setzt, übernimmt auch den Schließen-Knopf — sonst stünden zwei
+   * davon übereinander. Gedacht für breite Dialoge mit Reitern (Wabenansicht).
+   */
+  header?: ReactNode
 }
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
 
-export default function Modal({ open, onClose, title, children, className }: ModalProps) {
+export default function Modal({ open, onClose, title, children, className, header }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -69,16 +76,18 @@ export default function Modal({ open, onClose, title, children, className }: Mod
           className,
         )}
       >
-        <div className="mb-3 flex items-start justify-between gap-4">
-          {title ? <h2 className="text-base font-semibold text-ink">{title}</h2> : <span />}
-          <button
-            onClick={onClose}
-            aria-label="Schließen"
-            className="rounded-lg p-1 text-muted hover:bg-sunken hover:text-ink"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        {header ?? (
+          <div className="mb-3 flex items-start justify-between gap-4">
+            {title ? <h2 className="text-base font-semibold text-ink">{title}</h2> : <span />}
+            <button
+              onClick={onClose}
+              aria-label="Schließen"
+              className="rounded-lg p-1 text-muted hover:bg-sunken hover:text-ink"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
         {children}
       </div>
     </div>,
