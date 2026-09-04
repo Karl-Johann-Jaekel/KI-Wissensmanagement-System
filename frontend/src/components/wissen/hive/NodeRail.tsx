@@ -20,12 +20,26 @@ interface Props {
   onPickNode: (node: HiveNode) => void
   onClose: () => void
   className?: string
+  /**
+   * Im Sektor-Popup eingebettet: dort trägt die Kopfzeile des Dialogs bereits
+   * Name und Zurück-Weg, ein zweiter Rahmen mit zweitem Schließen-Knopf wäre
+   * doppelt.
+   */
+  embedded?: boolean
 }
 
 /** Gegenüber je Beziehungsgruppe, bevor nur noch gezählt wird. */
 const NAMES_PER_GROUP = 5
 
-export default function NodeRail({ node, sector, hive, onPickNode, onClose, className }: Props) {
+export default function NodeRail({
+  node,
+  sector,
+  hive,
+  onPickNode,
+  onClose,
+  className,
+  embedded = false,
+}: Props) {
   const meta = nodeMeta(node)
   const arxivId = meta.arxiv ?? meta.arxiv_id
   const href = safeHref(
@@ -40,30 +54,44 @@ export default function NodeRail({ node, sector, hive, onPickNode, onClose, clas
     <aside
       aria-label={`Details zum Knoten ${node.name}`}
       className={cn(
-        'flex min-h-0 flex-col overflow-hidden rounded-xl border border-edge bg-surface',
+        'flex min-h-0 flex-col overflow-hidden',
+        !embedded && 'rounded-xl border border-edge bg-surface',
         className,
       )}
     >
-      <div
-        className="flex items-start gap-2 border-b border-edge px-3.5 py-3"
-        style={{ background: `linear-gradient(90deg, ${color}1a 0%, transparent 70%)` }}
-      >
-        <div className="min-w-0 flex-1">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-muted">
-            Details zum Knoten
-          </div>
-          <h3 className="mt-0.5 break-words text-sm font-semibold text-ink">{node.name}</h3>
-        </div>
-        <button
-          onClick={onClose}
-          aria-label="Details schließen"
-          className="rounded-lg p-1 text-muted transition-colors hover:bg-sunken hover:text-ink"
+      {!embedded && (
+        <div
+          className="flex items-start gap-2 border-b border-edge px-3.5 py-3"
+          style={{ background: `linear-gradient(90deg, ${color}1a 0%, transparent 70%)` }}
         >
-          <X className="h-3.5 w-3.5" />
-        </button>
-      </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] uppercase tracking-[0.14em] text-muted">
+              Details zum Knoten
+            </div>
+            <h3 className="mt-0.5 break-words text-sm font-semibold text-ink">{node.name}</h3>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Details schließen"
+            className="rounded-lg p-1 text-muted transition-colors hover:bg-sunken hover:text-ink"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3.5 py-3">
+      {/* Als Spalte stapelt alles untereinander; im Popup steht daneben Platz für
+          eine zweite Spalte, sonst stünde ein 320-px-Streifen in einem
+          1024-px-Dialog. */}
+      <div
+        className={cn(
+          'min-h-0 flex-1 overflow-y-auto',
+          embedded
+            ? 'grid items-start gap-x-8 gap-y-4 px-1 py-1 md:grid-cols-[minmax(0,20rem)_1fr]'
+            : 'space-y-3 px-3.5 py-3',
+        )}
+      >
+        <div className={cn('space-y-3', embedded && 'min-w-0')}>
         <div className="flex flex-wrap gap-1.5">
           <Badge
             style={{ borderColor: `${color}66`, color }}
@@ -111,14 +139,38 @@ export default function NodeRail({ node, sector, hive, onPickNode, onClose, clas
           </p>
         )}
 
+        <div className="flex flex-col gap-1.5 pt-1">
+          {docId && (
+            <Link
+              to={`/wissen/doc/${docId}`}
+              className="inline-flex items-center gap-1.5 text-[11px] font-medium text-primary-400 hover:underline"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              Dokument öffnen
+            </Link>
+          )}
+          {href && (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 truncate text-[11px] font-medium text-primary-400 hover:underline"
+            >
+              <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
+              Quelle aufrufen
+            </a>
+          )}
+        </div>
+        </div>
+
         {groups.length > 0 && (
-          <div>
+          <div className="min-w-0">
             <h4 className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
               Beziehungen
             </h4>
-            <ul className="space-y-2">
-              {groups.slice(0, 6).map((group) => (
-                <li key={group.label}>
+            <ul className={cn('space-y-2', embedded && 'sm:columns-2 sm:gap-6 sm:space-y-0')}>
+              {groups.slice(0, embedded ? 8 : 6).map((group) => (
+                <li key={group.label} className={cn(embedded && 'mb-4 break-inside-avoid')}>
                   <div className="text-[10px] uppercase tracking-wider text-muted">
                     {group.label}
                   </div>
@@ -145,29 +197,6 @@ export default function NodeRail({ node, sector, hive, onPickNode, onClose, clas
             </ul>
           </div>
         )}
-
-        <div className="flex flex-col gap-1.5 pt-1">
-          {docId && (
-            <Link
-              to={`/wissen/doc/${docId}`}
-              className="inline-flex items-center gap-1.5 text-[11px] font-medium text-primary-400 hover:underline"
-            >
-              <FileText className="h-3.5 w-3.5" />
-              Dokument öffnen
-            </Link>
-          )}
-          {href && (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 truncate text-[11px] font-medium text-primary-400 hover:underline"
-            >
-              <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
-              Quelle aufrufen
-            </a>
-          )}
-        </div>
       </div>
     </aside>
   )

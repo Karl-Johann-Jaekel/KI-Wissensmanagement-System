@@ -32,7 +32,12 @@ Drei Festlegungen tragen das:
    `graph/scene.ts`, Kantenbezeichnungen aus `graph/relations.ts` — dieselbe Kante
    heißt in beiden Ansichten gleich, dasselbe Thema ist gleich geschnitten.
    `relationLabel` und `clusterLabel` wurden dafür aus ihren Modulen herausgereicht.
-3. **Die Kappung wird benannt.** Die Fußzeile sagt, dass die Antwort auf 2.000
+3. **Geöffneter Bereich und Knoten stehen in der Adresse** (`?bereich=`,
+   `?knoten=`). Ein Knoten aus einem Bereich wird im Popup aufgeschlagen, nicht
+   daneben — sonst schlösse ein Klick auf einen Namen die ganze Auswahl. Der
+   Zurück-Knopf des Browsers trägt dieselbe Bewegung wie der Pfeil im Popup, und
+   ein Link auf einen Knoten führt wieder dorthin.
+4. **Die Kappung wird benannt.** Die Fußzeile sagt, dass die Antwort auf 2.000
    Knoten gekappt ist. `val` (Server, ganzer Graph, vor der Kappung) und `degree`
    (Kanten in dieser Antwort) stehen als zwei Zahlen nebeneinander, statt eine für
    die andere auszugeben.

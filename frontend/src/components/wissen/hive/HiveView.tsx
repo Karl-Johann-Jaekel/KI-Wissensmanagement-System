@@ -11,7 +11,8 @@
  * gekappt (`DEFAULT_NODE_LIMIT`). Die Fußzeile sagt das, statt Vollständigkeit
  * zu suggerieren.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { FileText, Hexagon, Link2, Network, Search, Share2, X } from 'lucide-react'
 import { fetchGraph, type DocumentRow } from '../../../api'
 import { GRAPH_SOURCES, type GraphData, type GraphSource } from '../../../types'
@@ -71,15 +72,38 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
   const [mode, setMode] = useState<HiveMode>('comb')
   const [focus, setFocus] = useState<string | null>(null)
   const [hovered, setHovered] = useState<string | null>(null)
-  const [openSector, setOpenSector] = useState<string | null>(null)
-  const [selected, setSelected] = useState<HiveNode | null>(null)
   const [query, setQuery] = useState('')
   const searchRef = useRef<HTMLDivElement>(null)
+
+  /**
+   * Geöffneter Bereich und geöffneter Knoten stehen in der Adresse.
+   *
+   * Damit trägt der Zurück-Knopf des Browsers dieselbe Bewegung wie der Pfeil
+   * im Popup, und ein Link auf einen Knoten führt wieder dorthin. Vorher lagen
+   * beide im lokalen Zustand: ein Klick auf einen Namen im Popup schloss es,
+   * und der Weg zurück in den Bereich war verloren.
+   */
+  const [params, setParams] = useSearchParams()
+  const openSectorId = params.get('bereich')
+  const selectedId = params.get('knoten')
+
+  const go = useCallback(
+    (patch: { bereich?: string | null; knoten?: string | null }, push = true) => {
+      const next = new URLSearchParams(params)
+      for (const [key, value] of Object.entries(patch)) {
+        if (value) next.set(key, value)
+        else next.delete(key)
+      }
+      // Öffnen legt einen History-Schritt an, Zurückgehen ersetzt ihn — sonst
+      // wüchse beim Hin und Her ein Stapel gleicher Einträge.
+      setParams(next, { replace: !push })
+    },
+    [params, setParams],
+  )
 
   useEffect(() => {
     let cancelled = false
     setStatus('loading')
-    setSelected(null)
     fetchGraph(false, source)
       .then((d) => {
         if (cancelled) return
@@ -106,10 +130,10 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
     [hive.sectors],
   )
 
-  // Auswahl fällt weg, wenn ein Filter ihren Knoten aus dem Bestand nimmt.
-  useEffect(() => {
-    if (selected && !hive.nodesById.has(selected.id)) setSelected(null)
-  }, [hive, selected])
+  // Nimmt ein Filter den Knoten aus dem Bestand, zeigt die Adresse ins Leere —
+  // dann bleibt die Auswahl schlicht aus, ohne die Adresse anzufassen.
+  const selected = selectedId ? (hive.nodesById.get(selectedId) ?? null) : null
+  const openSector = openSectorId ? (sectorById.get(openSectorId) ?? null) : null
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -133,11 +157,12 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
   }, [matches.length])
 
   const patchFilter = (patch: Partial<HiveFilter>) => setFilter((f) => ({ ...f, ...patch }))
+  /** Knoten öffnen — im Popup, wenn eines offen ist, sonst in der Spalte. */
   const pickNode = (node: HiveNode) => {
-    setSelected(node)
-    setOpenSector(null)
+    go({ knoten: node.id })
     setQuery('')
   }
+  const openSectorAt = (id: string) => go({ bereich: id, knoten: null })
 
   const focusLabel = focus ? sectorById.get(focus)?.label : null
   const combined = useMemo(
@@ -407,34 +432,34 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
                     strokeLinejoin="round"
                   />
                   <text
-                    y={-16}
+                    y={-24}
                     textAnchor="middle"
                     fill="rgb(var(--c-ink))"
-                    className="text-[12px] font-semibold"
+                    className="text-[15px] font-semibold"
                   >
-                    {selected ? truncate(selected.name, 22) : 'Wissensbasis'}
+                    {selected ? truncate(selected.name, 26) : 'Wissensbasis'}
                   </text>
                   <text
-                    y={2}
+                    y={-2}
                     textAnchor="middle"
                     fill="rgb(var(--c-muted))"
-                    className="text-[10px] tabular-nums"
+                    className="text-[12px] tabular-nums"
                   >
                     {hive.stats.nodes.toLocaleString('de-DE')} Knoten
                   </text>
                   <text
-                    y={16}
+                    y={15}
                     textAnchor="middle"
                     fill="rgb(var(--c-muted))"
-                    className="text-[10px] tabular-nums"
+                    className="text-[12px] tabular-nums"
                   >
                     {hive.stats.links.toLocaleString('de-DE')} Kanten
                   </text>
                   <text
-                    y={34}
+                    y={40}
                     textAnchor="middle"
                     fill="rgb(var(--c-muted))"
-                    className="text-[9px] uppercase tracking-[0.16em]"
+                    className="text-[10px] uppercase tracking-[0.16em]"
                   >
                     {focusLabel ?? 'KWMS-Kern'}
                   </text>
@@ -448,7 +473,7 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
                     dimmed={focus !== null && focus !== sector.id}
                     hovered={hovered === sector.id}
                     selectedNodeId={selected?.id ?? null}
-                    onOpen={(s: Sector) => setOpenSector(s.id)}
+                    onOpen={(s: Sector) => openSectorAt(s.id)}
                     onHover={setHovered}
                     onPickNode={pickNode}
                   />
@@ -478,7 +503,7 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
                   <section key={sector.id} className="rounded-xl border border-edge bg-surface p-4">
                     <div className="mb-3 flex items-baseline justify-between gap-3">
                       <button
-                        onClick={() => setOpenSector(sector.id)}
+                        onClick={() => openSectorAt(sector.id)}
                         className="text-[11px] font-semibold uppercase tracking-[0.14em] hover:underline"
                         style={{ color: sector.color }}
                       >
@@ -504,7 +529,7 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
                       {undatedSectors.map((sector) => (
                         <li key={sector.id}>
                           <button
-                            onClick={() => setOpenSector(sector.id)}
+                            onClick={() => openSectorAt(sector.id)}
                             className="uppercase tracking-wider hover:underline"
                             style={{ color: sector.color }}
                           >
@@ -527,15 +552,16 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
             </div>
           )}
 
-          {/* Knoten-Details als Überlagerung; auf schmalen Geräten als Schublade. */}
-          {selected && (
+          {/* Knoten-Details als Überlagerung. Ist ein Bereich offen, steht der
+              Knoten dort drin — sonst lägen zwei Ansichten desselben übereinander. */}
+          {selected && !openSector && (
             <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-end p-3">
               <NodeRail
                 node={selected}
                 sector={sectorById.get(selected.sector)}
                 hive={hive}
-                onPickNode={setSelected}
-                onClose={() => setSelected(null)}
+                onPickNode={pickNode}
+                onClose={() => go({ knoten: null }, false)}
                 className="pointer-events-auto max-h-full w-full shadow-2xl sm:w-80"
               />
             </div>
@@ -567,13 +593,15 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
         </button>
       )}
 
-      {openSector && sectorById.has(openSector) && (
+      {openSector && (
         <SectorModal
-          sector={sectorById.get(openSector)!}
+          sector={openSector}
           hive={hive}
           documents={documents}
-          onClose={() => setOpenSector(null)}
+          node={selected}
+          onClose={() => go({ bereich: null, knoten: null }, false)}
           onPickNode={pickNode}
+          onBack={() => go({ knoten: null }, false)}
           onOpenGraph={onOpenGraph}
         />
       )}

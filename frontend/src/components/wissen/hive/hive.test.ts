@@ -306,19 +306,27 @@ describe('hiveLayout', () => {
     expect(layout.tiles[0].cy).toBeLessThan(0)
   })
 
-  it('hält die Nachbarwaben auf Gitterabstand statt sie zu überlagern', () => {
-    for (const count of [6, 7, 8, 9]) {
+  it('lässt keine zwei Waben überlappen — bei jeder Sektorzahl', () => {
+    // Zwei gleich ausgerichtete Sechsecke berühren sich frühestens bei `2·R`
+    // (Umkreis); darunter kann es je nach Richtung schneiden. Der Test prüft
+    // alle Paare, nicht nur die Nachbarn: bei kleiner Sektorzahl liegen sich
+    // auch übernächste nah.
+    for (const count of [3, 4, 5, 6, 7, 8, 9, 12]) {
       const { tiles } = hiveLayout(count)
-      const gap = Math.hypot(tiles[0].cx - tiles[1].cx, tiles[0].cy - tiles[1].cy)
-      expect(gap).toBeGreaterThanOrEqual(Math.sqrt(3) * tiles[0].r - 0.5)
+      for (let i = 0; i < tiles.length; i += 1) {
+        for (let j = i + 1; j < tiles.length; j += 1) {
+          const d = Math.hypot(tiles[i].cx - tiles[j].cx, tiles[i].cy - tiles[j].cy)
+          expect(d).toBeGreaterThanOrEqual(2 * tiles[i].r)
+        }
+      }
     }
   })
 
-  it('lässt das Zentrum frei', () => {
-    for (const count of [6, 7, 8]) {
+  it('hält die Waben vom Kern fern', () => {
+    for (const count of [3, 6, 7, 8, 12]) {
       const layout = hiveLayout(count)
       const ring = Math.hypot(layout.tiles[0].cx, layout.tiles[0].cy)
-      expect(ring - layout.tiles[0].r).toBeGreaterThan(layout.center.r * 0.4)
+      expect(ring - layout.tiles[0].r).toBeGreaterThanOrEqual(layout.center.r)
     }
   })
 

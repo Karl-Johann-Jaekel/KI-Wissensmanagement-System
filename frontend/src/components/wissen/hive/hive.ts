@@ -653,25 +653,51 @@ export function hexPath(cx: number, cy: number, r: number): string {
 }
 
 const TILE_R = 100
-const CENTER_R = 78
-/** Abstand benachbarter Waben im Gitter (Kante an Kante). */
-const LATTICE = Math.sqrt(3)
-/** Damit der Ring das Zentrum nie berührt, auch bei wenigen Sektoren. */
+
+/**
+ * Mindestabstand benachbarter Wabenmittelpunkte, in Vielfachen von `TILE_R`.
+ *
+ * Zwei gleich ausgerichtete Sechsecke überschneiden sich genau dann nicht, wenn
+ * ihre Mittelpunkte mindestens `2·r(φ)` auseinanderliegen — und `r(φ)`, der
+ * Abstand vom Mittelpunkt zum Rand, schwankt je nach Richtung zwischen der
+ * Apothem-Länge (0,87·R) und dem Umkreis (R). Auf einem Ring zeigt jede
+ * Nachbarschaft in eine andere Richtung; welche Richtung getroffen wird, hängt
+ * an der Sektorzahl. Das Layout rechnet deshalb mit dem ungünstigsten Fall
+ * (`2·R`) und legt Luft dazu — das gilt dann für jede Sektorzahl.
+ *
+ * Der frühere Wert war `√3` (Kante an Kante im Wabengitter). Der stimmt nur,
+ * wenn beide Waben *im Gitter* benachbart liegen; auf einem Siebenerring taten
+ * sie das nicht, und Papers und Modelle überlappten sichtbar.
+ */
+const NEIGHBOUR_GAP = 2.16
+
+/** Damit der Ring dem Kern nie zu nah kommt, auch bei wenigen Sektoren. */
 const MIN_RING = 2.14
+
+/** Anteil des Ringradius, den die Kernwabe einnimmt. */
+const CENTER_SHARE = 0.46
 
 /**
  * Ringanordnung der Waben, oben beginnend im Uhrzeigersinn.
  *
- * Der Radius folgt dem Wabengitter: Bei N Sektoren liegen benachbarte Zentren
- * `2·R_ring·sin(π/N)` auseinander, und genau `√3·R` weit stoßen zwei Waben
- * aneinander. Der Ring ist deshalb so groß, dass die Nachbarn sich berühren
- * statt zu überlappen — daher der Wabeneindruck. Bei sechs Sektoren käme der
- * Ring dem Zentrum zu nah; dort greift `MIN_RING`.
+ * Bei N Sektoren liegen benachbarte Mittelpunkte `2·R_ring·sin(π/N)`
+ * auseinander; der Ring wächst so weit, bis das `NEIGHBOUR_GAP` erreicht. Der
+ * Kern wächst mit, sonst risse mit steigender Sektorzahl ein Loch in die Mitte.
  */
 export function hiveLayout(count: number): HiveLayout {
-  const center = { cx: 0, cy: 0, r: CENTER_R }
-  if (count === 0) return { tiles: [], center, viewBox: '-200 -200 400 400', extent: 200 }
-  const ring = Math.max((LATTICE * TILE_R) / (2 * Math.sin(Math.PI / count)), MIN_RING * TILE_R)
+  if (count === 0) {
+    return {
+      tiles: [],
+      center: { cx: 0, cy: 0, r: TILE_R * 0.9 },
+      viewBox: '-200 -200 400 400',
+      extent: 200,
+    }
+  }
+  const ring = Math.max(
+    (NEIGHBOUR_GAP * TILE_R) / (2 * Math.sin(Math.PI / count)),
+    MIN_RING * TILE_R,
+  )
+  const center = { cx: 0, cy: 0, r: Math.round(ring * CENTER_SHARE) }
   const tiles: HexPlacement[] = []
   for (let i = 0; i < count; i += 1) {
     const angle = -90 + (360 / count) * i

@@ -109,7 +109,7 @@ describe('HiveView', () => {
     expect(within(dialog).getByText('Dokumente (1)')).toBeTruthy()
   })
 
-  it('führt vom Popup in die Knotendetails', async () => {
+  it('schlägt einen Knoten im Popup auf, statt es zu schließen', async () => {
     renderView()
     await screen.findByRole('group', { name: 'Wabenstruktur der Wissensbasis' })
     fireEvent.click(screen.getByLabelText(/^Papers — 1 Knoten/))
@@ -117,8 +117,8 @@ describe('HiveView', () => {
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getAllByText('Attention Is All You Need')[0])
 
-    // Popup schließt, die rechte Spalte übernimmt.
-    expect(screen.queryByRole('dialog')).toBeNull()
+    // Das Popup bleibt stehen — sonst wäre der Weg zurück in den Bereich weg.
+    expect(screen.getByRole('dialog')).toBeTruthy()
     const rail = screen.getByRole('complementary', {
       name: 'Details zum Knoten Attention Is All You Need',
     })
@@ -126,6 +126,24 @@ describe('HiveView', () => {
     expect(within(rail).getByText('führt ein')).toBeTruthy()
     expect(within(rail).getByText('evaluiert auf')).toBeTruthy()
     expect(within(rail).getByText('Self-Attention')).toBeTruthy()
+  })
+
+  it('führt vom Knoten zurück in seinen Bereich und von dort in die Wabe', async () => {
+    renderView()
+    await screen.findByRole('group', { name: 'Wabenstruktur der Wissensbasis' })
+    fireEvent.click(screen.getByLabelText(/^Papers — 1 Knoten/))
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getAllByText('Attention Is All You Need')[0],
+    )
+
+    fireEvent.click(screen.getByLabelText('Zurück zu Papers'))
+    // Wieder die Reiter des Bereichs, kein Knoten mehr.
+    expect(within(screen.getByRole('dialog')).getByText('Knoten (1)')).toBeTruthy()
+    expect(screen.queryByRole('complementary', { name: /Details zum Knoten/ })).toBeNull()
+
+    fireEvent.click(screen.getByLabelText('Zurück zur Wabenstruktur'))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('group', { name: 'Wabenstruktur der Wissensbasis' })).toBeTruthy()
   })
 
   it('findet einen Knoten über die Suche', async () => {

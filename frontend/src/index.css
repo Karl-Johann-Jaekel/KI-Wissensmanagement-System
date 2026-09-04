@@ -91,11 +91,16 @@ body {
   transform-origin: center;
   transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
+/* Chrome zeichnet auf einem <g tabindex> seinen eigenen Rahmen — als gelbes
+   Rechteck quer über die Wabe, auch beim bloßen Klick. Weg damit; die
+   Tastaturmarkierung übernimmt die Wabenkante selbst. */
+.hive-tile:focus,
 .hive-tile:focus-visible {
   outline: none;
 }
 .hive-tile:focus-visible > path:nth-of-type(2) {
-  stroke-width: 3;
+  stroke-width: 4;
+  stroke-dasharray: 10 6;
 }
 .hive-dot {
   cursor: pointer;

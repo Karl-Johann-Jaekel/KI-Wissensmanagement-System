@@ -85,7 +85,7 @@ export default function HexTile({
           y={-r * 0.6}
           textAnchor="middle"
           fill={sector.color}
-          className="text-[13px] font-semibold uppercase tracking-[0.14em]"
+          className="text-[14px] font-semibold uppercase tracking-[0.14em]"
         >
           {sector.label}
         </text>
@@ -93,7 +93,7 @@ export default function HexTile({
           y={-r * 0.6 + 15}
           textAnchor="middle"
           fill="rgb(var(--c-muted))"
-          className="text-[11px] tabular-nums"
+          className="text-[12px] tabular-nums"
         >
           {sector.count.toLocaleString('de-DE')} Knoten
         </text>
@@ -144,7 +144,7 @@ export default function HexTile({
           y={r * 0.68}
           textAnchor="middle"
           fill="rgb(var(--c-muted))"
-          className="text-[10px] tabular-nums"
+          className="text-[11px] tabular-nums"
         >
           {sector.links.toLocaleString('de-DE')} Kanten
         </text>

@@ -27,6 +27,7 @@ import Badge from '../../ui/Badge'
 import Button from '../../ui/Button'
 import Modal from '../../ui/Modal'
 import { Bars, Donut, Meter } from './Charts'
+import NodeRail from './NodeRail'
 import {
   keywords,
   mainGroups,
@@ -46,8 +47,18 @@ interface Props {
   sector: Sector
   hive: Hive
   documents: DocumentRow[]
+  /**
+   * Der im Popup geöffnete Knoten.
+   *
+   * Ein Knoten aus diesem Bereich wird **hier drin** aufgeschlagen, nicht neben
+   * dem Popup: sonst schlösse ein Klick auf einen Namen die ganze Auswahl, und
+   * der Weg zurück in den Bereich wäre weg.
+   */
+  node: HiveNode | null
   onClose: () => void
   onPickNode: (node: HiveNode) => void
+  /** Zurück vom Knoten in den Bereich. */
+  onBack: () => void
   /** Wechselt in den Graph-Explorer (Reiter „Graph"). */
   onOpenGraph: () => void
 }
@@ -133,8 +144,10 @@ export default function SectorModal({
   sector,
   hive,
   documents,
+  node,
   onClose,
   onPickNode,
+  onBack,
   onOpenGraph,
 }: Props) {
   const [tab, setTab] = useState<Tab>('overview')
@@ -206,31 +219,52 @@ export default function SectorModal({
         }}
       >
         <button
-          onClick={onClose}
-          aria-label="Zurück zur Wabenstruktur"
+          onClick={node ? onBack : onClose}
+          aria-label={node ? `Zurück zu ${sector.label}` : 'Zurück zur Wabenstruktur'}
           className="rounded-lg p-1.5 text-muted transition-colors hover:bg-sunken hover:text-ink"
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="min-w-0 flex-1">
-          <h2
-            className="truncate text-lg font-semibold uppercase tracking-[0.12em]"
-            style={{ color: sector.color }}
-          >
-            {sector.label}
-          </h2>
-          <p className="text-[11px] tabular-nums text-muted">
-            {sector.count.toLocaleString('de-DE')} Knoten ·{' '}
-            {sector.links.toLocaleString('de-DE')} Kanten
-            {sector.synthetic && ' · Systemebene'}
-          </p>
+          {node ? (
+            <>
+              <button
+                onClick={onBack}
+                className="text-[10px] uppercase tracking-[0.14em] hover:underline"
+                style={{ color: sector.color }}
+              >
+                {sector.label}
+              </button>
+              <h2 className="truncate text-base font-semibold text-ink" title={node.name}>
+                {node.name}
+              </h2>
+            </>
+          ) : (
+            <>
+              <h2
+                className="truncate text-lg font-semibold uppercase tracking-[0.12em]"
+                style={{ color: sector.color }}
+              >
+                {sector.label}
+              </h2>
+              <p className="text-[11px] tabular-nums text-muted">
+                {sector.count.toLocaleString('de-DE')} Knoten ·{' '}
+                {sector.links.toLocaleString('de-DE')} Kanten
+                {sector.synthetic && ' · Systemebene'}
+              </p>
+            </>
+          )}
         </div>
-        <Button variant="secondary" size="sm" icon={Network} onClick={onOpenGraph}>
-          <span className="hidden sm:inline">Im Graph ansehen</span>
-        </Button>
-        <Button variant="secondary" size="sm" icon={Download} onClick={exportSector}>
-          <span className="hidden sm:inline">Exportieren</span>
-        </Button>
+        {!node && (
+          <>
+            <Button variant="secondary" size="sm" icon={Network} onClick={onOpenGraph}>
+              <span className="hidden sm:inline">Im Graph ansehen</span>
+            </Button>
+            <Button variant="secondary" size="sm" icon={Download} onClick={exportSector}>
+              <span className="hidden sm:inline">Exportieren</span>
+            </Button>
+          </>
+        )}
         <button
           onClick={onClose}
           aria-label="Schließen"
@@ -239,6 +273,7 @@ export default function SectorModal({
           <X className="h-4 w-4" />
         </button>
       </div>
+      {node ? null : (
       <nav className="flex gap-0.5 overflow-x-auto px-4" aria-label="Sektor-Reiter">
         {tabs.map((t) => (
           <button
@@ -254,6 +289,7 @@ export default function SectorModal({
           </button>
         ))}
       </nav>
+      )}
     </div>
   )
 
@@ -268,7 +304,18 @@ export default function SectorModal({
       className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden p-0"
     >
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        {tab === 'overview' && (
+        {node && (
+          <NodeRail
+            node={node}
+            sector={sector}
+            hive={hive}
+            onPickNode={onPickNode}
+            onClose={onBack}
+            embedded
+          />
+        )}
+
+        {!node && tab === 'overview' && (
           <div className="grid gap-3 lg:grid-cols-[1.55fr_1fr]">
             <div className="flex flex-col gap-3">
               <div className="grid grid-cols-2 gap-3 rounded-xl border border-edge bg-canvas/60 p-3.5 sm:grid-cols-4">
@@ -395,7 +442,7 @@ export default function SectorModal({
           </div>
         )}
 
-        {tab === 'nodes' && (
+        {!node && tab === 'nodes' && (
           <div className="flex flex-col gap-3">
             <input
               value={query}
@@ -428,7 +475,7 @@ export default function SectorModal({
           </div>
         )}
 
-        {tab === 'links' && (
+        {!node && tab === 'links' && (
           <div className="grid gap-3 sm:grid-cols-2">
             <Section title="Verbindungstypen">
               <Meter
@@ -453,7 +500,7 @@ export default function SectorModal({
           </div>
         )}
 
-        {tab === 'docs' && (
+        {!node && tab === 'docs' && (
           <div>
             {docs.length === 0 ? (
               <p className="text-xs text-muted">
@@ -485,7 +532,7 @@ export default function SectorModal({
           </div>
         )}
 
-        {tab === 'clusters' && (
+        {!node && tab === 'clusters' && (
           <div className="flex flex-col gap-3">
             {groups.groups.length === 0 ? (
               <p className="text-xs leading-relaxed text-muted">
@@ -529,7 +576,7 @@ export default function SectorModal({
           </div>
         )}
 
-        {tab === 'time' && (
+        {!node && tab === 'time' && (
           <div className="flex flex-col gap-3">
             <Section title="Erste Veröffentlichung je Jahr">
               <Bars buckets={years.years} color={sector.color} height={180} ticks={10} />
