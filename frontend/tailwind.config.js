@@ -1,3 +1,5 @@
+import plugin from 'tailwindcss/plugin'
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
@@ -30,5 +32,17 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // Größe nach Zeigegerät, nicht nach Fensterbreite.
+    //
+    // Ein Tablet ist 768 px breit und wird mit dem Finger bedient; ein schmales
+    // Browserfenster am Schreibtisch ist genauso breit und wird mit der Maus
+    // bedient. Über `md:` bekämen beide dasselbe — gemessen hatte das Tablet
+    // dadurch wieder 28-px-Knöpfe. Tailwind 3.4 kennt diese Varianten noch
+    // nicht; sie kommen erst in v4, also hier nachgereicht.
+    plugin(({ addVariant }) => {
+      addVariant('pointer-fine', '@media (pointer: fine)')
+      addVariant('pointer-coarse', '@media (pointer: coarse)')
+    }),
+  ],
 }

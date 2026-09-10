@@ -15,6 +15,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { FileText, Hexagon, Link2, Network, Search, Share2, X } from 'lucide-react'
 import { fetchGraph, type DocumentRow } from '../../../api'
+import { useElementSize } from '../../../useElementSize'
+import { cn } from '../../../lib/cn'
 import { GRAPH_SOURCES, type GraphData, type GraphSource } from '../../../types'
 import { relationLabel } from '../../graph/relations'
 import Select from '../../ui/Select'
@@ -53,11 +55,13 @@ function StatCard({ icon: Icon, value, label }: {
   label: string
 }) {
   return (
-    <div className="flex items-center gap-2.5 rounded-xl border border-edge bg-surface px-3.5 py-2.5">
+    <div className="flex shrink-0 items-center gap-2.5 rounded-xl border border-edge bg-surface px-3 py-2 md:px-3.5 md:py-2.5">
       <Icon className="h-4 w-4 shrink-0 text-primary-400" />
       <div className="min-w-0">
         <div className="text-base font-semibold leading-none tabular-nums text-ink">{value}</div>
-        <div className="mt-1 text-[10px] uppercase tracking-wider text-muted">{label}</div>
+        <div className="mt-1 text-[11px] uppercase tracking-wider text-muted md:text-[10px]">
+          {label}
+        </div>
       </div>
     </div>
   )
@@ -124,7 +128,15 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
     () => buildHive(applyFilter(data, filter), { documents: documents.length }),
     [data, filter, documents.length],
   )
-  const layout = useMemo(() => hiveLayout(hive.sectors.length), [hive.sectors.length])
+  // Hochkant, sobald die Fläche höher als breit ist: dort ist der Ring die
+  // falsche Form, und die Beschriftung kam auf dem Telefon mit unter sieben
+  // Bildpunkten an (`portraitLayout` in hive.ts).
+  const { ref: combRef, width: combW, height: combH } = useElementSize<HTMLDivElement>()
+  const portrait = combW > 0 && combH > combW * 1.15
+  const layout = useMemo(
+    () => hiveLayout(hive.sectors.length, { portrait }),
+    [hive.sectors.length, portrait],
+  )
   const sectorById = useMemo(
     () => new Map(hive.sectors.map((s) => [s.id, s])),
     [hive.sectors],
@@ -200,7 +212,10 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Kennzahlen + Suche */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-edge px-4 py-3">
+        {/* Auf dem Handy eine wischbare Zeile: gestapelt nahmen die fünf Karten
+            zwei Reihen und damit den halben ersten Bildschirm ein, bevor von der
+            Wabe etwas zu sehen war. */}
+        <div className="flex items-center gap-2 overflow-x-auto border-b border-edge px-4 py-2.5 [scrollbar-width:none] md:flex-wrap md:overflow-visible md:py-3">
           <StatCard
             icon={Hexagon}
             value={hive.stats.nodes.toLocaleString('de-DE')}
@@ -234,7 +249,7 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Suche in der Wissensbasis …"
               aria-label="Suche in der Wissensbasis"
-              className="w-full rounded-xl border border-edge bg-surface py-2 pl-8 pr-3 text-xs text-ink placeholder:text-muted focus:border-primary-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
+              className="min-h-11 w-full rounded-xl border border-edge bg-surface py-2 pl-9 pr-3 text-sm text-ink placeholder:text-muted focus:border-primary-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 pointer-fine:min-h-0 pointer-fine:pl-8 pointer-fine:text-xs"
             />
             {matches.length > 0 && (
               <ul className="absolute right-0 top-full z-30 mt-1 w-full overflow-hidden rounded-xl border border-edge bg-surface shadow-xl">
@@ -280,8 +295,8 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
                 onClick={() => setMode(v.id)}
                 className={
                   mode === v.id
-                    ? 'bg-primary-950/70 px-2.5 py-1 text-[11px] font-medium text-primary-300'
-                    : 'px-2.5 py-1 text-[11px] text-muted hover:bg-sunken hover:text-ink'
+                    ? 'min-h-11 bg-primary-950/70 px-3.5 text-xs font-medium text-primary-300'
+                    : 'min-h-11 px-3.5 text-xs text-muted hover:bg-sunken hover:text-ink'
                 }
               >
                 {v.label}
@@ -290,7 +305,7 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
           </div>
           <button
             onClick={onOpenGraph}
-            className="rounded-lg border border-edge px-2.5 py-1 text-[11px] text-muted hover:bg-sunken hover:text-ink"
+            className="min-h-11 rounded-lg border border-edge px-3.5 text-xs text-muted hover:bg-sunken hover:text-ink"
           >
             Netzwerk ↗
           </button>
@@ -308,7 +323,7 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
           </Select>
         </div>
 
-        <div className="relative min-h-0 flex-1 overflow-hidden">
+        <div ref={combRef} className="relative min-h-0 flex-1 overflow-hidden">
           {status === 'loading' && (
             <div className="absolute inset-0 grid place-items-center gap-2 text-sm text-muted">
               <Spinner className="h-6 w-6" />
@@ -568,16 +583,23 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
         </div>
 
         {/* Verbindungstypen im Bestand */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-edge px-4 py-2 text-[10px] text-muted">
+        {/* Vier Zeilen Legende sind auf einem Handy ein Viertel des Bildschirms.
+            Dort stehen die drei häufigsten Arten, der Rest ab `md`. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-edge px-4 py-2 text-[11px] text-muted md:text-[10px]">
           <span className="font-semibold uppercase tracking-[0.14em]">Verbindungstypen</span>
-          {hive.relations.slice(0, 8).map((r) => (
-            <span key={r.relation} className="flex items-center gap-1.5">
+          {hive.relations.slice(0, 8).map((r, i) => (
+            <span
+              key={r.relation}
+              className={cn('items-center gap-1.5', i < 3 ? 'flex' : 'hidden md:flex')}
+            >
               <span className="h-px w-4 bg-muted" />
               {relationLabel(r.relation)}
               <span className="tabular-nums opacity-70">{r.count.toLocaleString('de-DE')}</span>
             </span>
           ))}
-          <span className="ml-auto">Serverantwort auf 2.000 Knoten gekappt (Kontingent je Art)</span>
+          <span className="ml-auto hidden md:inline">
+            Serverantwort auf 2.000 Knoten gekappt (Kontingent je Art)
+          </span>
         </div>
       </div>
 

@@ -6,9 +6,10 @@
  * selbst in `onRenderFramePre` und ziehen die Knoten weich auf ihr Ziel — dadurch
  * sind Layout-Wechsel animiert und die Kugeln bleiben trotzdem in Bewegung.
  */
-import { useCallback, useEffect, useMemo, useRef, type MutableRefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import { FALLBACK_COLOR, LANDMARK_COLOR } from '../../types'
+import { GLOBE_FRONT_MIN, globeLabelAnchors, spreadLabels, type LabelBox } from './labels'
 import {
   clusterCenters,
   globeBasis,
@@ -40,6 +41,7 @@ interface Props {
    * Graphen in die Fläche *daneben* ein, statt ihn teilweise darunter zu legen.
    */
   insetRight?: number
+  insetBottom?: number
   settings: GraphSettings
   theme: Theme
   /** Suchtreffer; null = kein Filter. */
@@ -63,6 +65,27 @@ interface Props {
 
 const DIM_ALPHA = 0.1
 const EASE = 0.12
+
+/**
+ * Grobes Zeigegerät (Finger) statt feinem (Maus, Stift).
+ *
+ * `pointer: coarse` fragt das Gerät, nicht die Fensterbreite: Ein schmales
+ * Browserfenster am Schreibtisch bleibt damit mausgenau, ein großes Tablet
+ * bekommt die Fingermaße.
+ */
+function useCoarsePointer(): boolean {
+  const [coarse, setCoarse] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(pointer: coarse)')
+    const update = () => setCoarse(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+  return coarse
+}
 
 const THEME_STYLES = {
   dark: {
@@ -89,6 +112,16 @@ function withAlpha(hex: string, alpha: number): string {
 }
 
 /** Wie weit ein Knoten vom Median seiner Art abweichen darf. */
+/**
+ * Mindest-Trefferradius in Bildpunkten für Finger-Bedienung.
+ *
+ * 12 statt der 22, die eine 44-px-Fläche ergäben: Auf dem dicht besetzten
+ * Globus überlappten sich bei 22 die Flächen benachbarter Knoten so weit, dass
+ * regelmäßig der falsche getroffen wird. 24 px Durchmesser sind der Punkt, an
+ * dem Treffsicherheit und Eindeutigkeit zusammen am besten stehen.
+ */
+const TOUCH_RADIUS_PX = 12
+
 const REL_MIN = 0.3
 const REL_MAX = 9
 
@@ -119,6 +152,7 @@ export default function GraphCanvas({
   width,
   height,
   insetRight = 0,
+  insetBottom = 0,
   settings,
   theme,
   activeIds,
@@ -137,6 +171,7 @@ export default function GraphCanvas({
   const rotationRef = useRef(0)
   const clockRef = useRef(performance.now())
   const styles = THEME_STYLES[theme]
+  const coarsePointer = useCoarsePointer()
 
   const groupColor = useMemo(() => {
     const map = new Map(scene.groups.map((g) => [g.id, g.color]))
@@ -226,12 +261,21 @@ export default function GraphCanvas({
       if (!fg) return
       const bounds = boundsOf(scene.nodes)
       if (!bounds) return
-      const { k, x, y } = fitTransform(bounds, { width, height, insetRight })
+      const { k, x, y } = fitTransform(bounds, { width, height, insetRight, insetBottom })
       fg.centerAt(x, y, 700)
       fg.zoom(k, 700)
     }, 400)
     return () => clearTimeout(timer)
-  }, [settings.layout, settings.detail, settings.groupMode, width, height, insetRight, scene])
+  }, [
+    settings.layout,
+    settings.detail,
+    settings.groupMode,
+    width,
+    height,
+    insetRight,
+    insetBottom,
+    scene,
+  ])
 
   useEffect(() => {
     if (!focus) return
@@ -435,13 +479,19 @@ export default function GraphCanvas({
   )
 
   const paintPointerArea = useCallback(
-    (node: SceneNode, color: string, ctx: CanvasRenderingContext2D) => {
+    (node: SceneNode, color: string, ctx: CanvasRenderingContext2D, globalScale: number) => {
+      // Die Trefferfläche steht in Weltmaß. Beim herausgezoomten Globus ist ein
+      // Knoten damit zwei, drei Bildpunkte groß — mit der Maus noch zu treffen,
+      // mit dem Finger nicht. Auf Zeigegeräten ohne Genauigkeit bekommt jeder
+      // Knoten deshalb eine Mindestgröße *auf dem Schirm*, unabhängig vom Zoom.
+      const world = nodeRadius(node, settings.nodeSize) + 2
+      const min = coarsePointer ? TOUCH_RADIUS_PX / Math.max(globalScale, 0.001) : 0
       ctx.beginPath()
-      ctx.arc(node.x ?? 0, node.y ?? 0, nodeRadius(node, settings.nodeSize) + 2, 0, 2 * Math.PI)
+      ctx.arc(node.x ?? 0, node.y ?? 0, Math.max(world, min), 0, 2 * Math.PI)
       ctx.fillStyle = color
       ctx.fill()
     },
-    [settings.nodeSize],
+    [settings.nodeSize, coarsePointer],
   )
 
   const paintOverlay = useCallback(
@@ -482,17 +532,54 @@ export default function GraphCanvas({
         sums.set(node.group, acc)
       }
       const layers = settings.layout === 'layers'
+      // Auf der Kugel reicht jede Gruppe von Pol zu Pol — „über dem obersten
+      // Knoten" traf dort für alle denselben Punkt, und acht Namen lagen
+      // aufeinander. Der Name folgt deshalb dem Teil, der gerade vorn steht.
+      const anchors = settings.layout === 'globe' ? globeLabelAnchors(scene.nodes) : null
+
+      type Placed = LabelBox & { color: string; text: string; alpha: number }
+      const boxes: Placed[] = []
       for (const group of scene.groups) {
-        const acc = sums.get(group.id)
-        if (!acc || acc.n === 0) continue
-        ctx.fillStyle = group.color
-        ctx.globalAlpha = layers ? 0.65 : 0.75
         const label = group.label.toUpperCase()
-        ctx.fillText(
-          layers && label.length > 14 ? `${label.slice(0, 13)}…` : label,
-          acc.x / acc.n,
-          layers ? acc.bottom + 16 / scale : acc.top - 12 / scale,
-        )
+        const text = layers && label.length > 14 ? `${label.slice(0, 13)}…` : label
+        let x: number
+        let y: number
+        let alpha = layers ? 0.65 : 0.75
+        if (anchors) {
+          const anchor = anchors.get(group.id)
+          if (!anchor) continue // Gruppe steht gerade auf der Rückseite
+          x = anchor.x
+          y = anchor.y
+          // Weiter hinten heißt blasser — so bleibt die Kugel räumlich lesbar.
+          alpha *= 0.45 + 0.55 * Math.min(1, Math.max(0, (anchor.depth - GLOBE_FRONT_MIN) / 0.3))
+        } else {
+          const acc = sums.get(group.id)
+          if (!acc || acc.n === 0) continue
+          x = acc.x / acc.n
+          y = layers ? acc.bottom + 16 / scale : acc.top - 12 / scale
+        }
+        boxes.push({
+          key: group.id,
+          x,
+          y,
+          width: ctx.measureText(text).width,
+          color: group.color,
+          text,
+          alpha,
+        })
+      }
+
+      // Auf der Kugel liegt der Name über tausend Punkten. Ein Saum in der
+      // Hintergrundfarbe hebt ihn heraus, ohne eine Fläche zu setzen, die den
+      // Graphen darunter verdecken würde.
+      ctx.lineJoin = 'round'
+      ctx.lineWidth = 3.5 / scale
+      ctx.strokeStyle = styles.background
+      for (const box of spreadLabels(boxes, fontSize * 1.6)) {
+        ctx.globalAlpha = box.alpha
+        ctx.strokeText(box.text, box.x, box.y)
+        ctx.fillStyle = box.color
+        ctx.fillText(box.text, box.x, box.y)
       }
       ctx.restore()
     },

@@ -75,14 +75,14 @@ export default function SkillsPage() {
                   <button
                     onClick={() => openEditor(skill)}
                     aria-label={`${skill.name} bearbeiten`}
-                    className="rounded p-1 text-muted hover:bg-sunken hover:text-ink"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded text-muted hover:bg-sunken hover:text-ink pointer-fine:h-8 pointer-fine:w-8"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => setDeleteTarget(skill)}
                     aria-label={`${skill.name} löschen`}
-                    className="rounded p-1 text-muted hover:bg-sunken hover:text-rose-500"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded text-muted hover:bg-sunken hover:text-rose-500 pointer-fine:h-8 pointer-fine:w-8"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>

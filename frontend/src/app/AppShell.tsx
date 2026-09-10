@@ -80,7 +80,8 @@ export default function AppShell() {
           <button
             onClick={() => setDrawerOpen(true)}
             aria-label="Menü öffnen"
-            className="rounded-lg p-1.5 text-muted hover:bg-sunken hover:text-ink"
+            // -m-1.5 haelt das Bild an seinem Platz, waehrend die Trefferflaeche waechst.
+            className="-m-1.5 inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:bg-sunken hover:text-ink"
           >
             <Menu className="h-5 w-5" />
           </button>

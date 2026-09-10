@@ -9,7 +9,7 @@ import { useProjects } from '../lib/storage'
 import { useTheme } from '../lib/theme'
 import { endpointId, type GraphData, type GraphSource } from '../types'
 import { useElementSize } from '../useElementSize'
-import ControlPanel, { PANEL_WIDTH } from './graph/ControlPanel'
+import ControlPanel, { PANEL_WIDTH, SHEET_HANDLE } from './graph/ControlPanel'
 import GraphCanvas from './graph/GraphCanvas'
 import Minimap from './graph/Minimap'
 import ReaderPanel from './graph/ReaderPanel'
@@ -49,8 +49,14 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
   // Standard, und dort bleibt es, solange niemand es wegzieht —, muss die
   // Kamera diese Breite freihalten, sonst verschwindet die letzte Spalte
   // dahinter (in der Ebenenansicht traf es "Konzepte").
-  const panelOnRight = panelPos === null || panelPos.x + PANEL_WIDTH / 2 > width / 2
+  // Unterhalb von `md` ist das Menü kein Seitenpanel mehr, sondern ein Blatt am
+  // unteren Rand (ControlPanel). Dann ist rechts nichts belegt, dafür unten.
+  const narrow = width > 0 && width < 768
+  const panelOnRight =
+    !narrow && (panelPos === null || panelPos.x + PANEL_WIDTH / 2 > width / 2)
   const insetRight = panelOnRight ? PANEL_WIDTH + 32 : 0
+  /** Höhe des zugeklappten Griffs — mehr verdeckt das Blatt nicht von selbst. */
+  const insetBottom = narrow ? SHEET_HANDLE : 0
   const nonce = useRef(0)
   // Globus: Rotation per Minimap-Klick anhalten, per Ziehen selbst drehen.
   const [rotationPaused, setRotationPaused] = useState(false)
@@ -212,6 +218,7 @@ export default function GraphSection({ refreshKey = 0 }: { refreshKey?: number }
             width={width}
             height={height}
             insetRight={insetRight}
+            insetBottom={insetBottom}
             settings={settings}
             theme={theme}
             activeIds={matches}

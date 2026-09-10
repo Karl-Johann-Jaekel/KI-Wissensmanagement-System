@@ -671,6 +671,9 @@ const TILE_R = 100
  */
 const NEIGHBOUR_GAP = 2.16
 
+/** Abstand zweier Waben, die im Gitter Kante an Kante liegen. */
+const LATTICE = Math.sqrt(3)
+
 /** Damit der Ring dem Kern nie zu nah kommt, auch bei wenigen Sektoren. */
 const MIN_RING = 2.14
 
@@ -684,7 +687,61 @@ const CENTER_SHARE = 0.46
  * auseinander; der Ring wächst so weit, bis das `NEIGHBOUR_GAP` erreicht. Der
  * Kern wächst mit, sonst risse mit steigender Sektorzahl ein Loch in die Mitte.
  */
-export function hiveLayout(count: number): HiveLayout {
+/**
+ * Hochkant: echtes Wabengitter in zwei Spalten statt eines Rings.
+ *
+ * Der Ring ist quer — sieben Waben nebeneinander brauchen Breite, und ein
+ * Telefon hat Höhe. Gemessen auf 390 px kam die Beschriftung dadurch mit 4,8
+ * bis 7,2 Bildpunkten an, also gar nicht. Zwei versetzte Spalten füllen das
+ * Hochformat und lassen dieselbe Schrift rund doppelt so groß ankommen.
+ *
+ * Die Waben stoßen hier Kante an Kante (`√3·R`) — das ist die Tessellation, für
+ * die das Sechseck gemacht ist, und deshalb hier kein Zusammenstoß, sondern der
+ * Zweck. Der Kern steht als erste Zelle oben, die Sektoren folgen.
+ */
+function portraitLayout(count: number): HiveLayout {
+  const stepX = 1.5 * TILE_R
+  const stepY = LATTICE * TILE_R
+  const cells = count + 1 // eine Zelle für den Kern
+
+  const at = (i: number) => {
+    const col = i % 2
+    const row = Math.floor(i / 2)
+    return { cx: col * stepX, cy: row * stepY + (col === 1 ? stepY / 2 : 0) }
+  }
+
+  const centerCell = at(0)
+  const tiles: HexPlacement[] = []
+  for (let i = 1; i < cells; i += 1) {
+    const { cx, cy } = at(i)
+    tiles.push({
+      // Hier wird bewusst *nicht* gerundet: Im Gitter stoßen die Waben exakt
+      // Kante an Kante. Zwei Nachkommastellen verschieben sie um Hundertstel —
+      // genug, dass die Kanten sich rechnerisch schneiden statt zu berühren.
+      cx: cx - centerCell.cx,
+      cy: cy - centerCell.cy,
+      r: TILE_R,
+      // Richtung vom Kern aus — die Speichen im Bild folgen ihr.
+      angle: (Math.atan2(cy - centerCell.cy, cx - centerCell.cx) * 180) / Math.PI,
+    })
+  }
+
+  const xs = tiles.map((t) => t.cx)
+  const ys = tiles.map((t) => t.cy)
+  const pad = TILE_R + 20
+  const minX = Math.min(0, ...xs) - pad
+  const maxX = Math.max(0, ...xs) + pad
+  const minY = Math.min(0, ...ys) - pad
+  const maxY = Math.max(0, ...ys) + pad
+  return {
+    tiles,
+    center: { cx: 0, cy: 0, r: Math.round(TILE_R * 0.92) },
+    viewBox: `${minX} ${minY} ${maxX - minX} ${maxY - minY}`,
+    extent: Math.round(Math.max(maxX - minX, maxY - minY) / 2),
+  }
+}
+
+export function hiveLayout(count: number, opts: { portrait?: boolean } = {}): HiveLayout {
   if (count === 0) {
     return {
       tiles: [],
@@ -693,6 +750,7 @@ export function hiveLayout(count: number): HiveLayout {
       extent: 200,
     }
   }
+  if (opts.portrait) return portraitLayout(count)
   const ring = Math.max(
     (NEIGHBOUR_GAP * TILE_R) / (2 * Math.sin(Math.PI / count)),
     MIN_RING * TILE_R,

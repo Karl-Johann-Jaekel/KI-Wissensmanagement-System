@@ -13,6 +13,11 @@ const VIEW = { width: 1000, height: 600 }
 const BREIT: Bounds = { minX: -500, maxX: 500, minY: -50, maxY: 50 }
 
 /** Bildpunkt-Position eines Weltpunkts bei gegebener Kamera. */
+/** Bildpunkt-Position eines Weltpunktes auf der senkrechten Achse. */
+function toScreenY(worldY: number, cam: { k: number; y: number }, height: number): number {
+  return (worldY - cam.y) * cam.k + height / 2
+}
+
 function toScreen(worldX: number, cam: { k: number; x: number }, width: number): number {
   return width / 2 + (worldX - cam.x) * cam.k
 }
@@ -78,5 +83,37 @@ describe('fitTransform', () => {
     const cam = fitTransform(BREIT, { width: 40, height: 30, insetRight: 264 })
     expect(Number.isFinite(cam.k)).toBe(true)
     expect(cam.k).toBeGreaterThan(0)
+  })
+})
+
+describe('fitTransform mit Blatt am unteren Rand', () => {
+  // Auf dem Handy liegt das Bedienmenue als Blatt unten statt rechts.
+  const HOCH: Bounds = { minX: -50, maxX: 50, minY: -400, maxY: 400 }
+  const PHONE = { width: 390, height: 800 }
+
+  it('haelt den Inhalt ueber dem Blatt', () => {
+    const inset = 220
+    const cam = fitTransform(HOCH, { ...PHONE, insetBottom: inset })
+    const unten = toScreenY(HOCH.maxY, cam, PHONE.height)
+    expect(unten).toBeLessThanOrEqual(PHONE.height - inset)
+  })
+
+  it('zentriert im freien Teil, nicht in der ganzen Flaeche', () => {
+    const inset = 220
+    const cam = fitTransform(HOCH, { ...PHONE, insetBottom: inset })
+    const mitte = toScreenY((HOCH.minY + HOCH.maxY) / 2, cam, PHONE.height)
+    expect(mitte).toBeCloseTo((PHONE.height - inset) / 2, 0)
+  })
+
+  it('ohne Blatt bleibt alles wie zuvor', () => {
+    const ohne = fitTransform(HOCH, PHONE)
+    const explizit = fitTransform(HOCH, { ...PHONE, insetBottom: 0 })
+    expect(ohne).toEqual(explizit)
+  })
+
+  it('zoomt weiter heraus, je mehr das Blatt verdeckt', () => {
+    const frei = fitTransform(HOCH, PHONE)
+    const belegt = fitTransform(HOCH, { ...PHONE, insetBottom: 300 })
+    expect(belegt.k).toBeLessThan(frei.k)
   })
 })

@@ -95,15 +95,16 @@ export default function ChatInput({
             // text-base verhindert Auto-Zoom auf iOS.
             className={cn(
               'w-full resize-none bg-transparent px-4 pb-2 pt-3 text-base text-ink outline-none',
+              'min-h-11 pointer-fine:min-h-0',
               'placeholder:text-muted sm:text-sm',
             )}
           />
 
-          <div className="flex items-center gap-1 px-2 pb-2">
+          <div className="flex items-center gap-2 px-2 pb-2 pointer-fine:gap-1">
             <Popover
               label="Wissen hinzufügen"
               trigger={<Plus className="h-4 w-4" />}
-              className="rounded-lg px-1.5"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-lg pointer-fine:h-auto pointer-fine:w-auto pointer-fine:px-1.5"
             >
               {(close) => (
                 <>
@@ -125,7 +126,7 @@ export default function ChatInput({
 
             <SkillPicker onInsert={insertAtCursor} />
 
-            <div className="ml-auto flex items-center gap-1">
+            <div className="ml-auto flex items-center gap-2 pointer-fine:gap-1">
               {value.length > MAX_CHARS * 0.75 && (
                 <span className="mr-1 text-[10px] tabular-nums text-muted">
                   {value.length}/{MAX_CHARS}
@@ -147,7 +148,7 @@ export default function ChatInput({
                 aria-label={busy ? 'Antwort abbrechen' : 'Senden'}
                 title={busy ? 'Antwort abbrechen' : 'Senden (Enter) · Zeilenumbruch mit Shift+Enter'}
                 className={cn(
-                  'ml-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                  'ml-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg pointer-fine:h-8 pointer-fine:w-8',
                   'text-white transition-colors',
                   'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
                   'disabled:pointer-events-none disabled:opacity-40',

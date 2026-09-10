@@ -8,6 +8,7 @@ const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElem
         ref={ref}
         className={cn(
           'rounded-lg border border-edge bg-surface px-2 py-1.5 text-sm text-ink',
+          'min-h-11 pointer-fine:min-h-0',
           'focus:border-primary-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30',
           className,
         )}

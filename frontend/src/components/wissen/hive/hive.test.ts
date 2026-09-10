@@ -17,6 +17,7 @@ import {
   sectorOfKind,
   sources,
   timeline,
+  type HexPlacement,
 } from './hive'
 
 function node(
@@ -298,6 +299,40 @@ describe('hexPath', () => {
   })
 })
 
+/**
+ * Überschneiden sich zwei gleich ausgerichtete Sechsecke?
+ *
+ * Exakt statt über den Umkreis geschätzt: Zwei zentralsymmetrische Körper
+ * überlappen genau dann, wenn ihr Mittelpunktsabstand *innerhalb* des auf das
+ * Doppelte vergrößerten Körpers liegt. Ein flaches Sechseck ist der Schnitt
+ * dreier Streifen mit Normalen bei 30°, 90° und 150°; die Halbbreite ist seine
+ * Apothem-Länge. Auf dem Rand heißt „stößt an" — im Wabengitter der Normalfall
+ * und ausdrücklich erlaubt.
+ */
+function overlaps(a: HexPlacement, b: HexPlacement): boolean {
+  const dx = a.cx - b.cx
+  const dy = a.cy - b.cy
+  const halfWidth = (Math.sqrt(3) / 2) * (2 * a.r)
+  const EPS = 1e-6
+  for (const deg of [30, 90, 150]) {
+    const rad = (Math.PI / 180) * deg
+    const proj = Math.abs(dx * Math.cos(rad) + dy * Math.sin(rad))
+    if (proj >= halfWidth - EPS) return false // ein trennender Streifen genügt
+  }
+  return true
+}
+
+function expectNoOverlap(tiles: HexPlacement[]): void {
+  for (let i = 0; i < tiles.length; i += 1) {
+    for (let j = i + 1; j < tiles.length; j += 1) {
+      expect(
+        overlaps(tiles[i], tiles[j]),
+        `Wabe ${i} und ${j} überschneiden sich`,
+      ).toBe(false)
+    }
+  }
+}
+
 describe('hiveLayout', () => {
   it('legt je Sektor eine Wabe auf den Ring, oben beginnend', () => {
     const layout = hiveLayout(7)
@@ -307,18 +342,8 @@ describe('hiveLayout', () => {
   })
 
   it('lässt keine zwei Waben überlappen — bei jeder Sektorzahl', () => {
-    // Zwei gleich ausgerichtete Sechsecke berühren sich frühestens bei `2·R`
-    // (Umkreis); darunter kann es je nach Richtung schneiden. Der Test prüft
-    // alle Paare, nicht nur die Nachbarn: bei kleiner Sektorzahl liegen sich
-    // auch übernächste nah.
     for (const count of [3, 4, 5, 6, 7, 8, 9, 12]) {
-      const { tiles } = hiveLayout(count)
-      for (let i = 0; i < tiles.length; i += 1) {
-        for (let j = i + 1; j < tiles.length; j += 1) {
-          const d = Math.hypot(tiles[i].cx - tiles[j].cx, tiles[i].cy - tiles[j].cy)
-          expect(d).toBeGreaterThanOrEqual(2 * tiles[i].r)
-        }
-      }
+      expectNoOverlap(hiveLayout(count).tiles)
     }
   })
 
@@ -369,5 +394,40 @@ describe('mainGroups', () => {
   it('lässt die Systemebene außen vor', () => {
     const hive = buildHive(fixture(), { includeSystem: true })
     expect(mainGroups('service', hive)).toEqual({ groups: [], rest: 0 })
+  })
+})
+
+describe('hiveLayout hochkant', () => {
+  // Auf dem Telefon ist der Ring die falsche Form: sieben Waben nebeneinander
+  // brauchen Breite, das Geraet hat Hoehe. Gemessen kam die Beschriftung mit
+  // unter sieben Bildpunkten an.
+  it('stapelt die Waben in zwei Spalten', () => {
+    const { tiles } = hiveLayout(7, { portrait: true })
+    expect(tiles).toHaveLength(7)
+    const spalten = new Set(tiles.map((t) => Math.round(t.cx)))
+    expect(spalten.size).toBe(2)
+  })
+
+  it('überlappt auch hochkant nicht', () => {
+    for (const count of [3, 5, 6, 7, 8, 9]) {
+      expectNoOverlap(hiveLayout(count, { portrait: true }).tiles)
+    }
+  })
+
+  it('haelt den Kern von den Waben frei', () => {
+    const layout = hiveLayout(7, { portrait: true })
+    const kern: HexPlacement = { cx: 0, cy: 0, r: layout.center.r, angle: 0 }
+    for (const tile of layout.tiles) expect(overlaps(kern, tile)).toBe(false)
+  })
+
+  it('liefert ein hochformatiges Sichtfeld', () => {
+    const [, , w, h] = hiveLayout(7, { portrait: true }).viewBox.split(' ').map(Number)
+    expect(h).toBeGreaterThan(w)
+  })
+
+  it('ist deutlich schmaler als der Ring', () => {
+    const quer = hiveLayout(7).viewBox.split(' ').map(Number)[2]
+    const hoch = hiveLayout(7, { portrait: true }).viewBox.split(' ').map(Number)[2]
+    expect(hoch).toBeLessThan(quer * 0.75)
   })
 })

@@ -14,9 +14,16 @@ const VARIANTS: Record<Variant, string> = {
   danger: 'bg-rose-600 text-white hover:bg-rose-700',
 }
 
+/**
+ * Grundmass ist die Fingerkuppe (44 px), ab `md` die kompakte Desktop-Groesse.
+ *
+ * Gemessen auf einem 390-px-Schirm waren die `sm`-Knoepfe 28 px hoch — unter
+ * dem, was sich zuverlaessig treffen laesst. Hier statt auf jeder Seite: den
+ * Baustein trifft es einmal, die Seiten erben es.
+ */
 const SIZES: Record<Size, string> = {
-  sm: 'px-2.5 py-1.5 text-xs gap-1.5',
-  md: 'px-3.5 py-2 text-sm gap-2',
+  sm: 'min-h-11 px-3 text-xs gap-1.5 pointer-fine:min-h-0 pointer-fine:px-2.5 pointer-fine:py-1.5',
+  md: 'min-h-11 px-4 text-sm gap-2 pointer-fine:min-h-0 pointer-fine:px-3.5 pointer-fine:py-2',
 }
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

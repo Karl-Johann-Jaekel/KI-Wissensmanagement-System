@@ -120,20 +120,25 @@ export default function SearchPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-4 text-xs text-muted">
-          <label className="flex items-center gap-1.5">
+          <label className="flex min-h-11 items-center gap-1.5 pointer-fine:min-h-0">
             Treffer:
             <Select
               value={topK}
               onChange={(e) => setTopK(Number(e.target.value))}
-              className="px-1.5 py-0.5 text-xs"
+              className="min-h-11 px-2 text-xs pointer-fine:min-h-0 pointer-fine:px-1.5 pointer-fine:py-0.5"
             >
               <option value={5}>5</option>
               <option value={10}>10</option>
               <option value={20}>20</option>
             </Select>
           </label>
-          <label className="flex items-center gap-1.5">
-            <input type="checkbox" checked={rerank} onChange={(e) => setRerank(e.target.checked)} />
+          <label className="flex min-h-11 cursor-pointer items-center gap-2 pointer-fine:min-h-0 pointer-fine:gap-1.5">
+            <input
+              type="checkbox"
+              checked={rerank}
+              onChange={(e) => setRerank(e.target.checked)}
+              className="h-5 w-5 accent-primary-600 pointer-fine:h-4 pointer-fine:w-4"
+            />
             Reranker
           </label>
         </div>

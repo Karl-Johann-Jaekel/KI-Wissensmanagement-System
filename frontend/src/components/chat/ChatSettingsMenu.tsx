@@ -21,6 +21,7 @@ export default function ChatSettingsMenu({
       label="Chat-Einstellungen"
       align="right"
       trigger={<SlidersHorizontal className="h-4 w-4" />}
+      className="inline-flex h-11 w-11 items-center justify-center rounded-lg pointer-fine:h-auto pointer-fine:w-auto"
       panelClassName="w-64 p-3"
     >
       {() => (
@@ -33,7 +34,7 @@ export default function ChatSettingsMenu({
             <Select
               value={topK}
               onChange={(e) => onTopKChange(Number(e.target.value))}
-              className="px-1.5 py-0.5 text-xs"
+              className="min-h-11 px-2 text-xs pointer-fine:min-h-0 pointer-fine:px-1.5 pointer-fine:py-0.5"
             >
               {[3, 5, 8, 10, 15].map((n) => (
                 <option key={n} value={n}>

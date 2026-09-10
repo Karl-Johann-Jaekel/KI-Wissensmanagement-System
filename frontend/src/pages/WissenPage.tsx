@@ -56,7 +56,7 @@ export default function WissenPage() {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                'border-b-2 px-3 pb-2.5 pt-1 font-medium transition-colors',
+                'inline-flex min-h-11 items-center border-b-2 px-3 pb-2.5 pt-1 font-medium transition-colors pointer-fine:min-h-0',
                 tab === t.id
                   ? 'border-primary-600 text-primary-700 dark:text-primary-300'
                   : 'border-transparent text-muted hover:text-ink',

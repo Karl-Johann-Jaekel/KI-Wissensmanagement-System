@@ -56,6 +56,9 @@ export default function DocumentTable({ docs, emptyHint }: DocumentTableProps) {
               }}
               className={cn(
                 'cursor-pointer border-b border-edge/60 hover:bg-sunken',
+                // Auf einem Tablet ist die Tabelle die sichtbare Variante und
+                // wird trotzdem mit dem Finger bedient — die Zeile lag bei 43 px.
+                '[&>td]:py-3.5 pointer-fine:[&>td]:py-2.5',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500/40',
               )}
             >
@@ -78,10 +81,14 @@ export default function DocumentTable({ docs, emptyHint }: DocumentTableProps) {
           <li key={d.id}>
             <button
               onClick={() => open(d.id)}
-              className="w-full rounded-xl border border-edge bg-surface px-3 py-2.5 text-left hover:bg-sunken"
+              className="w-full rounded-xl border border-edge bg-surface px-3.5 py-3 text-left hover:bg-sunken"
             >
-              <div className="truncate text-sm font-medium text-ink">{d.title}</div>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
+              {/* Zwei Zeilen statt Abschneiden: Papertitel sind lang, und die
+                  ersten vier Woerter unterscheiden sie oft nicht. */}
+              <div className="line-clamp-2 text-sm font-medium leading-snug text-ink">
+                {d.title}
+              </div>
+              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted">
                 <Badge tone={d.source_type === 'markdown' ? 'violet' : 'neutral'}>
                   {d.source_type}
                 </Badge>

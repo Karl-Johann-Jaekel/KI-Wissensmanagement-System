@@ -21,6 +21,14 @@ export interface Viewport {
   height: number
   /** Von einer Überlagerung belegte Bildpunkte am rechten Rand. */
   insetRight?: number
+  /**
+   * Dasselbe am unteren Rand.
+   *
+   * Auf dem Handy liegt das Bedienmenü nicht rechts, sondern als Blatt unten.
+   * Ohne dieses Maß rutschte der untere Teil des Graphen darunter — derselbe
+   * Fehler wie seinerzeit rechts, nur um 90 Grad gedreht.
+   */
+  insetBottom?: number
   /** Luft zwischen Inhalt und Kante; deckt auch den Knotenradius ab. */
   padding?: number
 }
@@ -64,6 +72,7 @@ export function boundsOf(nodes: readonly { x?: number; y?: number }[]): Bounds |
 export function fitTransform(bounds: Bounds, viewport: Viewport): CameraTransform {
   const pad = viewport.padding ?? 40
   const inset = Math.max(0, viewport.insetRight ?? 0)
+  const insetY = Math.max(0, viewport.insetBottom ?? 0)
 
   // Ein einzelner Knoten hat die Ausdehnung null — ohne Untergrenze teilte die
   // Rechnung durch null und der Zoom liefe gegen unendlich.
@@ -71,16 +80,17 @@ export function fitTransform(bounds: Bounds, viewport: Viewport): CameraTransfor
   const h = Math.max(1, bounds.maxY - bounds.minY)
 
   const availW = Math.max(60, viewport.width - inset - pad * 2)
-  const availH = Math.max(60, viewport.height - pad * 2)
+  const availH = Math.max(60, viewport.height - insetY - pad * 2)
   const k = Math.min(K_MAX, Math.max(K_MIN, Math.min(availW / w, availH / h)))
 
   // Der freie Bereich endet `inset` Bildpunkte vor der rechten Kante, seine
   // Mitte liegt also um inset/2 links der Flächenmitte. Die Kamera zeigt immer
   // auf die Flächenmitte — sie muss deshalb um denselben Betrag nach rechts,
-  // umgerechnet in Weltkoordinaten.
+  // umgerechnet in Weltkoordinaten. Für das Blatt am unteren Rand gilt
+  // dasselbe eine Achse weiter: freier Teil oben, Kamera nach unten.
   return {
     k,
     x: (bounds.minX + bounds.maxX) / 2 + inset / 2 / k,
-    y: (bounds.minY + bounds.maxY) / 2,
+    y: (bounds.minY + bounds.maxY) / 2 + insetY / 2 / k,
   }
 }

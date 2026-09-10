@@ -15,7 +15,7 @@ export default function SkillPicker({ onInsert }: SkillPickerProps) {
     <Popover
       label="Skill einfügen (Prompt-Vorlage)"
       trigger={<Slash className="h-4 w-4" />}
-      className="rounded-lg border border-edge px-1.5"
+      className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-edge pointer-fine:h-auto pointer-fine:w-auto pointer-fine:px-1.5"
     >
       {(close) => (
         <>

@@ -23,7 +23,7 @@ export default function Badge({ tone = 'neutral', className, ...rest }: BadgePro
   return (
     <span
       className={cn(
-        'inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide',
+        'inline-block rounded-full border px-2 py-0.5 text-xs uppercase tracking-wide pointer-fine:text-[10px]',
         TONES[tone],
         className,
       )}
