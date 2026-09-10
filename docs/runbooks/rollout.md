@@ -211,6 +211,21 @@ curl -s -o /dev/null -w "ingest %{http_code}\n" -X POST \
 
 Erwartet: `/graph` deutlich schneller, `ingest 404`.
 
+### Seit dem Audit-Rollout zusaetzlich
+
+```bash
+# Die Startseite nennt diese Zahlen in ihrem ersten Satz.
+curl -s https://<domain>/api/stats
+
+# Muessen als Datei kommen (text/plain), nicht als index.html der SPA.
+curl -sI https://<domain>/robots.txt | grep -i content-type
+curl -sI https://<domain>/llms.txt   | grep -i content-type
+```
+
+Erwartet: `/stats` mit vier Zahlen, beide Dateien `text/plain`. Kommt dort
+`text/html`, liegt die Datei nicht im Image — dann wurde `caddy` nicht neu
+gebaut, sondern nur neu gestartet (siehe Schritt 6).
+
 ---
 
 ## Zurückrollen

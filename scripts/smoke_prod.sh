@@ -35,6 +35,20 @@ if [ "$NODES" -gt 0 ]; then ok=0; else ok=1; fi
 check "/graph" $ok "($NODES Knoten)"
 
 
+# 2b. /stats nennt dieselbe Groesse, die /graph ausliefert.
+#
+# Die Startseite schreibt diese Zahlen woertlich in ihren ersten Satz. Faellt der
+# Endpunkt aus, steht dort kuenftig nichts — faellt er *daneben*, steht dort etwas
+# Falsches, und das faellt niemandem auf. Deshalb hier die Invariante statt eines
+# blossen 200: der Bestand ist nie kleiner als der gelieferte Ausschnitt.
+#
+# Das python3 bleibt einzeilig wie oben bei /graph: unter Windows schiebt der
+# pyenv-Shim sonst etwas in das Skript und es endet im SyntaxError.
+TRIPLE=$(curl -fsS --max-time 15 "$BASE_URL/stats" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["documents"], d["chunks"], d["nodes"])' 2>/dev/null || echo "0 0 0")
+read -r S_DOCS S_CHUNKS S_NODES <<< "$TRIPLE"
+if [ "$S_DOCS" -gt 0 ] && [ "$S_CHUNKS" -gt 0 ] && [ "$S_NODES" -ge "$NODES" ]; then ok=0; else ok=1; fi
+check "/stats" $ok "($S_DOCS Dokumente / $S_CHUNKS Chunks / $S_NODES Knoten)"
+
 # 3. Ein public-Chat streamt bis [DONE]
 if curl -fsS --max-time 120 -X POST "$BASE_URL/chat" \
   -H 'Content-Type: application/json' \
