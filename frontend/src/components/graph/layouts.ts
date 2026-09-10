@@ -127,7 +127,34 @@ export interface GlobePoint {
   lon: number
   /** Abstand vom Mittelpunkt inkl. Streuung. */
   r: number
+  /**
+   * Nicht auf der Kugelschale, sondern im Inneren.
+   *
+   * `core` steht fest in der Mitte, `orbit` läuft als geneigter Ring darum.
+   * Beides bleibt innerhalb der Kugel: Der Kern ist der Mittelpunkt, an dem die
+   * Dienste hängen — das gehört ins Zentrum, nicht an die Außenhaut zwischen
+   * die Papers.
+   */
+  inner?: 'core' | 'orbit'
 }
+
+/**
+ * Radius des Dienste-Rings, als Anteil des Kugelradius.
+ *
+ * Weit genug, dass die Namen der Dienste nicht auf dem Kern liegen; eng genug,
+ * dass der Ring deutlich innerhalb der Schale bleibt und nicht mit den Papers
+ * verwechselt wird.
+ */
+const ORBIT_SHARE = 0.36
+
+/**
+ * Neigung des Dienste-Rings.
+ *
+ * Ohne Neigung läge er flach auf der Äquatorebene und erschiene als waagerechte
+ * Linie durch die Mitte. Geneigt liest er sich als Ring in perspektivischer
+ * Verkürzung — und die Vorder-/Rückseite bleibt über `depth` unterscheidbar.
+ */
+const ORBIT_TILT = Math.PI / 3
 
 /**
  * Die drehungsunabhängige Hälfte des Globus.
@@ -137,10 +164,35 @@ export interface GlobePoint {
  * zu rechnen statt in jedem Bild ist der ganze Trick hinter `globeFrame`.
  */
 export function globeBasis(nodes: SceneNode[], opts: LayoutOptions): GlobePoint[] {
-  const groups = byGroup(nodes)
   const radius = BASE * (0.55 + opts.clusterGap / 40)
-  const widths = globeSectors([...groups.values()].map((list) => list.length))
   const points: GlobePoint[] = []
+
+  // Kern und Dienste liegen im Inneren, nicht auf der Schale — sie belegen
+  // deshalb auch keinen Längengrad-Sektor der Wissensarten.
+  const shell: SceneNode[] = []
+  const services: SceneNode[] = []
+  for (const node of nodes) {
+    if (node.kind === 'system') {
+      points.push({ id: node.id, lat: 0, lon: 0, r: 0, inner: 'core' })
+    } else if (node.kind === 'service') {
+      services.push(node)
+    } else {
+      shell.push(node)
+    }
+  }
+  services.forEach((node, i) => {
+    points.push({
+      id: node.id,
+      lat: 0,
+      // Gleichmäßig auf dem Ring verteilt; `globeFrame` dreht ihn mit.
+      lon: (Math.PI * 2 * i) / Math.max(services.length, 1),
+      r: radius * ORBIT_SHARE,
+      inner: 'orbit',
+    })
+  })
+
+  const groups = byGroup(shell)
+  const widths = globeSectors([...groups.values()].map((list) => list.length))
 
   let lonStart = 0
   let index = 0
@@ -176,11 +228,28 @@ export function globeFrame(
 ): Map<string, Target> {
   for (const p of basis) {
     const lon = p.lon + rotation
-    const cosLat = Math.cos(p.lat)
     const existing = out.get(p.id)
-    const x = p.r * cosLat * Math.sin(lon)
-    const y = -p.r * Math.sin(p.lat)
-    const depth = (cosLat * Math.cos(lon) + 1) / 2
+    let x: number
+    let y: number
+    let depth: number
+    if (p.inner === 'core') {
+      // Mittelpunkt der Kugel, immer vorn: Er wird von den Diensten umringt und
+      // darf nicht hinter ihnen verschwinden.
+      x = 0
+      y = 0
+      depth = 1
+    } else if (p.inner === 'orbit') {
+      // Ring in einer geneigten Ebene: waagerecht voll ausgedehnt, senkrecht um
+      // den Kosinus der Neigung gestaucht. Die dritte Achse trägt die Tiefe.
+      x = p.r * Math.cos(lon)
+      y = p.r * Math.sin(lon) * Math.cos(ORBIT_TILT)
+      depth = (Math.sin(lon) * Math.sin(ORBIT_TILT) + 1) / 2
+    } else {
+      const cosLat = Math.cos(p.lat)
+      x = p.r * cosLat * Math.sin(lon)
+      y = -p.r * Math.sin(p.lat)
+      depth = (cosLat * Math.cos(lon) + 1) / 2
+    }
     if (existing) {
       existing.x = x
       existing.y = y
@@ -387,11 +456,19 @@ export function tierLabelPositions(
     // der Canvas an ihrer Fußlinie. Der Name steht am echten linken Rand der
     // Reihe, nicht an einer festen Koordinate — sonst überlappt er bei breitem
     // Spaltenblock die Knoten oder schwebt bei schmalem im Nichts.
+    //
+    // Die Zahl ist der Punkt, an dem der Name *endet*: Der Canvas setzt ihn
+    // rechtsbündig. Linksbündig lief er über den ersten Knoten der Reihe —
+    // „DIENSTE" lag auf arXiv, „FUNDAMENT" auf dem Kern —, weil drei Zellen
+    // Abstand kürzer sind als das Wort.
+    //
+    // Sechs Zellen Abstand, nicht zwei: Der Name des ersten Knotens steht
+    // mittig unter ihm und ragt damit über den Reihenanfang hinaus nach links.
     const geo = layerGeometry(opts)
-    const left = -Math.max(layerSpan(opts) * 0.8, BASE) / 2 - geo.cell * 3
+    const rowLeft = -Math.max(layerSpan(opts) * 0.8, BASE) / 2
     return LAYER_ROWS.map((tier, index) => ({
       tier,
-      x: left,
+      x: rowLeft - geo.cell * 6,
       y: geo.baseline + geo.rowOffset + index * geo.rowStep,
     }))
   }

@@ -245,3 +245,75 @@ describe('columnWidth', () => {
     expect(widths).toEqual([...widths].sort((a, b) => a - b))
   })
 })
+
+describe('Globus: Kern in der Mitte, Dienste als Ring darum', () => {
+  // Vorher lagen Kern und Dienste auf der Kugelschale zwischen den Papers. Der
+  // Kern ist aber der Punkt, an dem die Dienste haengen — das gehoert nach innen.
+  const basis = globeBasis(NODES, OPTS)
+  const frame = (rotation: number) => globeFrame(basis, rotation)
+
+  it('setzt den Kern in den Mittelpunkt', () => {
+    const t = frame(0).get('kern')!
+    expect(t.x).toBe(0)
+    expect(t.y).toBe(0)
+  })
+
+  it('haelt den Kern dort, egal wie weit die Kugel gedreht ist', () => {
+    for (const rotation of [0, 0.7, Math.PI, 4.2]) {
+      const t = frame(rotation).get('kern')!
+      expect(radius(t)).toBe(0)
+    }
+  })
+
+  it('laesst den Kern nie hinter den Diensten verschwinden', () => {
+    expect(frame(1.3).get('kern')!.depth).toBe(1)
+  })
+
+  it('legt die Dienste auf einen Ring um den Kern', () => {
+    const t = frame(0)
+    const abstaende = ['svc1', 'svc2'].map((id) => radius(t.get(id)!))
+    // Gleich weit vom Kern entfernt, aber nicht auf ihm.
+    expect(abstaende[0]).toBeGreaterThan(0)
+    for (const d of abstaende) expect(d).toBeCloseTo(abstaende[0], 6)
+  })
+
+  it('haelt den Ring innerhalb der Kugel', () => {
+    const t = frame(0)
+    const schale = ['c1', 'c2', 'p1', 'p2'].map((id) => radius(t.get(id)!))
+    const innen = Math.max(...['svc1', 'svc2'].map((id) => radius(t.get(id)!)))
+    expect(innen).toBeLessThan(Math.min(...schale))
+  })
+
+  it('dreht den Ring mit der Kugel', () => {
+    const a = frame(0).get('svc1')!
+    const b = frame(1.2).get('svc1')!
+    expect(a.x).not.toBeCloseTo(b.x, 3)
+  })
+
+  it('unterscheidet Vorder- und Rueckseite des Rings', () => {
+    // Ueber eine ganze Umdrehung muss ein Dienst vorn und hinten gewesen sein.
+    const tiefen = [0, 1, 2, 3, 4, 5, 6].map((r) => frame(r).get('svc1')!.depth)
+    expect(Math.max(...tiefen)).toBeGreaterThan(0.8)
+    expect(Math.min(...tiefen)).toBeLessThan(0.2)
+  })
+
+  it('nimmt Kern und Dienste aus den Sektoren der Wissensarten', () => {
+    // Sonst schoben sie die Papers auf der Schale zur Seite.
+    const t = frame(0)
+    for (const id of ['c1', 'c2', 'p1', 'p2']) expect(radius(t.get(id)!)).toBeGreaterThan(0)
+  })
+})
+
+describe('Ebenen: Reihenname stoesst nicht in die Reihe', () => {
+  // „DIENSTE" lag auf arXiv, „FUNDAMENT" auf dem Kern: Der Name wurde
+  // linksbuendig knapp vor der Reihe gesetzt und lief darueber.
+  it('endet links vor dem ersten Knoten der Reihe', () => {
+    const ziele = layoutTargets('layers', NODES, OPTS)
+    for (const pos of tierLabelPositions('layers', OPTS)) {
+      const reihe = NODES.filter((n) => n.tier === pos.tier)
+      if (reihe.length === 0) continue
+      const linkester = Math.min(...reihe.map((n) => ziele.get(n.id)!.x))
+      expect(pos.x).toBeLessThan(linkester)
+    }
+  })
+})

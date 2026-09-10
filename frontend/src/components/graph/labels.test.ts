@@ -102,3 +102,43 @@ describe('globeLabelAnchors', () => {
     expect(anchors.get('g')!.depth).toBeCloseTo(0.9, 5)
   })
 })
+
+describe('globeLabelAnchors: Mitte freihalten', () => {
+  // Seit Kern und Dienste-Ring im Zentrum stehen, darf dort kein Cluster-Name
+  // mehr landen — sonst liegt er auf den Diensten.
+  const node = (group: string, x: number, y: number, depth = 1): DepthNode => ({
+    group,
+    x,
+    y,
+    depth,
+  })
+
+  it('schiebt einen Namen aus der Mitte nach außen', () => {
+    const a = globeLabelAnchors([node('g', 10, 0)], undefined, 100).get('g')!
+    expect(Math.hypot(a.x, a.y)).toBeCloseTo(100, 6)
+  })
+
+  it('behält dabei die Richtung', () => {
+    const a = globeLabelAnchors([node('g', 3, 4)], undefined, 100).get('g')!
+    // 3:4 bleibt 3:4, nur länger.
+    expect(a.x / a.y).toBeCloseTo(3 / 4, 6)
+    expect(a.x).toBeGreaterThan(0)
+  })
+
+  it('weicht nach oben aus, wenn der Schwerpunkt genau im Zentrum liegt', () => {
+    const a = globeLabelAnchors([node('g', 0, 0)], undefined, 100).get('g')!
+    expect(a.x).toBe(0)
+    expect(a.y).toBe(-100)
+  })
+
+  it('lässt weit außen liegende Namen unangetastet', () => {
+    const a = globeLabelAnchors([node('g', 300, 0)], undefined, 100).get('g')!
+    expect(a.x).toBeCloseTo(300, 6)
+  })
+
+  it('ohne Mindestabstand bleibt alles wie zuvor', () => {
+    const a = globeLabelAnchors([node('g', 5, 5)]).get('g')!
+    expect(a.x).toBeCloseTo(5, 6)
+    expect(a.y).toBeCloseTo(5, 6)
+  })
+})

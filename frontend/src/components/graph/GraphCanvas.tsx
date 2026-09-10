@@ -122,6 +122,15 @@ function withAlpha(hex: string, alpha: number): string {
  */
 const TOUCH_RADIUS_PX = 12
 
+/**
+ * Aufschlag auf den Radius des Kerns.
+ *
+ * Er ist der einzige Knoten seiner Art, also liegt sein `val` immer auf dem
+ * Median — über die Vernetzung wächst er nie. Damit er als Mittelpunkt des
+ * Globus trägt, kommt die Größe hier dazu.
+ */
+const CORE_BONUS = 8
+
 const REL_MIN = 0.3
 const REL_MAX = 9
 
@@ -143,7 +152,7 @@ export function nodeRadius(node: SceneNode, nodeSize: number): number {
   const rel = Math.min(REL_MAX, Math.max(REL_MIN, node.val / ref))
   const base = 2 + Math.sqrt(rel) * 2.2
   const hub = node.members ? 3.5 : 0
-  const core = node.kind === 'system' ? 4 : 0
+  const core = node.kind === 'system' ? CORE_BONUS : 0
   return (base + hub + core) * nodeSize * (0.55 + 0.45 * (node.depth ?? 1))
 }
 
@@ -259,7 +268,17 @@ export default function GraphCanvas({
     const timer = setTimeout(() => {
       const fg = fgRef.current
       if (!fg) return
-      const bounds = boundsOf(scene.nodes)
+      // Gegen die *Ziel*positionen einpassen, nicht gegen die gerade
+      // animierten. Die Knoten gleiten mit `EASE` auf ihre Plätze; nach festen
+      // 400 ms waren sie mal da und mal nicht, und im zweiten Fall rechnete die
+      // Kamera gegen eine viel zu weite Wolke — der Globus erschien dann als
+      // Punkt in der Mitte. In der Wolke gibt es keine Ziele, dort entscheidet
+      // die Simulation und die aktuellen Positionen sind das Beste, was da ist.
+      const targets = targetsRef.current
+      const bounds =
+        settings.layout !== 'cloud' && targets.size > 0
+          ? boundsOf([...targets.values()])
+          : boundsOf(scene.nodes)
       if (!bounds) return
       const { k, x, y } = fitTransform(bounds, { width, height, insetRight, insetBottom })
       fg.centerAt(x, y, 700)
@@ -505,7 +524,8 @@ export default function GraphCanvas({
 
       // Ring/Ebenen tragen zusätzlich die Namen der Systemschichten.
       if (settings.layout === 'ring' || settings.layout === 'layers') {
-        ctx.textAlign = settings.layout === 'layers' ? 'left' : 'center'
+        // Rechtsbündig: der Name endet vor der Reihe, statt in sie hineinzulaufen.
+        ctx.textAlign = settings.layout === 'layers' ? 'right' : 'center'
         for (const pos of tierLabelPositions(settings.layout, layoutOpts)) {
           // In den Ebenen färbt die Reihe ihren Namen — wie ihre Knoten.
           ctx.fillStyle =
@@ -535,7 +555,13 @@ export default function GraphCanvas({
       // Auf der Kugel reicht jede Gruppe von Pol zu Pol — „über dem obersten
       // Knoten" traf dort für alle denselben Punkt, und acht Namen lagen
       // aufeinander. Der Name folgt deshalb dem Teil, der gerade vorn steht.
-      const anchors = settings.layout === 'globe' ? globeLabelAnchors(scene.nodes) : null
+      // Mindestabstand vom Zentrum: Dort stehen jetzt Kern und Dienste-Ring.
+      // Der Radius kommt aus der Kugel selbst, nicht aus einer geratenen Zahl.
+      const shellRadius = globe ? Math.max(...globe.map((p) => p.r)) : 0
+      const anchors =
+        settings.layout === 'globe'
+          ? globeLabelAnchors(scene.nodes, GLOBE_FRONT_MIN, shellRadius * 0.55)
+          : null
 
       type Placed = LabelBox & { color: string; text: string; alpha: number }
       const boxes: Placed[] = []
@@ -583,7 +609,7 @@ export default function GraphCanvas({
       }
       ctx.restore()
     },
-    [scene, settings.hubLabels, settings.layout, layoutOpts, styles],
+    [scene, settings.hubLabels, settings.layout, layoutOpts, styles, globe],
   )
 
   const linkVisibility = useCallback(

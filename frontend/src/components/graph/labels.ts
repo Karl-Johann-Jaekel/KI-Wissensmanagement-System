@@ -87,6 +87,7 @@ export const GLOBE_FRONT_MIN = 0.62
 export function globeLabelAnchors(
   nodes: readonly DepthNode[],
   minDepth = GLOBE_FRONT_MIN,
+  minRadius = 0,
 ): Map<string, Anchor> {
   const sums = new Map<string, { x: number; y: number; w: number; d: number; n: number }>()
   for (const node of nodes) {
@@ -107,7 +108,19 @@ export function globeLabelAnchors(
   const out = new Map<string, Anchor>()
   for (const [group, acc] of sums) {
     if (acc.w <= 0) continue
-    out.set(group, { x: acc.x / acc.w, y: acc.y / acc.w, depth: acc.d / acc.n })
+    let x = acc.x / acc.w
+    let y = acc.y / acc.w
+    // In der Mitte der Kugel steht der Kern mit seinem Dienste-Ring. Ein
+    // Schwerpunkt, der dort landet, wird nach außen geschoben — sonst liegt der
+    // Name des Clusters auf den Diensten.
+    const dist = Math.hypot(x, y)
+    if (minRadius > 0 && dist < minRadius) {
+      // Ohne Richtung (Schwerpunkt genau im Zentrum) nach oben ausweichen.
+      const factor = dist > 1e-6 ? minRadius / dist : 0
+      x = factor ? x * factor : 0
+      y = factor ? y * factor : -minRadius
+    }
+    out.set(group, { x, y, depth: acc.d / acc.n })
   }
   return out
 }

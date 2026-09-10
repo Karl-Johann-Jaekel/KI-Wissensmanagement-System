@@ -87,6 +87,9 @@ export const SERVICES: { id: string; name: string; note: string }[] = [
 ]
 
 export const SYSTEM_ID = 'sys:kern'
+
+/** Anzeigename des Kerns. Steht einmal hier, weil ihn zwei Ansichten zeichnen. */
+export const CORE_NAME = 'AI-Core'
 const EPOCH = new Date(0).toISOString()
 
 export interface SceneNode {
@@ -467,7 +470,7 @@ export function buildScene(data: GraphData, opts: BuildOptions): Scene {
   const core: SceneNode = {
     id: SYSTEM_ID,
     kind: 'system',
-    name: 'KWMS-Kern',
+    name: CORE_NAME,
     status: 'verified',
     first_seen: EPOCH,
     val: 12,

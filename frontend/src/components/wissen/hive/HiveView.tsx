@@ -19,6 +19,7 @@ import { useElementSize } from '../../../useElementSize'
 import { cn } from '../../../lib/cn'
 import { GRAPH_SOURCES, type GraphData, type GraphSource } from '../../../types'
 import { relationLabel } from '../../graph/relations'
+import { CORE_NAME } from '../../graph/scene'
 import Select from '../../ui/Select'
 import Spinner from '../../ui/Spinner'
 import { Bars } from './Charts'
@@ -475,7 +476,7 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
                     fill="rgb(var(--c-muted))"
                     className="text-[10px] uppercase tracking-[0.16em]"
                   >
-                    {focusLabel ?? 'KWMS-Kern'}
+                    {focusLabel ?? CORE_NAME}
                   </text>
                 </g>
 
