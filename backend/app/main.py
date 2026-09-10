@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app import __version__
-from app.api import chat, documents, graph, health, review, search
+from app.api import chat, documents, graph, health, review, search, stats
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.db.session import SessionLocal
@@ -63,6 +63,7 @@ app.include_router(search.router)
 app.include_router(chat.router)
 app.include_router(documents.router)
 app.include_router(review.router)
+app.include_router(stats.router)
 
 
 @app.exception_handler(EmbeddingError)
