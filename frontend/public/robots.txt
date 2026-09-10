@@ -1,0 +1,10 @@
+# Ohne diese Datei beantwortete Caddy /robots.txt mit der index.html der App
+# (try_files … /index.html) — ein Crawler bekam HTTP 200 und HTML, wo er eine
+# Regeldatei erwartet.
+
+User-agent: *
+Allow: /
+
+# Kein Crawling der API: JSON-Endpunkte gehören nicht in einen Suchindex, und
+# jeder Abruf zählt gegen das Rate-Limit.
+Disallow: /api/

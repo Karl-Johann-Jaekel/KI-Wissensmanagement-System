@@ -1,0 +1,38 @@
+# KI-Wissensmanagement-System
+
+> Frage-Antwort-System über KI-Forschungsliteratur von arXiv. Antworten entstehen
+> ausschließlich aus abgerufenen Textstellen des eigenen Korpus und nennen Paper und
+> Abschnitt. Dazu ein Wissens-Graph aus Papers, Konzepten, Modellen, Datensätzen,
+> Aufgaben und Code-Repositories.
+
+Die Oberfläche ist eine Einzelseiten-Anwendung; alle Pfade liefern dieselbe
+`index.html` und werden im Browser aufgelöst. Wer Daten will, nimmt besser die
+HTTP-API — sie antwortet in JSON, ohne Rendering.
+
+## Ansichten
+
+- [Übersicht](/inbox): Erklärung des Systems, Bestandszahlen, neue Knoten der letzten 7 Tage
+- [Wissensbasis](/wissen): Wabenansicht, Graph-Explorer und Dokumentliste
+- [Suche](/suche): hybride Suche; die Anfrage steht als `?q=` in der Adresse
+- [Chat](/chat): Fragen in ganzen Sätzen, Antwort mit Quellenbelegen
+- [Skills](/skills): vorbereitete Prompt-Vorlagen
+- [Projekte](/projekte): Chats nach Vorhaben gruppiert (lokal im Browser gespeichert)
+
+## API
+
+Basis ist `/api`; die Beschreibung liegt maschinenlesbar bereit.
+
+- [OpenAPI](/api/openapi.json): vollständiges Schema aller Endpunkte
+- [Bestandszahlen](/api/stats): Dokumente, Textabschnitte, Graph-Knoten und -Kanten
+- [Dokumente](/api/documents): Korpusliste mit Titel, Quelle und Abschnittszahl
+- [Graph](/api/graph): Knoten und Kanten der öffentlichen Sicht, auf 2.000 Knoten gekappt
+- [Neues](/api/graph/changelog?days=7): zuletzt hinzugekommene Knoten
+- [Suche](/api/search): `POST` mit `{"query": "...", "top_k": 5}`
+- [Chat](/api/chat): `POST`, antwortet als Server-Sent-Events-Strom
+
+## Grenzen
+
+- Nur Lesen. Upload, Bearbeiten und Löschen sind in dieser Instanz abgeschaltet.
+- Die Endpunkte sind ratenbegrenzt; bei `429` nennt `Retry-After` die Wartezeit.
+- Der Korpus deckt KI-Forschung auf arXiv ab. Außerhalb davon antwortet der Chat,
+  dass er nichts gefunden hat, statt zu raten.
