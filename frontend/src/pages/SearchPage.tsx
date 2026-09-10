@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronDown, ChevronUp, MessageSquarePlus, Search as SearchIcon } from 'lucide-react'
 import { postSearch, type SearchHitRow } from '../api'
 import Button from '../components/ui/Button'
@@ -76,28 +76,63 @@ function ResultCard({ hit }: { hit: SearchHitRow }) {
   )
 }
 
+/** Serverseitige Obergrenze (`SearchRequest.query`). Darüber gab es HTTP 422. */
+const MAX_QUERY = 2000
+
 export default function SearchPage() {
-  const [query, setQuery] = useState('')
+  // Die Anfrage steht in der URL: eine Suche war bisher nicht teilbar und nach
+  // einem Reload weg. Sie ist außerdem das Ziel, an das der „Neu"-Feed der
+  // Einstiegsseite verweist.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const urlQuery = searchParams.get('q') ?? ''
+  const [query, setQuery] = useState(urlQuery)
   const [topK, setTopK] = useState(5)
   const [rerank, setRerank] = useState(false)
   const [hits, setHits] = useState<SearchHitRow[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const busyRef = useRef(false)
 
-  const search = async () => {
+  const run = useCallback(
+    async (raw: string, options: { topK: number; rerank: boolean }) => {
+      const q = raw.trim().slice(0, MAX_QUERY)
+      if (!q || busyRef.current) return
+      busyRef.current = true
+      setBusy(true)
+      setError('')
+      try {
+        const result = await postSearch(q, { topK: options.topK, rerank: options.rerank || null })
+        setHits(result)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+        setHits(null)
+      } finally {
+        busyRef.current = false
+        setBusy(false)
+      }
+    },
+    [],
+  )
+
+  // Aufruf mit `?q=` — einmal je Anfrage, nicht bei jedem Tastendruck.
+  useEffect(() => {
+    if (!urlQuery) return
+    setQuery(urlQuery)
+    void run(urlQuery, { topK, rerank })
+    // topK/rerank bewusst nicht als Dependency: ihre Änderung soll erst die
+    // nächste ausgelöste Suche betreffen, nicht sofort eine neue starten.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlQuery, run])
+
+  const search = () => {
     const q = query.trim()
-    if (!q || busy) return
-    setBusy(true)
-    setError('')
-    try {
-      const result = await postSearch(q, { topK, rerank: rerank || null })
-      setHits(result)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-      setHits(null)
-    } finally {
-      setBusy(false)
+    if (!q) return
+    if (q === urlQuery) {
+      void run(q, { topK, rerank })
+      return
     }
+    // Der URL-Wechsel stößt den Effekt oben an, der sucht.
+    setSearchParams({ q }, { replace: true })
   }
 
   return (
@@ -112,6 +147,8 @@ export default function SearchPage() {
             onKeyDown={(e) => e.key === 'Enter' && search()}
             placeholder="Hybrid-Suche im Neuralen Gedächtnis … (DE/EN)"
             className="text-base sm:text-sm"
+            maxLength={MAX_QUERY}
+            aria-label="Suchbegriff"
             autoFocus
           />
           <Button onClick={search} loading={busy} icon={SearchIcon} aria-label="Suchen">
@@ -143,7 +180,18 @@ export default function SearchPage() {
           </label>
         </div>
 
-        {error && <p className="text-sm text-rose-500">{error}</p>}
+        {error && (
+          <p className="text-sm text-rose-500" role="alert">
+            {error}
+          </p>
+        )}
+
+        {/* Die Suche läuft gemessen mehrere Sekunden; ohne Ansage passiert für
+            einen Screenreader-Nutzer in dieser Zeit nichts und danach ebenso.
+            Sichtbar, weil auch sehende Nutzer nicht abzählen sollten. */}
+        <p aria-live="polite" className="text-xs text-muted">
+          {busy ? 'Suche läuft …' : hits === null ? '' : `${hits.length} Treffer`}
+        </p>
 
         {hits === null && !error && (
           <EmptyState
