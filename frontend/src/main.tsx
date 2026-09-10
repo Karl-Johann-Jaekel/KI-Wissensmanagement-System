@@ -6,6 +6,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import { ToastProvider } from './components/ui/Toast'
 import { applyTheme } from './lib/theme'
 import InboxPage from './pages/InboxPage'
+import NotFoundPage from './pages/NotFoundPage'
 import SearchPage from './pages/SearchPage'
 import SkillsPage from './pages/SkillsPage'
 import './index.css'
@@ -44,7 +45,7 @@ const router = createBrowserRouter([
       { path: '/skills', element: <SkillsPage /> },
       { path: '/projekte', element: <ProjektePage /> },
       { path: '/projekte/:projectId', element: <ProjektDetailPage /> },
-      { path: '*', element: <Navigate to="/chat" replace /> },
+      { path: '*', element: <NotFoundPage /> },
     ],
   },
 ])
