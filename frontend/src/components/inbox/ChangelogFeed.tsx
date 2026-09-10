@@ -36,10 +36,10 @@ export default function ChangelogFeed({ days = 7 }: { days?: number }) {
           </span>
         </li>
       ))}
-      <li className="pt-2 text-right">
+      <li className="flex justify-end pt-2">
         <Link
           to="/wissen?tab=graph"
-          className="text-xs text-primary-600 hover:underline dark:text-primary-400"
+          className="inline-flex min-h-11 items-center text-xs text-primary-600 hover:underline dark:text-primary-400 pointer-fine:min-h-0"
         >
           Im Graph ansehen →
         </Link>
