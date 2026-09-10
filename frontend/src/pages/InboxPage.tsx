@@ -6,8 +6,10 @@
  * nur mitteilt, dass hier nichts zu sehen ist. Stattdessen erklärt sie jetzt,
  * was die Anwendung tut und wie die Teile zusammenhängen.
  */
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { BookOpen, MessageSquare, Search, ShieldCheck, Sparkles, Workflow } from 'lucide-react'
+import { fetchStats, type CorpusStats } from '../api'
 import ChangelogFeed from '../components/inbox/ChangelogFeed'
 import Card from '../components/ui/Card'
 
@@ -41,7 +43,10 @@ const GRUNDSAETZE = [
   {
     icon: Workflow,
     titel: 'Fakten müssen sich bewähren',
-    text: 'Aus den Papers extrahierte Aussagen gelten zunächst als offen. In den Graphen wandern sie erst, wenn zwei unabhängige Quellen sie stützen.',
+    // Die Zahl der geforderten Quellen ist eine Einstellung (PROMOTE_MIN_SOURCES)
+    // und stand hier als „zwei" — gemessen läuft die Instanz auf einer. Der Satz
+    // nennt jetzt die Regel statt eines Wertes, den er nicht kennt.
+    text: 'Aus den Papers extrahierte Aussagen gelten zunächst als offen. In den Graphen wandern sie erst, wenn Belegzahl und Konfidenz die eingestellte Schwelle erreichen — regelbasiert, mit Herkunft an jedem Fakt.',
   },
   {
     icon: Sparkles,
@@ -50,18 +55,58 @@ const GRUNDSAETZE = [
   },
 ]
 
+/** Zahl im Fließtext — hervorgehoben, aber im Satz stehend. */
+function Zahl({ children }: { children: React.ReactNode }) {
+  return <strong className="font-medium text-ink">{children}</strong>
+}
+
+/**
+ * Bestandssatz aus den gemessenen Zahlen.
+ *
+ * Solange sie unterwegs sind, steht der Satz ohne sie da — eine Zahl, die
+ * gleich durch eine andere ersetzt wird, ist schlimmer als keine. Fällt der
+ * Abruf aus, bleibt es dabei; der Rest der Seite stimmt weiterhin.
+ */
+function Bestand({ stats }: { stats: CorpusStats | null }) {
+  if (!stats) {
+    return (
+      <>Ein Frage-Antwort-System über KI-Forschungsliteratur, das jede Aussage mit ihrer Quelle
+      belegt.</>
+    )
+  }
+  const n = (value: number) => value.toLocaleString('de-DE')
+  return (
+    <>
+      Ein Frage-Antwort-System über KI-Forschungsliteratur, das jede Aussage mit ihrer Quelle
+      belegt. Im Bestand liegen <Zahl>{n(stats.documents)} Papers</Zahl> als{' '}
+      <Zahl>{n(stats.chunks)} Textabschnitte</Zahl>, daraus ein Graph aus{' '}
+      <Zahl>{n(stats.nodes)} Knoten</Zahl>.
+    </>
+  )
+}
+
 export default function InboxPage() {
+  const [stats, setStats] = useState<CorpusStats | null>(null)
+
+  useEffect(() => {
+    let aktuell = true
+    // Ohne Zahlen ist die Seite unvollständig, nicht kaputt: ein Fehlschlag
+    // bleibt still, statt eine rote Zeile über die Erklärung zu legen.
+    fetchStats()
+      .then((s) => aktuell && setStats(s))
+      .catch(() => {})
+    return () => {
+      aktuell = false
+    }
+  }, [])
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto flex max-w-4xl flex-col gap-4 p-4 lg:p-6">
         <header>
           <h1 className="text-lg font-semibold">Wie das hier funktioniert</h1>
           <p className="mt-1 text-sm leading-relaxed text-muted">
-            Ein Frage-Antwort-System über KI-Forschungsliteratur, das jede Aussage mit ihrer
-            Quelle belegt. Im Bestand liegen{' '}
-            <strong className="font-medium text-ink">56 Papers</strong> als{' '}
-            <strong className="font-medium text-ink">6.950 Textabschnitte</strong>, daraus ein
-            Graph aus <strong className="font-medium text-ink">13.271 Knoten</strong>.
+            <Bestand stats={stats} />
           </p>
         </header>
 

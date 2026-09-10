@@ -6,8 +6,11 @@ Vollständiger Plan in [PLAN.md](PLAN.md) — vor jeder Aufgabe lesen, aktuelle 
 dort abhaken. GitHub-Portfolio-Track wurde entfernt (ADR-0004).
 
 **Stand:** Phasen 0–11 fertig bis auf 11.6. **Live unter
-https://wissen.jaekel.dev** (56 Papers/6.950 Chunks; Hit@5 0,94; Graph mit 13.271
-Knoten aus eigenem Korpus + Papers-with-Code, Serverkappung 2.000 je Antwort).
+https://wissen.jaekel.dev** (gemessen 10.09.2026: 69 Papers/8.300 Chunks; Hit@5
+0,94; Graph aus eigenem Korpus + Papers-with-Code, Serverkappung 2.000 je
+Antwort). Der Update-Loop schiebt diese Zahlen weiter — aktueller Stand immer
+über `GET /stats`, nie fest verdrahtet (die Startseite tat das und lag um ein
+Fünftel daneben).
 UI: Sidebar-App mit Chat-Verläufen, Suche, Wissen, Skills, Projekte,
 Wabenansicht als Einstieg in `/wissen` (ADR-0025) und Graph-Explorer mit 4 Layouts
 (ADR-0016); dunkel, mobile-friendly.

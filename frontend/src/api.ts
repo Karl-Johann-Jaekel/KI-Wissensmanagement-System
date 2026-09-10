@@ -232,3 +232,26 @@ export async function fetchChangelog(days = 7): Promise<ChangelogItem[]> {
   return (await res.json()).items as ChangelogItem[]
 }
 
+
+// ------------------------------------------------------------------ stats
+
+export interface CorpusStats {
+  documents: number
+  chunks: number
+  nodes: number
+  edges: number
+  /** Obergrenze der Knoten in *einer* `/graph`-Antwort. */
+  node_limit: number
+}
+
+/**
+ * Bestandsgrößen für die Einstiegsseite.
+ *
+ * Die Zahlen standen dort wörtlich im Quelltext und lagen gemessen um ein
+ * Fünftel daneben, weil der Update-Loop den Bestand weiterschiebt.
+ */
+export async function fetchStats(): Promise<CorpusStats> {
+  const res = await fetch(`${BASE}/stats`)
+  if (!res.ok) throw apiError(res, 'Die Bestandszahlen')
+  return (await res.json()) as CorpusStats
+}
