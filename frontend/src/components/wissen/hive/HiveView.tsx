@@ -195,7 +195,7 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
 
   return (
     <div className="relative flex h-full min-h-0">
-      <aside className="hidden w-56 shrink-0 lg:block">
+      <aside aria-label="Ansicht und Filter" className="hidden w-56 shrink-0 lg:block">
         <HiveSidebar
           mode={mode}
           onMode={setMode}
@@ -595,7 +595,10 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
             >
               <span className="h-px w-4 bg-muted" />
               {relationLabel(r.relation)}
-              <span className="tabular-nums opacity-70">{r.count.toLocaleString('de-DE')}</span>
+              {/* Ohne `opacity-70`: 70 % von `muted` auf dem Canvas sind 4,26:1 und
+                  fallen bei 11 px unter WCAG AA (axe). Die Zahl erbt jetzt den
+                  Ton der Zeile — 7,87:1, gleiche Anmutung. */}
+              <span className="tabular-nums">{r.count.toLocaleString('de-DE')}</span>
             </span>
           ))}
           <span className="ml-auto hidden md:inline">

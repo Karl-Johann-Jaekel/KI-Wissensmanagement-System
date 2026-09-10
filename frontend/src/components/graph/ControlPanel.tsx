@@ -89,7 +89,7 @@ function Chip({
         'inline-flex min-h-11 items-center rounded-md px-3 text-xs font-medium transition-colors',
         'pointer-fine:min-h-0 pointer-fine:px-2 pointer-fine:py-1 pointer-fine:text-[11px]',
         active
-          ? 'bg-primary-600 text-white dark:bg-primary-500 dark:text-primary-950'
+          ? 'bg-primary-600 text-white dark:bg-primary-500 dark:text-canvas'
           : 'border border-edge bg-surface text-muted hover:text-ink',
       )}
     >

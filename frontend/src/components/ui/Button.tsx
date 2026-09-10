@@ -6,9 +6,17 @@ import Spinner from './Spinner'
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
 type Size = 'sm' | 'md'
 
+/**
+ * `dark:text-canvas` statt `dark:text-primary-950`: Letzteres ist ein sehr
+ * dunkles Blau (#172554) und kam auf `primary-500` (#3b82f6) auf 3,99:1 —
+ * unter den 4,5:1, die WCAG AA für Fließtextgrößen verlangt. axe meldete das
+ * auf jeder Seite, weil es der Hauptknopf der Anwendung ist. Der Canvas-Ton
+ * (#020617) auf demselben Grund ergibt 5,48:1, im Hover-Zustand
+ * (`primary-400`) 7,93:1 — und bleibt farblich dieselbe Idee.
+ */
 const VARIANTS: Record<Variant, string> = {
   primary:
-    'bg-primary-600 text-white hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-400 dark:text-primary-950',
+    'bg-primary-600 text-white hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-400 dark:text-canvas',
   secondary: 'border border-edge bg-surface text-ink hover:bg-sunken',
   ghost: 'text-muted hover:bg-sunken hover:text-ink',
   danger: 'bg-rose-600 text-white hover:bg-rose-700',

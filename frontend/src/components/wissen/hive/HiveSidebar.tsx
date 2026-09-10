@@ -40,9 +40,11 @@ const DEGREE_STEPS = [
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
-      <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
+      {/* h2, nicht h3: über der Spalte steht die H1 der Seite und sonst nichts —
+          eine übersprungene Ebene meldet axe als `heading-order`. */}
+      <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
         {title}
-      </h3>
+      </h2>
       {children}
     </section>
   )

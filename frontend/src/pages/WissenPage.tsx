@@ -43,7 +43,11 @@ export default function WissenPage() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-4 border-b border-edge bg-surface px-4 pt-3">
-        <h1 className="hidden pb-3 text-base font-semibold lg:block">Wissen</h1>
+        {/* Auf schmalen Schirmen trug die Seite gar keine H1 — axe meldete
+            `page-has-heading-one`, und ein Screenreader-Nutzer landete auf einer
+            Seite ohne Namen. `sr-only` statt `hidden`: vorgelesen wird sie
+            immer, gezeichnet erst ab `lg` wie zuvor. */}
+        <h1 className="sr-only pb-3 text-base font-semibold lg:not-sr-only lg:block">Wissen</h1>
         <nav className="flex gap-1 text-sm" aria-label="Wissen-Bereiche">
           {(
             [
