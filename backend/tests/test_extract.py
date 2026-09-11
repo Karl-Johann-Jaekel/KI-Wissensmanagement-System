@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import httpx
 import pytest
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from app.corpus import extract
 from app.corpus.aliases import normalize_entity
 from app.corpus.extract import (
     ExtractedFacts,
@@ -151,3 +153,60 @@ def test_edges_are_not_attached_to_rejected_nodes(db_session: Session) -> None:
         ).scalar_one()
         == "rejected"
     )
+
+
+# --------------------------------------------------- 429 ist kein kaputtes Paper
+
+
+def _http_error(status: int, retry_after: str | None = None) -> httpx.HTTPStatusError:
+    headers = {"Retry-After": retry_after} if retry_after else {}
+    response = httpx.Response(status, headers=headers, request=httpx.Request("POST", "https://x"))
+    return httpx.HTTPStatusError("abgewiesen", request=response.request, response=response)
+
+
+ANTWORT = '{"concepts": [], "models": [], "datasets": [], "relations": []}'
+
+
+def test_transient_provider_error_is_retried(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Am 07.09.2026 verlor der Lauf ein Paper an einen 429 — beide Kontingente leer.
+
+    Das Paper blieb offen (richtig), aber der Lauf endete mit Exit 1 und liess den
+    FAILURE-Marker liegen, der das Monitoring tagelang auf "down" hielt.
+    """
+    monkeypatch.setattr(extract.time, "sleep", lambda _s: None)
+    versuche: list[int] = []
+
+    def chat(_messages: list[dict]) -> str:
+        versuche.append(1)
+        if len(versuche) == 1:
+            raise _http_error(429, "3")
+        return ANTWORT
+
+    facts, _spent = extract._extract_with_retry(chat, [{"role": "user", "content": "x"}], "Paper")
+
+    assert len(versuche) == 2
+    assert facts.concepts == []
+
+
+def test_permanent_provider_error_is_not_retried(monkeypatch: pytest.MonkeyPatch) -> None:
+    """401 kommt beim zweiten Anlauf genauso — nachfassen waere nur Wartezeit."""
+    monkeypatch.setattr(extract.time, "sleep", lambda _s: None)
+    versuche: list[int] = []
+
+    def chat(_messages: list[dict]) -> str:
+        versuche.append(1)
+        raise _http_error(401)
+
+    with pytest.raises(httpx.HTTPStatusError):
+        extract._extract_with_retry(chat, [{"role": "user", "content": "x"}], "Paper")
+
+    assert len(versuche) == 1
+
+
+def test_retry_after_is_capped() -> None:
+    """Eine vom Anbieter genannte Viertelstunde wuerde den Cron-Lauf blockieren."""
+    assert extract._retry_after(_http_error(429, "900")) == extract._MAX_BACKOFF_SECONDS
+    assert extract._retry_after(_http_error(429, "3")) == 3.0
+    # Ohne verwertbare Angabe eine kurze, feste Pause.
+    assert extract._retry_after(_http_error(429)) == 5.0
+    assert extract._retry_after(_http_error(429, "sofort")) == 5.0

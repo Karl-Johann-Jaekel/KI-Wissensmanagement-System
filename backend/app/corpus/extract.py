@@ -14,9 +14,11 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session, attributes
 
@@ -326,6 +328,25 @@ _RETRY_HINT = {
 }
 
 
+#: Obergrenze der Wartezeit nach einem 429. Der Lauf haengt woechentlich im Cron;
+#: eine halbe Minute Pause ist billiger als ein verlorenes Paper, aber eine vom
+#: Anbieter genannte Viertelstunde wuerde den Lauf blockieren.
+_MAX_BACKOFF_SECONDS = 30.0
+
+#: Statuscodes, die voruebergehend sind: Kontingent voll bzw. Dienst gerade weg.
+_TRANSIENT_STATUS = frozenset({429, 500, 502, 503, 504})
+
+
+def _retry_after(exc: httpx.HTTPStatusError) -> float:
+    """Wartezeit aus ``Retry-After``, gedeckelt; ohne Angabe eine kurze Pause."""
+    raw = exc.response.headers.get("Retry-After", "")
+    try:
+        wanted = float(raw)
+    except ValueError:
+        wanted = 5.0
+    return max(1.0, min(wanted, _MAX_BACKOFF_SECONDS))
+
+
 def _extract_with_retry(chat: Chat, messages: list[dict], title: str) -> tuple[ExtractedFacts, int]:
     """Einmal nachfassen, bevor ein Paper als gescheitert gilt.
 
@@ -335,7 +356,29 @@ def _extract_with_retry(chat: Chat, messages: list[dict], title: str) -> tuple[E
     sie ebenso.
     """
     spent = _tokens_of(messages)
-    answer = chat(messages)
+    try:
+        answer = chat(messages)
+    except httpx.HTTPStatusError as exc:
+        # Ein volles Minutenkontingent ist kein kaputtes Paper.
+        #
+        # Gemessen am 07.09.2026: der Lauf verlor ein Paper an einen 429, nachdem
+        # schon der Rueckfall-Anbieter abgewiesen hatte — beide Kontingente am
+        # Ende eines Stapels leer. Das Paper blieb offen (richtig), aber der Lauf
+        # endete mit Exit 1 und liess den FAILURE-Marker liegen, der das
+        # Uptime-Monitoring tagelang auf "down" hielt. Einmal abwarten und
+        # nachfassen kostet Sekunden und spart eine Woche falschen Alarms.
+        if exc.response.status_code not in _TRANSIENT_STATUS:
+            raise
+        pause = _retry_after(exc)
+        log.info(
+            "Anbieter abgewiesen (%s) fuer %r — %.0fs warten, dann noch einmal",
+            exc.response.status_code,
+            title[:80],
+            pause,
+        )
+        time.sleep(pause)
+        spent += _tokens_of(messages)
+        answer = chat(messages)
     spent += estimate_tokens(answer)
     try:
         return parse_extraction(answer), spent
