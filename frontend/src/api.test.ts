@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { apiError, graphQuery, handleSseEvent, streamChat, type StreamHandlers } from './api'
+import {
+  apiError,
+  fetchStats,
+  graphQuery,
+  handleSseEvent,
+  streamChat,
+  type StreamHandlers,
+} from './api'
 
 function makeHandlers(): StreamHandlers & {
   tokens: string[]
@@ -169,5 +176,38 @@ describe('apiError', () => {
   it('trennt Serverfehler von Anfragefehlern', () => {
     expect(apiError(res(503), 'Die Suche').message).toContain('antwortet gerade nicht')
     expect(apiError(res(400), 'Die Suche').message).toContain('konnte nicht geladen werden')
+  })
+})
+
+describe('Zeitgrenze der lesenden Aufrufe', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('macht aus einem Zeitablauf einen lesbaren Satz', async () => {
+    // So meldet der Browser eine abgelaufene AbortSignal.timeout-Frist.
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new DOMException('signal timed out', 'TimeoutError')
+    }))
+
+    await expect(fetchStats()).rejects.toThrow(/laenger als 25 Sekunden/)
+  })
+
+  it('gibt jedem lesenden Aufruf ein Abbruchsignal mit', async () => {
+    const spy = vi.fn(
+      async (_url: string, _init?: RequestInit) => new Response('{}', { status: 200 }),
+    )
+    vi.stubGlobal('fetch', spy)
+
+    await fetchStats()
+
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(spy.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('laesst andere Netzfehler unveraendert durch', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new TypeError('Failed to fetch')
+    }))
+
+    await expect(fetchStats()).rejects.toThrow('Failed to fetch')
   })
 })

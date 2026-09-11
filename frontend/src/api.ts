@@ -25,6 +25,35 @@ export function apiError(res: Response, was: string): Error {
   return new Error(`${was} konnte nicht geladen werden (HTTP ${res.status}).`)
 }
 
+/**
+ * Geduld der lesenden Aufrufe.
+ *
+ * Ohne Grenze wartet `fetch` unbegrenzt: bleibt die Verbindung haengen, dreht
+ * sich der Spinner bis der Besucher aufgibt, und die Seite sagt nie, dass etwas
+ * schiefging. Gemessen braucht die langsamste Antwort (`/graph`, 2 MB) rund eine
+ * Sekunde und die Suche sechs — 25 Sekunden sind reichlich Abstand und trotzdem
+ * ein Ende.
+ *
+ * Der Chat-Strom faellt bewusst nicht darunter: er laeuft legitim minutenlang
+ * und bringt seinen eigenen `AbortSignal` vom Aufrufer mit.
+ */
+const TIMEOUT_MS = 25_000
+
+/** `fetch` mit Zeitgrenze; ein Zeitablauf wird zum lesbaren Satz statt zum DOMException. */
+async function fetchWithTimeout(url: string, init: RequestInit = {}): Promise<Response> {
+  try {
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) })
+  } catch (err) {
+    if (err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+      throw new Error(
+        `Die Anfrage hat laenger als ${TIMEOUT_MS / 1000} Sekunden gebraucht. ` +
+          'Bitte noch einmal versuchen.',
+      )
+    }
+    throw err
+  }
+}
+
 /** Query string für `GET /graph` — `source: 'all'` bleibt weg, das ist der Default. */
 export function graphQuery(includePending: boolean, source: GraphSource = 'all'): string {
   const params = new URLSearchParams({ include_pending: String(includePending) })
@@ -37,7 +66,7 @@ export async function fetchGraph(
   includePending = false,
   source: GraphSource = 'all',
 ): Promise<GraphData> {
-  const res = await fetch(`${BASE}/graph?${graphQuery(includePending, source)}`)
+  const res = await fetchWithTimeout(`${BASE}/graph?${graphQuery(includePending, source)}`)
   if (!res.ok) throw apiError(res, 'Der Wissens-Graph')
   return (await res.json()) as GraphData
 }
@@ -164,7 +193,7 @@ export interface DocumentRow {
 }
 
 export async function fetchDocuments(): Promise<DocumentRow[]> {
-  const res = await fetch(`${BASE}/documents`)
+  const res = await fetchWithTimeout(`${BASE}/documents`)
   if (!res.ok) throw apiError(res, 'Die Dokumentliste')
   return (await res.json()) as DocumentRow[]
 }
@@ -184,7 +213,7 @@ export interface DocumentDetail {
 }
 
 export async function fetchDocument(id: string): Promise<DocumentDetail> {
-  const res = await fetch(`${BASE}/documents/${id}`)
+  const res = await fetchWithTimeout(`${BASE}/documents/${id}`)
   if (!res.ok) throw apiError(res, 'Das Dokument')
   return (await res.json()) as DocumentDetail
 }
@@ -204,7 +233,7 @@ export async function postSearch(
   query: string,
   options: { topK?: number; rerank?: boolean | null } = {},
 ): Promise<SearchHitRow[]> {
-  const res = await fetch(`${BASE}/search`, {
+  const res = await fetchWithTimeout(`${BASE}/search`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -227,7 +256,7 @@ export interface ChangelogItem {
 }
 
 export async function fetchChangelog(days = 7): Promise<ChangelogItem[]> {
-  const res = await fetch(`${BASE}/graph/changelog?days=${days}`)
+  const res = await fetchWithTimeout(`${BASE}/graph/changelog?days=${days}`)
   if (!res.ok) throw apiError(res, 'Die Neuigkeiten')
   return (await res.json()).items as ChangelogItem[]
 }
@@ -251,7 +280,7 @@ export interface CorpusStats {
  * Fünftel daneben, weil der Update-Loop den Bestand weiterschiebt.
  */
 export async function fetchStats(): Promise<CorpusStats> {
-  const res = await fetch(`${BASE}/stats`)
+  const res = await fetchWithTimeout(`${BASE}/stats`)
   if (!res.ok) throw apiError(res, 'Die Bestandszahlen')
   return (await res.json()) as CorpusStats
 }
