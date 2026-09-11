@@ -277,3 +277,34 @@ def test_edge_confidence_can_rise(db_session: Session) -> None:
     db_session.commit()
     weight = db_session.execute(text("SELECT weight FROM graph_edges")).scalar_one()
     assert weight == 0.8
+
+
+def test_graph_reports_its_true_size(db_session: Session, client: TestClient) -> None:
+    """Die Antwort nennt den Bestand, nicht nur den ausgelieferten Ausschnitt.
+
+    Ohne diese Zahlen konnte die Wabenansicht nur sagen, was sie bekommen hat:
+    sie schrieb "2.000 Knoten" fuer denselben Graphen, fuer den die Startseite
+    13.051 nannte.
+    """
+    _reset_graph(db_session)
+    _seed_knowledge(db_session)
+
+    with _bind(db_session):
+        body = client.get("/graph").json()
+
+    # Ungekappt: Gesamtgroesse und Auslieferung sind dasselbe.
+    assert body["total_nodes"] == len(body["nodes"]) == 2
+    assert body["total_links"] == len(body["links"]) == 1
+
+
+def test_graph_totals_survive_the_cap(db_session: Session, client: TestClient) -> None:
+    """Gekappt zaehlt ``total_nodes`` weiter den Bestand, nicht die Auswahl."""
+    _reset_graph(db_session)
+    _seed_knowledge(db_session)
+
+    with _bind(db_session):
+        body = client.get("/graph?limit=1").json()
+
+    assert len(body["nodes"]) == 1
+    assert body["total_nodes"] == 2
+    assert body["node_limit"] == 1

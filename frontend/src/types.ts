@@ -38,6 +38,15 @@ export interface GraphLink {
 export interface GraphData {
   nodes: GraphNode[]
   links: GraphLink[]
+  /**
+   * Groesse des Bestands, bevor der Server auf `node_limit` kappt.
+   *
+   * Optional, weil Testdaten und aeltere Antworten sie nicht tragen — wer sie
+   * nutzt, prueft auf `undefined` statt eine Null anzuzeigen.
+   */
+  total_nodes?: number
+  total_links?: number
+  node_limit?: number
 }
 
 /** Goldton für vielzitierte Primärquellen — bewusst außerhalb der Typ-Palette. */

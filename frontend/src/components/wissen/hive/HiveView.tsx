@@ -50,13 +50,17 @@ interface Props {
   onOpenGraph: () => void
 }
 
-function StatCard({ icon: Icon, value, label }: {
+function StatCard({ icon: Icon, value, label, title }: {
   icon: typeof Hexagon
   value: string
   label: string
+  title?: string
 }) {
   return (
-    <div className="flex shrink-0 items-center gap-2.5 rounded-xl border border-edge bg-surface px-3 py-2 md:px-3.5 md:py-2.5">
+    <div
+      title={title}
+      className="flex shrink-0 items-center gap-2.5 rounded-xl border border-edge bg-surface px-3 py-2 md:px-3.5 md:py-2.5"
+    >
       <Icon className="h-4 w-4 shrink-0 text-primary-400" />
       <div className="min-w-0">
         <div className="text-base font-semibold leading-none tabular-nums text-ink">{value}</div>
@@ -129,6 +133,15 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
     () => buildHive(applyFilter(data, filter), { documents: documents.length }),
     [data, filter, documents.length],
   )
+
+  // Zwei Verkleinerungen liegen zwischen Bestand und Bild: der Server kappt auf
+  // ein Kontingent je Art, danach filtert diese Ansicht. Die Kennzahl nennt
+  // deshalb ihren Bezug, statt eine Zahl ohne Nenner zu zeigen.
+  const gekappt = typeof data.total_nodes === 'number' && data.total_nodes > data.nodes.length
+  const KAPPUNG =
+    `Der Server liefert höchstens ${(data.node_limit ?? 0).toLocaleString('de-DE')} Knoten ` +
+    `(Kontingent je Art), damit die Simulation nicht einfriert. Die Filter dieser Ansicht ` +
+    `verkleinern die Auswahl zusätzlich.`
   // Hochkant, sobald die Fläche höher als breit ist: dort ist der Ring die
   // falsche Form, und die Beschriftung kam auf dem Telefon mit unter sieben
   // Bildpunkten an (`portraitLayout` in hive.ts).
@@ -217,15 +230,20 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
             zwei Reihen und damit den halben ersten Bildschirm ein, bevor von der
             Wabe etwas zu sehen war. */}
         <div className="flex items-center gap-2 overflow-x-auto border-b border-edge px-4 py-2.5 [scrollbar-width:none] md:flex-wrap md:overflow-visible md:py-3">
+          {/* "2.000 Knoten" stand hier ohne Bezug — fuer denselben Graphen nennt
+              die Startseite 13.051. Die Zahl ist der Ausschnitt, den der Server
+              liefert; das Etikett sagt jetzt, wovon. */}
           <StatCard
             icon={Hexagon}
             value={hive.stats.nodes.toLocaleString('de-DE')}
-            label="Knoten"
+            label={gekappt ? `von ${data.total_nodes!.toLocaleString('de-DE')} Knoten` : 'Knoten'}
+            title={gekappt ? KAPPUNG : undefined}
           />
           <StatCard
             icon={Link2}
             value={hive.stats.links.toLocaleString('de-DE')}
-            label="Kanten"
+            label={gekappt ? `von ${data.total_links!.toLocaleString('de-DE')} Kanten` : 'Kanten'}
+            title={gekappt ? KAPPUNG : undefined}
           />
           <StatCard
             icon={FileText}
@@ -601,9 +619,12 @@ export default function HiveView({ documents, onOpenGraph }: Props) {
               <span className="tabular-nums">{r.count.toLocaleString('de-DE')}</span>
             </span>
           ))}
-          <span className="ml-auto hidden md:inline">
-            Serverantwort auf 2.000 Knoten gekappt (Kontingent je Art)
-          </span>
+          {gekappt && (
+            <span className="ml-auto hidden md:inline">
+              Serverantwort auf {(data.node_limit ?? 0).toLocaleString('de-DE')} Knoten gekappt
+              (Kontingent je Art)
+            </span>
+          )}
         </div>
       </div>
 

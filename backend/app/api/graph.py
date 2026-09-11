@@ -88,7 +88,7 @@ def get_graph(
     ),
     limit: int = Query(default=DEFAULT_NODE_LIMIT, ge=1, le=20000),
     db: Session = Depends(get_db),
-) -> dict[str, list[dict]]:
+) -> dict[str, object]:
     if include_pending:
         # pending = ungeprüfte LLM-Extraktion — nur Admin (schließt bisherigen Leak).
         require_admin(request)
@@ -122,6 +122,15 @@ def get_graph(
         val[str(e.source)] += e.weight
         val[str(e.target)] += e.weight
 
+    # Vor dem Kappen festhalten, wie gross der Bestand wirklich ist.
+    #
+    # Ohne diese beiden Zahlen kann die Oberflaeche nur sagen, was sie bekommen
+    # hat: sie schrieb "2.000 Knoten" und meinte den Ausschnitt, waehrend die
+    # Startseite fuer denselben Graphen 13.051 nannte. Zwei Zahlen fuer dieselbe
+    # Sache, beide unkommentiert.
+    total_nodes = len(refs)
+    total_links = len(edges)
+
     if len(refs) > limit:
         refs = _cap_by_kind(refs, val, limit)
     kept_ids = {r.id for r in refs}
@@ -148,6 +157,11 @@ def get_graph(
         return int(count) if isinstance(count, int | float) else None
 
     return {
+        # Gesamtgroesse neben der Auswahl — die Oberflaeche schreibt daraus
+        # "2.000 von 13.051" statt einer Zahl ohne Bezug.
+        "total_nodes": total_nodes,
+        "total_links": total_links,
+        "node_limit": limit,
         "nodes": [
             {
                 "id": str(n.id),
