@@ -39,4 +39,18 @@ export default tseslint.config(
     files: ['src/main.tsx', 'src/components/ui/Toast.tsx', 'src/components/graph/GraphCanvas.tsx'],
     rules: { 'react-refresh/only-export-components': 'off' },
   },
+  {
+    // Das Accessibility-Gate laeuft in Node, nicht im Browser: `process`,
+    // `console` und Nodes eingebautes `fetch`/`WebSocket` sind dort normal.
+    files: ['a11y/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        fetch: 'readonly',
+        process: 'readonly',
+        setTimeout: 'readonly',
+        WebSocket: 'readonly',
+      },
+    },
+  },
 )

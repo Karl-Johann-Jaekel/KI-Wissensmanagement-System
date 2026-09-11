@@ -87,6 +87,19 @@ jobs:
       - name: Typecheck + build
         run: npm run build
 
+      # axe gegen den gebauten Stand in echtem Chrome. jsdom taugt dafuer nicht:
+      # die haeufigste Fundklasse war Kontrast, und den prueft axe nur, wo
+      # wirklich gezeichnet wird — sonst ueberspringt die Regel still. Zwoelf
+      # Verstoesse lagen so monatelang unbemerkt in Produktion.
+      - name: Accessibility-Gate (axe)
+        run: |
+          npm run preview -- --port 4173 &
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:4173/inbox > /dev/null && break
+            sleep 1
+          done
+          npm run test:a11y
+
   gitleaks:
     name: gitleaks secret scan
     runs-on: ubuntu-latest
