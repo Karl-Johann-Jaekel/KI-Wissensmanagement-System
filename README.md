@@ -3,8 +3,11 @@
 RAG-System über KI-Forschungsliteratur mit Zitationspflicht, dazu ein Wissens-Graph
 mit belegter Herkunft je Aussage und ein wiederkehrender Lauf, der beides aktuell hält.
 
-56 arXiv-Papers · 6.950 Chunks · 13.271 Graph-Knoten / 24.920 Kanten · 38.026 Belege
-· Hit-Rate@5 **0,94** · 309 Tests · 24 ADRs
+69 arXiv-Papers · 8.300 Chunks · 13.051 Graph-Knoten / 24.867 Kanten · 38.251 Belege
+· Hit-Rate@5 **0,88** · 508 Tests · 26 ADRs
+
+<sub>Zahlen gemessen am 11.09.2026 gegen die laufende Instanz; Knoten und Kanten
+sind die öffentliche Sicht (`GET /stats`). Der Update-Loop schiebt sie weiter.</sub>
 
 ```
 Frage ──▶ Hybrid-Retrieval ──▶ Kontext ──▶ LLM ──▶ Antwort mit Quellenangabe
@@ -20,8 +23,8 @@ Frage ──▶ Hybrid-Retrieval ──▶ Kontext ──▶ LLM ──▶ Antwo
 |  |  |
 |---|---|
 | **Umfang** | Solo-Projekt, 22.07.–18.08.2026 · 62 Commits · 213 Dateien · 12 Phasen nach [PLAN.md](PLAN.md) |
-| **Bestand** | 56 indexierte Papers (6.950 Chunks); Graph aus 13.271 Knoten — rund 370 aus eigener LLM-Extraktion, der Rest aus dem Papers-with-Code-Archiv |
-| **Retrieval** | Hit-Rate@5 0,94 (15 von 16 Golden-Fragen, deutsch und englisch), p95 221 ms |
+| **Bestand** | 69 indexierte Papers (8.300 Chunks); Graph aus 13.051 Knoten — rund 370 aus eigener LLM-Extraktion, der Rest aus dem Papers-with-Code-Archiv |
+| **Retrieval** | Hit-Rate@5 0,88 (14 von 16 Golden-Fragen, deutsch und englisch), p50 487 ms, p95 1,8 s. Gefallen von 0,94, seit der Korpus auf 69 Papers wuchs: die beiden Misses sind dieselbe Quelle (`2005.11401`) in beiden Sprachen — sie rankt auf Platz 6, verdrängt von neueren RAG-Papers |
 | **Stack** | FastAPI · Postgres 16 + pgvector · SQLAlchemy/Alembic · Docling · GROBID · Mistral EU-API · React 18 + TypeScript + Tailwind · Docker · GitHub Actions |
 | **Datenschutz** | EU-Verarbeitung; Konversationen liegen im Browser, nicht auf dem Server; keine Paper-PDFs im Repo; Autorentabelle ohne Kontaktfelder (per CHECK erzwungen) |
 | **Betrieb** | Live unter [wissen.jaekel.dev](https://wissen.jaekel.dev). Deploy-Gate und Restore erprobt; offen sind Uptime-Monitoring und ein Restore-Drill auf dem VPS. |
@@ -235,7 +238,7 @@ normalisierte Datensätze und Quellenzeilen; sie an `documents` zu hängen und d
 nachzuladen ist noch nicht verdrahtet.
 
 Jede Aussage trägt ihre Belege in `entities_extracted`. Mehrfach belegt sind bislang
-13 von 13.271 Knoten — nicht weil die Quellen sich selten decken, sondern weil sie
+15 von 13.386 Knoten — nicht weil die Quellen sich selten decken, sondern weil sie
 die Knotenart verschieden ableiten: „BERT" liegt als `concept` **und** als `model`
 im Graphen, und dedupliziert wird nur innerhalb einer Art (ADR-0020).
 
@@ -243,11 +246,14 @@ im Graphen, und dedupliziert wird nur innerhalb einer Art (ADR-0020).
 
 ## Qualitätssicherung
 
-- **309 Tests**: 216 im Backend (Retrieval, Extraktion, Promotion, Provenienz-Schema,
-  Harvester, GROBID-Parser, API, Deploy-Gate, Fehlerbehandlung, Indizes) und 93 im
+- **508 Tests**: 297 im Backend (Retrieval, Extraktion, Promotion, Provenienz-Schema,
+  Harvester, GROBID-Parser, API, Deploy-Gate, Fehlerbehandlung, Indizes) und 211 im
   Frontend (Speicherschicht, Graph-Layouts, Clusterbildung, SSE-Parsing, Abbruch,
-  URL-Prüfung). DB-Tests laufen in Transaktionen mit
+  URL-Prüfung, Dialog-Fokus, Zeitgrenzen). DB-Tests laufen in Transaktionen mit
   Rollback; LLM und HTTP sind gemockt, kein Test geht ins Netz.
+- **Accessibility-Gate**: axe-core läuft in CI gegen den gebauten Stand in echtem
+  Chrome, sechs Routen in zwei Viewports. jsdom taugt dafür nicht — Kontrast prüft
+  axe nur, wo wirklich gezeichnet wird.
 - **CI**: `ruff`, `mypy` und `gitleaks` in GitHub Actions, dazu ein Frontend-Job mit
   Typprüfung, Vitest und Produktionsbuild.
 - **Deploy-Gate** vor jedem Rollout: prüft unter anderem, ob die Embeddings im Index
@@ -352,7 +358,7 @@ mcp_server/      MCP-Werkzeuge für Claude Desktop
 eval/            Golden-Set, Hit-Rate-Messung, Parameter-Tuning
 scripts/         Korpus-Fetch · PwC-Dump · Reindex · Provenienz-Backfill ·
                  Deploy-Gate · Smoke-Test · Backup
-docs/            24 ADRs in adr/, Betriebsanleitungen in runbooks/
+docs/            26 ADRs in adr/, Betriebsanleitungen in runbooks/
 ```
 
 ## Lizenz
