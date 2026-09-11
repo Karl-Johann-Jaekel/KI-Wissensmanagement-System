@@ -4,7 +4,7 @@ RAG-System über KI-Forschungsliteratur mit Zitationspflicht, dazu ein Wissens-G
 mit belegter Herkunft je Aussage und ein wiederkehrender Lauf, der beides aktuell hält.
 
 69 arXiv-Papers · 8.300 Chunks · 13.051 Graph-Knoten / 24.867 Kanten · 38.251 Belege
-· Hit-Rate@5 **0,88** · 508 Tests · 26 ADRs
+· Hit-Rate@5 **0,88** · 511 Tests · 26 ADRs
 
 <sub>Zahlen gemessen am 11.09.2026 gegen die laufende Instanz; Knoten und Kanten
 sind die öffentliche Sicht (`GET /stats`). Der Update-Loop schiebt sie weiter.</sub>
@@ -246,7 +246,7 @@ im Graphen, und dedupliziert wird nur innerhalb einer Art (ADR-0020).
 
 ## Qualitätssicherung
 
-- **508 Tests**: 297 im Backend (Retrieval, Extraktion, Promotion, Provenienz-Schema,
+- **511 Tests**: 300 im Backend (Retrieval, Extraktion, Promotion, Provenienz-Schema,
   Harvester, GROBID-Parser, API, Deploy-Gate, Fehlerbehandlung, Indizes) und 211 im
   Frontend (Speicherschicht, Graph-Layouts, Clusterbildung, SSE-Parsing, Abbruch,
   URL-Prüfung, Dialog-Fokus, Zeitgrenzen). DB-Tests laufen in Transaktionen mit
